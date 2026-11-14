@@ -23,7 +23,8 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 | Criar/listar marcas com escopo de tenant | Implementado | Depende de PostgreSQL configurado para uso real. |
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
 | Equipe: membros, papéis, convites e auditoria | Implementado nesta entrega | Convites exigem SMTP e e-mail verificado; teste de integração cobre criação, reenvio, cancelamento, aceite e trilha auditável. |
-| Brand Kit, OAuth, conteúdo, revisão, aprovação, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
+| Brand Kit | Núcleo de versões implementado | Editor por marca, snapshots imutáveis, URLs de fonte, aprovação e histórico. Importação de assets, templates e checagem automática de fontes seguem pendentes. |
+| OAuth, conteúdo, revisão, aprovação de conteúdo, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
 
 ## Mapa de telas
 
@@ -78,10 +79,10 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 **Telas:** S04, S05, S06.
 
 1. Criar detalhes da marca com abas; manter arquivos e fatos separados por tenant/marca.
-2. Definir schema versionado do Brand Kit para identidade, tom, audiência, produtos, claims aprovados, restrições, CTAs e templates.
-3. Importar materiais com checksum, origem, tipo e estado de revisão; não marcar conteúdo importado como aprovado automaticamente.
-4. Permitir editar e publicar uma nova versão do Brand Kit; versões antigas continuam consultáveis.
-5. Adicionar autorização de leitura/edição e testes de tenant para importação, versão e download.
+2. ~~Definir schema versionado do Brand Kit para identidade, tom, audiência, produtos, claims aprovados, restrições e CTAs.~~ Concluído: snapshots imutáveis são vinculados ao tenant e à marca.
+3. Importar materiais com checksum, origem, tipo e estado de revisão; não marcar conteúdo importado como aprovado automaticamente. Pendente: armazenamento privado e importação de logos/templates.
+4. ~~Permitir salvar rascunhos, aprovar uma versão e consultar versões anteriores.~~ Concluído. Nova edição cria nova versão; aprovação antiga não pode ser reaplicada.
+5. ~~Adicionar autorização de leitura/edição e testes de tenant para versões.~~ Concluído. Acesso a arquivos e download ficam pendentes do fluxo de mídia.
 
 **Aceite da fase:** a marca mostra sua versão aprovada de identidade e conhecimento, com fonte rastreável; conteúdo externo ou importado não vira fato aprovado sem ação humana.
 

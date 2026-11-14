@@ -11,6 +11,7 @@ import { AUTH_LIMITS, BRAND_LIMITS, WORKSPACE_SECTION_IDS, type Locale } from "@
 import { Link } from "@/lib/i18n/routing";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { TeamManagement } from "@/components/workspace/team-management";
+import { BrandKitEditor } from "@/components/brand/brand-kit-editor";
 
 type AuthMode = "sign_in" | "sign_up";
 type BrandState = { organizationId: string | null; items: BrandListItem[]; pending: boolean; error: boolean };
@@ -39,6 +40,7 @@ export function WorkspaceEntry() {
   const [message, setMessage] = useState("");
   const [brands, setBrands] = useState<BrandState>(INITIAL_BRANDS);
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
+  const [activeBrandKitId, setActiveBrandKitId] = useState<string | null>(null);
   const [archivingBrandId, setArchivingBrandId] = useState<string | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
@@ -341,9 +343,11 @@ export function WorkspaceEntry() {
                 <span className="brandCollection__identity"><strong>{brand.name}</strong><small>{brand.description || brand.industry || ""}</small></span>
                 <span className="brandCollection__social">{brand.socialProfiles.length === 0 ? tPortfolio("noChannels") : brand.socialProfiles.map((profile) => profile.displayName).join(", ")}</span>
                 <span className="brandCollection__actions">
-                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setEditingBrandId(brand.id); setArchivingBrandId(null); }}>{tPortfolio("editBrand")}</Button>
-                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setArchivingBrandId(brand.id); setEditingBrandId(null); }}>{tPortfolio("archiveBrand")}</Button>
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setEditingBrandId(brand.id); setArchivingBrandId(null); setActiveBrandKitId(null); }}>{tPortfolio("editBrand")}</Button>
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setArchivingBrandId(brand.id); setEditingBrandId(null); setActiveBrandKitId(null); }}>{tPortfolio("archiveBrand")}</Button>
+                  <Button appearance="quiet" type="button" disabled={busy} aria-expanded={activeBrandKitId === brand.id} onClick={() => { setActiveBrandKitId((current) => current === brand.id ? null : brand.id); setEditingBrandId(null); setArchivingBrandId(null); }}>{tPortfolio("editBrandKit")}</Button>
                 </span>
+                {activeBrandKitId === brand.id ? <BrandKitEditor brandId={brand.id} brandName={brand.name} /> : null}
                 {editingBrandId === brand.id ? (
                   <form className="brandCollection__editor" onSubmit={(event) => void handleUpdateBrand(event, brand.id)}>
                     <TextField id={`brand-name-${brand.id}`} name="name" label={tPortfolio("brandName")} defaultValue={brand.name} maxLength={BRAND_LIMITS.nameCharacters} required />

@@ -51,6 +51,25 @@ export const BRAND_LIMITS = {
   markCharacters: 2,
 } as const;
 
+export const BRAND_KIT_VERSION_STATUSES = ["draft", "approved", "superseded"] as const;
+export type BrandKitVersionStatus = (typeof BRAND_KIT_VERSION_STATUSES)[number];
+export const BRAND_KIT_VERSION_STATUS = {
+  draft: "draft",
+  approved: "approved",
+  superseded: "superseded",
+} as const;
+export const BRAND_KIT_LIMITS = {
+  textCharacters: 2_000,
+  itemCharacters: 200,
+  itemsPerField: 30,
+  colors: 12,
+  facts: 30,
+  sources: 256,
+  historyVersions: 100,
+  initialVersion: 0,
+  versionIncrement: 1,
+} as const;
+
 export const AUTH_LIMITS = {
   passwordCharacters: 8,
   nameCharacters: 100,
@@ -133,6 +152,19 @@ export const TEAM_API_PATHS = {
   collection: "/api/team",
   invitations: "/api/team/invitations",
   audit: "/api/team/audit",
+} as const;
+export const BRAND_KIT_API_PATHS = {
+  brands: "/api/brands",
+  segment: "brand-kit",
+  approveAction: "approve",
+} as const;
+export function getBrandKitApiPath(brandId: string) {
+  return `${BRAND_KIT_API_PATHS.brands}/${encodeURIComponent(brandId)}/${BRAND_KIT_API_PATHS.segment}`;
+}
+export const BRAND_KIT_UI_IDS = {
+  editorPrefix: "brand-kit-editor-",
+  titleSuffix: "-title",
+  historySuffix: "-history",
 } as const;
 export const TEAM_FORM_ID_PREFIXES = {
   role: "team-role-",

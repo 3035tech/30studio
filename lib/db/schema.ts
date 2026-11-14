@@ -1,13 +1,15 @@
 import { relations } from "drizzle-orm";
-import { boolean, foreignKey, index, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
+import { boolean, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { BRAND_KIT_VERSION_STATUSES, BRAND_KIT_VERSION_STATUS, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
 import { organization, user } from "@/lib/db/auth-schema";
+import type { BrandKitContent } from "@/lib/validation/brand-kits";
 
 export * from "@/lib/db/auth-schema";
 
 export const socialPlatform = pgEnum("social_platform", SOCIAL_PLATFORMS);
 export const socialProfileStatus = pgEnum("social_profile_status", SOCIAL_PROFILE_STATUSES);
 export const teamAuditAction = pgEnum("team_audit_action", TEAM_AUDIT_ACTION_VALUES);
+export const brandKitVersionStatus = pgEnum("brand_kit_version_status", BRAND_KIT_VERSION_STATUSES);
 
 export const brands = pgTable(
   "brands",
@@ -70,7 +72,31 @@ export const teamAuditEvents = pgTable(
   ],
 );
 
-export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles: many(socialProfiles) }));
+export const brandKitVersions = pgTable(
+  "brand_kit_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    brandId: uuid("brand_id").notNull(),
+    version: integer("version").notNull(),
+    status: brandKitVersionStatus("status").notNull().default(BRAND_KIT_VERSION_STATUS.draft),
+    content: jsonb("content").$type<BrandKitContent>().notNull(),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
+  },
+  (table) => [
+    foreignKey({ name: "brand_kit_versions_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    uniqueIndex("brand_kit_versions_identity_unique").on(table.organizationId, table.brandId, table.version),
+    index("brand_kit_versions_brand_idx").on(table.organizationId, table.brandId, table.version),
+  ],
+);
+
+export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles: many(socialProfiles), brandKitVersions: many(brandKitVersions) }));
 export const socialProfileRelations = relations(socialProfiles, ({ one }) => ({
   brand: one(brands, { fields: [socialProfiles.brandId], references: [brands.id] }),
+}));
+export const brandKitVersionRelations = relations(brandKitVersions, ({ one }) => ({
+  brand: one(brands, { fields: [brandKitVersions.brandId], references: [brands.id] }),
 }));

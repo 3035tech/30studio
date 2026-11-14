@@ -10,7 +10,7 @@ The screen map, feature scope, delivery phases, dependencies, and acceptance cri
 
 The repository uses Git Flow; see [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md) for branch and commit conventions.
 
-The current work is an initial product foundation. It is not a production release. Database credentials, auth/email delivery, social OAuth app credentials, customer Brand Kit import, and deployment are not configured. No social posts can be published.
+The current work is an initial product foundation. It is not a production release. Database credentials, production SMTP, social OAuth app credentials, Brand Kit asset import, and deployment are not configured. No social posts can be published.
 
 ## Local development
 

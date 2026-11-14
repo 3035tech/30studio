@@ -104,6 +104,27 @@
 .brandCollection__editor, .brandCollection__archive { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 12px; padding: 12px 0 6px; }
 .brandCollection__editorActions, .brandCollection__archive { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .brandCollection__archive p { flex: 1 1 100%; margin: 0; color: #526174; font-size: 13px; }
+.brandKitEditor { grid-column: 1 / -1; min-width: 0; margin: 10px 0 8px; padding: 23px; background: var(--brand-surface); border: 1px solid #e2e8f0; border-radius: 9px; }
+.brandKitEditor__header, .brandKitEditor__factsHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.brandKitEditor__header h3 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 20px; letter-spacing: -.025em; }
+.brandKitEditor__header p, .brandKitEditor__factsHeading p, .brandKitEditor__historyHeading p { margin: 6px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
+.brandKitEditor__form { margin-top: 19px; padding-top: 17px; border-top: 1px solid #dbe3ee; }
+.brandKitEditor__formIntro { margin: 0 0 16px; color: #526174; font-size: 13px; line-height: 1.5; }
+.brandKitEditor__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px; }
+.brandKitEditor__facts { margin-top: 23px; }
+.brandKitEditor__factsHeading h4, .brandKitEditor__historyHeading h4 { margin: 0; color: var(--brand-dark); font-size: 15px; }
+.brandKitEditor__factsHeading p, .brandKitEditor__historyHeading p { max-width: 68ch; }
+.brandKitEditor__fact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .75fr) auto; align-items: end; gap: 12px; margin-top: 14px; }
+.brandKitEditor__fact > button { min-height: 44px; }
+.brandKitEditor__emptyFacts { margin: 14px 0 0; color: #64748b; font-size: 13px; }
+.brandKitEditor__formActions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 20px; }
+.brandKitEditor__history { margin-top: 25px; padding-top: 20px; border-top: 1px solid #dbe3ee; }
+.brandKitEditor__historyHeading { margin-bottom: 15px; }
+.brandKitEditor__error { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.brandKitStatus { display: inline-flex; align-items: center; min-height: 26px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.brandKitStatus--draft { background: #fff2dc; color: #8a4b00; }
+.brandKitStatus--approved { background: #dcfce7; color: #166534; }
+.brandKitStatus--superseded { background: #e2e8f0; color: #475569; }
 .brandCreate { margin-top: 28px; padding: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
 .brandCreate__heading h2 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 .brandCreate__heading p { margin: 7px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
@@ -146,9 +167,9 @@
   body, .entryShell, .entryLoading, .workspaceShell { background: var(--brand-dark); color: #f8fafc; }
   .brandLogo__light { display: none !important; }
   .brandLogo__dark { display: block !important; }
-  .entryPanel, .workspaceHeader, .workspaceEmpty, .brandCollection, .brandCreate, .teamCollection { background: #12264a; border-color: #344667; }
-  .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2, .teamCollection__identity strong { color: #f8fafc; }
-  .entryDescription, .entryLoading, .brandCount, .brandCollection__identity small, .brandCollection__social, .brandCreate__heading p, .workspaceHeaderActions label, .workspaceEmail { color: #cbd5e1; }
+  .entryPanel, .workspaceHeader, .workspaceEmpty, .brandCollection, .brandCreate, .teamCollection, .brandKitEditor { background: #12264a; border-color: #344667; }
+  .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2, .teamCollection__identity strong, .brandKitEditor__header h3, .brandKitEditor__factsHeading h4, .brandKitEditor__historyHeading h4 { color: #f8fafc; }
+  .entryDescription, .entryLoading, .brandCount, .brandCollection__identity small, .brandCollection__social, .brandCreate__heading p, .workspaceHeaderActions label, .workspaceEmail, .brandKitEditor__header p, .brandKitEditor__factsHeading p, .brandKitEditor__historyHeading p, .brandKitEditor__formIntro { color: #cbd5e1; }
   .workspaceHeader { border-color: #344667; }
   .workspaceNavigation__link { color: #e2e8f0; }
   .workspaceNavigation__link:hover { background: rgb(139 92 246 / 15%); }
@@ -161,6 +182,9 @@
   .teamCollection__identity span, .teamCollection__joined, .teamCollection__role, .teamCollection__confirmation span { color: #cbd5e1; }
   .dataTable__scroll { background: #12264a; border-color: #344667; }
   .teamInviteForm { background: #12264a; border-color: #344667; }
+  .brandKitEditor__form, .brandKitEditor__history { border-color: #344667; }
+  .brandKitEditor textarea, .brandKitEditor input { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
+  .brandKitStatus--superseded { background: #344667; color: #e2e8f0; }
   .teamAccess__section h3 { color: #f8fafc; }
   .teamInviteForm input, .teamInviteForm select { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
   .dataTable th { background: #0b1b3b; border-color: #344667; }
@@ -198,6 +222,10 @@
   .brandCollection__social { grid-column: 2; }
   .brandCollection__actions, .brandCollection__editor, .brandCollection__archive { grid-column: 2; }
   .brandCollection__editor { grid-template-columns: 1fr; }
+  .brandKitEditor { padding: 18px; }
+  .brandKitEditor__header, .brandKitEditor__factsHeading { align-items: stretch; flex-direction: column; }
+  .brandKitEditor__fields, .brandKitEditor__fact { grid-template-columns: 1fr; }
+  .brandKitEditor__error { align-items: flex-start; flex-direction: column; }
   .teamCollection__item { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .teamCollection__actions { align-items: stretch; flex-wrap: wrap; }
   .teamCollection__actions > .grid { flex-basis: 100%; }
