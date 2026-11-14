@@ -20,7 +20,7 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 | Better Auth, sessão, organizações e membros no schema Drizzle | Base implementada | Entrega de e-mail não configurada; cadastro/verificação não está pronto para clientes. |
 | Troca/criação de workspace e interface PT/EN | Implementado no primeiro fluxo | Ainda não há shell completo de navegação do produto. |
 | Criar/listar marcas com escopo de tenant | Implementado | Depende de PostgreSQL configurado para uso real. |
-| Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 1 teste de integração passaram. O teste de integração usa PostgreSQL descartável; rotas HTTP e autorização por sessão ainda precisam de testes próprios. |
+| Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
 | Convites, Brand Kit, OAuth, conteúdo, revisão, aprovação, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
 
 ## Mapa de telas
