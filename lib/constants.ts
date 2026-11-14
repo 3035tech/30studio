@@ -294,6 +294,8 @@ export const API_ERROR_CODES = {
   calendarItemNotFound: "CALENDAR_ITEM_NOT_FOUND",
   contentMediaNotFound: "CONTENT_MEDIA_NOT_FOUND",
   contentMediaConflict: "CONTENT_MEDIA_CONFLICT",
+  campaignIdempotencyConflict: "CAMPAIGN_IDEMPOTENCY_CONFLICT",
+  contentVersionConflict: "CONTENT_VERSION_CONFLICT",
   contentMediaLimitReached: "CONTENT_MEDIA_LIMIT_REACHED",
   contentMediaGenerationFailed: "CONTENT_MEDIA_GENERATION_FAILED",
   contentMediaGenerationUnavailable: "CONTENT_MEDIA_GENERATION_UNAVAILABLE",

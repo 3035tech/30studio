@@ -40,6 +40,7 @@ const campaignPublicationSchema = z.object({
 
 export const calendarCampaignCreateSchema = z.object({
   brandId: z.uuid(),
+  idempotencyKey: z.uuid(),
   title: z.string().trim().min(1).max(CONTENT_LIMITS.titleCharacters),
   brief: z.string().trim().min(1).max(CONTENT_LIMITS.campaignBriefCharacters),
   publications: z.array(campaignPublicationSchema).min(1).max(CONTENT_LIMITS.maximumCampaignPublications),
@@ -49,12 +50,14 @@ export const calendarCampaignCreateResponseSchema = z.object({
   data: z.object({
     campaignId: z.uuid(),
     publications: z.array(z.object({ id: z.uuid(), platform: z.enum(SOCIAL_PLATFORMS) })),
+    replayed: z.boolean(),
   }),
 });
 
 export const calendarItemUpdateSchema = calendarItemCreateSchema;
 
 export const calendarContentVersionSaveSchema = calendarItemCreateSchema.extend({
+  expectedVersionNumber: z.number().int().nonnegative(),
   canonicalCopy: z.string().trim().min(1).max(CONTENT_LIMITS.canonicalCopyCharacters),
   variantCopy: z.string().trim().min(1).max(CONTENT_LIMITS.variantCopyCharacters),
 }).strict();

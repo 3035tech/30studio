@@ -50,6 +50,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const version = await createCalendarContentVersion(tenant.organizationId, tenant.userId, itemId, parsed.data);
     if (!version) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
+    if (version.kind === "conflict") throw new ApiError(API_ERROR_CODES.contentVersionConflict, HTTP_STATUS.conflict);
     return NextResponse.json({ data: version }, { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return apiErrorResponse(error);

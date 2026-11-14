@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, count, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
 import { BRAND_KIT_VERSION_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_RETRY_DELAYS_MS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_WORKER, CONTENT_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
+import { getCampaignRequestFingerprint } from "@/lib/server/campaign-idempotency";
 import { brandKitVersions, brands, campaigns, contentItems, contentMediaAssets, contentMediaReviews, contentVariants, contentVersions, user } from "@/lib/db/schema";
 import type { CalendarCampaignCreateInput, CalendarContentVersionSaveInput, CalendarItemCreateInput, CalendarItemUpdateInput } from "@/lib/validation/calendar";
 
@@ -55,6 +56,25 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
 export async function createCalendarCampaign(organizationId: string, userId: string, input: CalendarCampaignCreateInput) {
   const database = getDatabase();
   return database.transaction(async (transaction) => {
+    const { idempotencyKey, ...requestPayload } = input;
+    const requestFingerprint = getCampaignRequestFingerprint(requestPayload);
+    const [previousCampaign] = await transaction.select({
+      id: campaigns.id,
+      requestFingerprint: campaigns.requestFingerprint,
+    }).from(campaigns).where(and(
+      eq(campaigns.organizationId, organizationId),
+      eq(campaigns.createdBy, userId),
+      eq(campaigns.idempotencyKey, idempotencyKey),
+    )).limit(1);
+    if (previousCampaign) {
+      if (previousCampaign.requestFingerprint !== requestFingerprint) return { kind: "conflict" as const };
+      const publications = await transaction.select({ id: contentItems.id, platform: contentItems.platform }).from(contentItems).where(and(
+        eq(contentItems.organizationId, organizationId),
+        eq(contentItems.campaignId, previousCampaign.id),
+      )).orderBy(asc(contentItems.plannedAt));
+      return { kind: "replayed" as const, campaignId: previousCampaign.id, publications, replayed: true };
+    }
+
     const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
       eq(brands.organizationId, organizationId),
       eq(brands.id, input.brandId),
@@ -67,9 +87,24 @@ export async function createCalendarCampaign(organizationId: string, userId: str
       brandId: input.brandId,
       title: input.title,
       brief: input.brief,
+      idempotencyKey,
+      requestFingerprint,
       createdBy: userId,
-    }).returning({ id: campaigns.id });
-    if (!campaign) return null;
+    }).onConflictDoNothing().returning({ id: campaigns.id });
+    if (!campaign) {
+      const [concurrentCampaign] = await transaction.select({ id: campaigns.id, requestFingerprint: campaigns.requestFingerprint }).from(campaigns).where(and(
+        eq(campaigns.organizationId, organizationId),
+        eq(campaigns.createdBy, userId),
+        eq(campaigns.idempotencyKey, idempotencyKey),
+      )).limit(1);
+      if (!concurrentCampaign) return null;
+      if (concurrentCampaign.requestFingerprint !== requestFingerprint) return { kind: "conflict" as const };
+      const publications = await transaction.select({ id: contentItems.id, platform: contentItems.platform }).from(contentItems).where(and(
+        eq(contentItems.organizationId, organizationId),
+        eq(contentItems.campaignId, concurrentCampaign.id),
+      )).orderBy(asc(contentItems.plannedAt));
+      return { kind: "replayed" as const, campaignId: concurrentCampaign.id, publications, replayed: true };
+    }
 
     const publications = await transaction.insert(contentItems).values(input.publications.map((publication) => ({
       organizationId,
@@ -82,7 +117,7 @@ export async function createCalendarCampaign(organizationId: string, userId: str
       timeZone: publication.timeZone,
       createdBy: userId,
     }))).returning({ id: contentItems.id, platform: contentItems.platform });
-    return { campaignId: campaign.id, publications };
+    return { kind: "created" as const, campaignId: campaign.id, publications, replayed: false };
   });
 }
 
@@ -474,12 +509,13 @@ export async function failContentMediaJob(job: { organizationId: string; id: str
 export async function createCalendarContentVersion(organizationId: string, userId: string, itemId: string, input: CalendarContentVersionSaveInput) {
   const database = getDatabase();
   return database.transaction(async (transaction) => {
-    const [item] = await transaction.select({ id: contentItems.id }).from(contentItems).where(and(
+    const [item] = await transaction.select({ id: contentItems.id, brandId: contentItems.brandId, campaignId: contentItems.campaignId, platform: contentItems.platform }).from(contentItems).where(and(
       eq(contentItems.id, itemId),
       eq(contentItems.organizationId, organizationId),
       inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
     )).for("update").limit(1);
     if (!item) return null;
+    if (item.campaignId && (item.brandId !== input.brandId || item.platform !== input.platform)) return { kind: "conflict" as const };
 
     const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
       eq(brands.organizationId, organizationId),
@@ -492,6 +528,7 @@ export async function createCalendarContentVersion(organizationId: string, userI
       eq(contentVersions.organizationId, organizationId),
       eq(contentVersions.contentItemId, itemId),
     )).orderBy(desc(contentVersions.versionNumber)).limit(1);
+    if ((latestVersion?.versionNumber ?? 0) !== input.expectedVersionNumber) return { kind: "conflict" as const };
     const [brandKitVersion] = await transaction.select({ version: brandKitVersions.version }).from(brandKitVersions).where(and(
       eq(brandKitVersions.organizationId, organizationId),
       eq(brandKitVersions.brandId, input.brandId),
@@ -529,6 +566,6 @@ export async function createCalendarContentVersion(organizationId: string, userI
       eq(contentItems.organizationId, organizationId),
       inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
     )).returning({ id: contentItems.id });
-    return updatedItem ? { id: version.id, versionNumber } : null;
+    return updatedItem ? { kind: "created" as const, id: version.id, versionNumber } : null;
   });
 }

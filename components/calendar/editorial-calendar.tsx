@@ -52,6 +52,8 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
   const [formOpen, setFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>([SOCIAL_PLATFORMS[0]]);
+  const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState("");
+  const [previewPlatform, setPreviewPlatform] = useState<SocialPlatform | null>(null);
   const [busy, setBusy] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -147,9 +149,17 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     setNotice("");
   }
 
+  function selectCalendarItem(item: CalendarItem) {
+    setSelectedItem(item);
+    setContentVersionState(null);
+    setGeneratedCopy(null);
+    setPreviewPlatform(null);
+  }
+
   function openCampaignForm(date: Date) {
     setSelectedDate(toLocalDateInputValue(date));
     setSelectedPlatforms([SOCIAL_PLATFORMS[0]]);
+    setCampaignIdempotencyKey(crypto.randomUUID());
     setFormOpen(true);
     setNotice("");
   }
@@ -183,14 +193,22 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandId: String(form.get(CALENDAR_FORM_FIELDS.brandId) ?? ""),
+          idempotencyKey: campaignIdempotencyKey,
           title: String(form.get("title") ?? ""),
           brief: String(form.get("brief") ?? ""),
           publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
         }),
       });
       const payload: unknown = await response.json().catch(() => null);
-      if (!response.ok || !calendarCampaignCreateResponseSchema.safeParse(payload).success) throw new Error("Calendar campaign could not be created.");
+      const parsed = calendarCampaignCreateResponseSchema.safeParse(payload);
+      if (response.status === 409) {
+        setCampaignIdempotencyKey(crypto.randomUUID());
+        setNotice(t("campaignConflict"));
+        return;
+      }
+      if (!response.ok || !parsed.success) throw new Error("Calendar campaign could not be created.");
       setFormOpen(false);
+      setCampaignIdempotencyKey("");
       setNotice(t("campaignCreated", { count: publications.length }));
       setRefreshIndex((current) => current + 1);
     } catch {
@@ -219,14 +237,20 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandId: String(form.get(CALENDAR_FORM_FIELDS.brandId) ?? selectedItem.brandId),
-          platform: String(form.get("platform") ?? ""),
+          platform: String(form.get("platform") ?? selectedItem.platform),
           title: String(form.get("title") ?? ""),
           plannedAt: localDateTime.toISOString(),
           timeZone,
+          expectedVersionNumber: contentVersionState?.data?.current?.versionNumber ?? 0,
           canonicalCopy: String(form.get("canonicalCopy") ?? ""),
           variantCopy: String(form.get("variantCopy") ?? ""),
         }),
       });
+      if (response.status === 409) {
+        setNotice(t("versionConflict"));
+        setContentRefreshIndex((current) => current + 1);
+        return;
+      }
       if (!response.ok) throw new Error("Calendar content could not be saved.");
       setSelectedItem(null);
       setNotice(t("contentSaved"));
@@ -380,7 +404,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
                 <ol className="editorialCalendar__items">
                   {dayItems.map((item) => (
                     <li className="editorialCalendar__item" key={item.id}>
-                      <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
+                      <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => selectCalendarItem(item)} aria-label={t("editContent", { title: item.title })}>
                       <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
                       <strong>{item.title}</strong>
                       {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
@@ -401,7 +425,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           <h3>{new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(new Date(`${dateKey}T12:00:00`))}</h3>
           <ul>{dayItems.map((item) => <li key={item.id}>
             <span className="editorialCalendar__listTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
-            <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
+            <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => selectCalendarItem(item)} aria-label={t("editContent", { title: item.title })}>
               <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
             </button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
             {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
@@ -417,7 +441,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             <SelectField id="calendar-edit-idea-brand" name={CALENDAR_FORM_FIELDS.brandId} label={t("brand")} defaultValue={selectedItem.brandId} disabled={Boolean(selectedItem.campaignId)} required>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </SelectField>
-            <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} required>
+            <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} onChange={(event) => setPreviewPlatform(SOCIAL_PLATFORMS.find((platform) => platform === event.target.value) ?? selectedItem.platform)} disabled={Boolean(selectedItem.campaignId)} required>
               {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
             </SelectField>
             <TextField id="calendar-edit-idea-date" name="date" label={t("date")} type="date" defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} required />
@@ -430,6 +454,11 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             </div>
             <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} value={selectedCopy?.canonicalCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: event.target.value, variantCopy: current?.itemId === selectedItem.id ? current.variantCopy : selectedCopy?.variantCopy ?? "" }))} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
             <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value }))} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
+            <section className="editorialCalendar__channelPreview" aria-label={t("previewTitle")}>
+              <div><strong>{t("previewFor", { platform: t(`platforms.${previewPlatform ?? selectedItem.platform}`) })}</strong><span>{selectedItem.title}</span></div>
+              <p>{selectedCopy?.variantCopy || t("previewEmpty")}</p>
+              <small>{t("previewCharacters", { count: Array.from(selectedCopy?.variantCopy ?? "").length })}</small>
+            </section>
             {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
             <ContentMediaPanel key={`${selectedItem.id}-${contentVersionState.data.current?.id ?? "new"}`} itemId={selectedItem.id} versionId={contentVersionState.data.current?.id ?? null} versionNumber={contentVersionState.data.current?.versionNumber ?? null} />
             <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); }}>{t("cancel")}</Button></div>

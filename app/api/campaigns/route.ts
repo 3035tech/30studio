@@ -25,9 +25,14 @@ export async function POST(request: NextRequest) {
 
     const campaign = await createCalendarCampaign(tenant.organizationId, tenant.userId, parsed.data);
     if (!campaign) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
-    const response = calendarCampaignCreateResponseSchema.safeParse({ data: campaign });
+    if (campaign.kind === "conflict") throw new ApiError(API_ERROR_CODES.campaignIdempotencyConflict, HTTP_STATUS.conflict);
+    const response = calendarCampaignCreateResponseSchema.safeParse({ data: {
+      campaignId: campaign.campaignId,
+      publications: campaign.publications,
+      replayed: campaign.replayed,
+    } });
     if (!response.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);
-    return NextResponse.json(response.data, { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(response.data, { status: campaign.replayed ? HTTP_STATUS.ok : HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return apiErrorResponse(error);
   }

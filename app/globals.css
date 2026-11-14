@@ -160,6 +160,11 @@
 .editorialCalendar__generationAction { display: grid; gap: 5px; justify-items: start; }
 .editorialCalendar__generationAction p { margin: 0; color: var(--brand-muted); font-size: 12px; line-height: 1.5; }
 .editorialCalendar__versionHistory { padding: 12px 14px; border: 1px solid #dbe3ee; border-radius: 8px; background: color-mix(in srgb, var(--brand-surface) 55%, white); color: var(--brand-dark); font-size: 11px; }
+.editorialCalendar__channelPreview { display: grid; gap: 10px; padding: 16px; border: 1px solid #dbe3ee; border-radius: 12px; background: var(--brand-surface); color: var(--brand-dark); }
+.editorialCalendar__channelPreview > div { display: grid; gap: 3px; }
+.editorialCalendar__channelPreview > div strong { font-size: 12px; }
+.editorialCalendar__channelPreview > div span, .editorialCalendar__channelPreview small { color: #64748b; font-size: 11px; }
+.editorialCalendar__channelPreview p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
 .editorialCalendar__versionHistory ol { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 18px; color: #526174; }
 .contentMediaPanel { display: grid; gap: 11px; padding: 13px; border: 1px solid #dbe3ee; border-radius: 10px; background: color-mix(in srgb, var(--brand-surface) 55%, white); }
 .contentMediaPanel__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -302,6 +307,8 @@
   .contentMediaPanel__header p, .contentMediaPanel__privacy, .contentMediaPanel__empty, .contentMediaPanel__notice, .contentMediaPanel__meta span { color: #cbd5e1; }
   .contentMediaPanel__placeholder { background: #12264a; color: #f8fafc; }
   .editorialCalendar__versionHistory { background: #0b1b3b; border-color: #344667; color: #f8fafc; }
+  .editorialCalendar__channelPreview { background: #0b1b3b; border-color: #344667; color: #f8fafc; }
+  .editorialCalendar__channelPreview > div span, .editorialCalendar__channelPreview small { color: #cbd5e1; }
   .editorialCalendar__versionHistory ol { color: #cbd5e1; }
   .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2, .teamCollection__identity strong, .brandKitEditor__header h3, .brandKitEditor__factsHeading h4, .brandKitEditor__historyHeading h4 { color: #f8fafc; }
   .entryDescription, .entryLoading, .brandCount, .brandCollection__identity small, .brandCollection__social, .brandCreate__heading p, .workspaceHeaderActions label, .workspaceEmail, .brandKitEditor__header p, .brandKitEditor__factsHeading p, .brandKitEditor__historyHeading p, .brandKitEditor__formIntro { color: #cbd5e1; }

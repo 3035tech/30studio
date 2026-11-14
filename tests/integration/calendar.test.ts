@@ -96,34 +96,47 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     timeZone: "America/Sao_Paulo",
     canonicalCopy: "The verified source message.",
     variantCopy: "A LinkedIn-specific draft.",
+    expectedVersionNumber: 0,
   });
   assert.ok(firstVersion);
+  assert.equal(firstVersion.kind, "created");
+  if (firstVersion.kind !== "created") return;
   assert.equal(firstVersion.versionNumber, 1);
   assert.equal((await listCalendarItems(ids.organizationA, { ...query, status: CONTENT_STATUS.draft })).data.length, 1);
 
-  const campaign = await createCalendarCampaign(ids.organizationA, ids.user, {
+  const campaignInput = {
     brandId: brandA.id,
+    idempotencyKey: crypto.randomUUID(),
     title: "Enrollment campaign",
     brief: "Invite families to try the new classes.",
     publications: [
       { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-20T15:00:00.000Z", timeZone: "America/Sao_Paulo" },
       { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-22T18:30:00.000Z", timeZone: "America/Sao_Paulo" },
     ],
-  });
+  };
+  const campaign = await createCalendarCampaign(ids.organizationA, ids.user, campaignInput);
   assert.ok(campaign);
+  assert.equal(campaign.kind, "created");
   assert.equal(campaign.publications.length, 2);
   const campaignItems = (await listCalendarItems(ids.organizationA, query)).data.filter((calendarItem) => calendarItem.campaignId === campaign.campaignId);
   assert.equal(campaignItems.length, 2);
   assert.deepEqual(campaignItems.map((calendarItem) => calendarItem.plannedAt.toISOString()), ["2026-11-20T15:00:00.000Z", "2026-11-22T18:30:00.000Z"]);
   assert.equal(campaignItems.every((calendarItem) => calendarItem.campaignTitle === "Enrollment campaign"), true);
+  const campaignReplay = await createCalendarCampaign(ids.organizationA, ids.user, campaignInput);
+  assert.equal(campaignReplay?.kind, "replayed");
+  assert.equal(campaignReplay?.campaignId, campaign.campaignId);
+  assert.equal(campaignReplay?.publications.length, 2);
+  const conflictingCampaignReplay = await createCalendarCampaign(ids.organizationA, ids.user, { ...campaignInput, title: "Changed after timeout" });
+  assert.equal(conflictingCampaignReplay?.kind, "conflict");
   assert.equal(await createCalendarCampaign(ids.organizationA, ids.user, {
     brandId: brandB.id,
+    idempotencyKey: crypto.randomUUID(),
     title: "Cross-tenant campaign",
     brief: "Must not be stored.",
     publications: [{ platform: SOCIAL_PLATFORMS[0], plannedAt: plannedAt.toISOString(), timeZone: "America/Sao_Paulo" }],
   }), null);
 
-  const secondVersion = await createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
+  const concurrentVersions = await Promise.all([createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
     brandId: brandA.id,
     platform: SOCIAL_PLATFORMS[0],
     title: "Launch announcement",
@@ -131,9 +144,22 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     timeZone: "America/Sao_Paulo",
     canonicalCopy: "The updated verified source message.",
     variantCopy: "The updated LinkedIn-specific draft.",
-  });
+    expectedVersionNumber: 1,
+  }), createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Launch announcement",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "A competing concurrent revision.",
+    variantCopy: "A competing channel draft.",
+    expectedVersionNumber: 1,
+  })]);
+  const secondVersion = concurrentVersions.find((version) => version?.kind === "created");
+  assert.equal(concurrentVersions.filter((version) => version?.kind === "conflict").length, 1);
   assert.equal(secondVersion?.versionNumber, 2);
   assert.ok(secondVersion);
+  if (secondVersion.kind !== "created") return;
 
   const imageJobKey = crypto.randomUUID();
   const imageJobInput = {
@@ -186,5 +212,6 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     timeZone: "America/Sao_Paulo",
     canonicalCopy: "Must not be stored.",
     variantCopy: "Must not be stored.",
+    expectedVersionNumber: 0,
   }), null);
 });

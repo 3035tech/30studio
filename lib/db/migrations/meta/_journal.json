@@ -99,6 +99,13 @@
       "when": 1794683006599,
       "tag": "0013_silky_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794685367399,
+      "tag": "0014_remarkable_shaman",
+      "breakpoints": true
     }
   ]
 }

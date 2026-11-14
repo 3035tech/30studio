@@ -46,6 +46,8 @@ export const campaigns = pgTable(
     brandId: uuid("brand_id").notNull(),
     title: text("title").notNull(),
     brief: text("brief").notNull(),
+    idempotencyKey: uuid("idempotency_key"),
+    requestFingerprint: text("request_fingerprint"),
     createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -53,6 +55,7 @@ export const campaigns = pgTable(
   (table) => [
     foreignKey({ name: "campaigns_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
     unique("campaigns_org_id_brand_unique").on(table.organizationId, table.id, table.brandId),
+    uniqueIndex("campaigns_org_creator_idempotency_unique").on(table.organizationId, table.createdBy, table.idempotencyKey),
     index("campaigns_org_brand_created_idx").on(table.organizationId, table.brandId, table.createdAt),
   ],
 );
