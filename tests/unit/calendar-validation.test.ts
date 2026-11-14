@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CALENDAR, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarItemCreateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
+import { calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
   const result = calendarItemCreateSchema.safeParse({
@@ -25,6 +25,20 @@ test("calendar ideas reject invalid time zones and client-selected tenant scope"
   };
   assert.equal(calendarItemCreateSchema.safeParse(validIdea).success, false);
   assert.equal(calendarItemCreateSchema.safeParse({ ...validIdea, timeZone: "UTC", organizationId: "another-tenant" }).success, false);
+});
+
+test("calendar idea updates accept only editable calendar fields", () => {
+  const validUpdate = {
+    brandId: "11111111-1111-4111-8111-111111111111",
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Product launch",
+    plannedAt: "2026-11-14T12:00:00.000Z",
+    timeZone: "UTC",
+  };
+  const result = calendarItemUpdateSchema.safeParse(validUpdate);
+  assert.equal(result.success, true);
+  assert.equal(calendarItemUpdateSchema.safeParse({ ...validUpdate, status: "approved" }).success, false);
+  assert.equal(calendarItemUpdateSchema.safeParse({ ...validUpdate, organizationId: "another-tenant" }).success, false);
 });
 
 test("calendar query accepts one grid and rejects oversized or empty ranges", () => {

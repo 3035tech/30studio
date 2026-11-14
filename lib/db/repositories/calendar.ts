@@ -3,7 +3,7 @@ import { and, asc, eq, gte, lt } from "drizzle-orm";
 import { CONTENT_LIMITS, CONTENT_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
 import { brands, contentItems } from "@/lib/db/schema";
-import type { CalendarItemCreateInput } from "@/lib/validation/calendar";
+import type { CalendarItemCreateInput, CalendarItemUpdateInput } from "@/lib/validation/calendar";
 
 export type CalendarQuery = {
   start: Date;
@@ -66,6 +66,39 @@ export async function createCalendarIdea(organizationId: string, userId: string,
       timeZone: input.timeZone,
       createdBy: userId,
     }).returning({ id: contentItems.id });
+    return item ?? null;
+  });
+}
+
+export async function updateCalendarIdea(organizationId: string, itemId: string, input: CalendarItemUpdateInput) {
+  const database = getDatabase();
+  return database.transaction(async (transaction) => {
+    const [existing] = await transaction.select({ id: contentItems.id }).from(contentItems).where(and(
+      eq(contentItems.id, itemId),
+      eq(contentItems.organizationId, organizationId),
+      eq(contentItems.status, CONTENT_STATUS.idea),
+    )).for("update").limit(1);
+    if (!existing) return null;
+
+    const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
+      eq(brands.organizationId, organizationId),
+      eq(brands.id, input.brandId),
+      eq(brands.isActive, true),
+    )).for("update").limit(1);
+    if (!brand) return null;
+
+    const [item] = await transaction.update(contentItems).set({
+      brandId: input.brandId,
+      platform: input.platform,
+      title: input.title,
+      plannedAt: new Date(input.plannedAt),
+      timeZone: input.timeZone,
+      updatedAt: new Date(),
+    }).where(and(
+      eq(contentItems.id, itemId),
+      eq(contentItems.organizationId, organizationId),
+      eq(contentItems.status, CONTENT_STATUS.idea),
+    )).returning({ id: contentItems.id });
     return item ?? null;
   });
 }

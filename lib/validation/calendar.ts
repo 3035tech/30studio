@@ -32,6 +32,8 @@ export const calendarItemCreateSchema = z.object({
   timeZone: validTimeZone,
 }).strict();
 
+export const calendarItemUpdateSchema = calendarItemCreateSchema;
+
 export const calendarItemSchema = z.object({
   id: z.uuid(),
   brandId: z.uuid(),
@@ -51,4 +53,5 @@ export const calendarResponseSchema = z.object({
 });
 
 export type CalendarItemCreateInput = z.infer<typeof calendarItemCreateSchema>;
+export type CalendarItemUpdateInput = z.infer<typeof calendarItemUpdateSchema>;
 export type CalendarItem = z.infer<typeof calendarItemSchema>;

@@ -67,6 +67,7 @@ export const CONTENT_STATUS = {
 export const CONTENT_LIMITS = {
   titleCharacters: 180,
   maximumCalendarItems: 300,
+  maximumVisibleCalendarItemsPerDay: 3,
 } as const;
 export const CALENDAR = {
   daysPerWeek: 7,
@@ -75,12 +76,17 @@ export const CALENDAR = {
   millisecondsPerDay: 86_400_000,
   previousMonthStep: -1,
   nextMonthStep: 1,
+  maximumVisibleItemsPerDay: CONTENT_LIMITS.maximumVisibleCalendarItemsPerDay,
   defaultPlannedTime: "09:00",
   firstWeekday: { pt: 1, en: 0 },
 } as const;
 export const CALENDAR_API_PATHS = {
   collection: "/api/calendar",
+  item: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}`,
 } as const;
+export const CALENDAR_VIEW_MODES = ["month", "list"] as const;
+export type CalendarViewMode = (typeof CALENDAR_VIEW_MODES)[number];
+export const CALENDAR_VIEW_MODE = { month: "month", list: "list" } as const;
 export const CALENDAR_QUERY_PARAMETERS = {
   start: "start",
   end: "end",
@@ -93,6 +99,8 @@ export const CALENDAR_UI_IDS = {
   title: "editorial-calendar-title",
   filters: "editorial-calendar-filters",
   newIdeaForm: "editorial-calendar-new-idea",
+  editTitle: "calendar-edit-title",
+  editDescription: "calendar-edit-description",
 } as const;
 
 export const BRAND_KIT_VERSION_STATUSES = ["draft", "approved", "superseded"] as const;
@@ -223,6 +231,7 @@ export const API_ERROR_CODES = {
   brandAssetNotFound: "BRAND_ASSET_NOT_FOUND",
   brandAssetInvalid: "BRAND_ASSET_INVALID",
   brandAssetStateConflict: "BRAND_ASSET_STATE_CONFLICT",
+  calendarItemNotFound: "CALENDAR_ITEM_NOT_FOUND",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
   invitationNotFound: "INVITATION_NOT_FOUND",
