@@ -5,6 +5,7 @@ export const PRODUCT = {
 
 export const WORKSPACE_SECTION_IDS = {
   overview: "workspace-overview",
+  calendar: "workspace-calendar",
   brands: "workspace-brands",
   createBrand: "workspace-create-brand",
   team: "workspace-team",
@@ -49,6 +50,49 @@ export const BRAND_LIMITS = {
   descriptionCharacters: 180,
   industryCharacters: 80,
   markCharacters: 2,
+} as const;
+
+export const CONTENT_STATUSES = ["idea", "draft", "in_review", "approved", "scheduled", "published", "failed", "cancelled"] as const;
+export type ContentStatus = (typeof CONTENT_STATUSES)[number];
+export const CONTENT_STATUS = {
+  idea: "idea",
+  draft: "draft",
+  inReview: "in_review",
+  approved: "approved",
+  scheduled: "scheduled",
+  published: "published",
+  failed: "failed",
+  cancelled: "cancelled",
+} as const;
+export const CONTENT_LIMITS = {
+  titleCharacters: 180,
+  maximumCalendarItems: 300,
+} as const;
+export const CALENDAR = {
+  daysPerWeek: 7,
+  weeksPerView: 6,
+  maximumRequestRangeDays: 43,
+  millisecondsPerDay: 86_400_000,
+  previousMonthStep: -1,
+  nextMonthStep: 1,
+  defaultPlannedTime: "09:00",
+  firstWeekday: { pt: 1, en: 0 },
+} as const;
+export const CALENDAR_API_PATHS = {
+  collection: "/api/calendar",
+} as const;
+export const CALENDAR_QUERY_PARAMETERS = {
+  start: "start",
+  end: "end",
+  brandId: "brandId",
+  platform: "platform",
+  status: "status",
+} as const;
+export const CALENDAR_UI_IDS = {
+  section: WORKSPACE_SECTION_IDS.calendar,
+  title: "editorial-calendar-title",
+  filters: "editorial-calendar-filters",
+  newIdeaForm: "editorial-calendar-new-idea",
 } as const;
 
 export const BRAND_KIT_VERSION_STATUSES = ["draft", "approved", "superseded"] as const;
@@ -302,7 +346,7 @@ export type TenantPermission = (typeof TENANT_PERMISSIONS)[keyof typeof TENANT_P
 export const TENANT_ROLE_PERMISSIONS = {
   [TENANT_ROLE.owner]: [TENANT_PERMISSIONS.organizationManage, TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
   [TENANT_ROLE.admin]: [TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
-  [TENANT_ROLE.editor]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.editor]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.analyticsRead],
   [TENANT_ROLE.approver]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
   [TENANT_ROLE.analyst]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.analyticsRead],
 } as const;

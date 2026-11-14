@@ -11,6 +11,14 @@ test("brand management permission follows the tenant role policy", () => {
   assert.equal(hasTenantPermission(TENANT_ROLE.analyst, TENANT_PERMISSIONS.brandsManage), false);
 });
 
+test("calendar access separates content readers from idea creators", () => {
+  assert.equal(hasTenantPermission(TENANT_ROLE.editor, TENANT_PERMISSIONS.contentRead), true);
+  assert.equal(hasTenantPermission(TENANT_ROLE.editor, TENANT_PERMISSIONS.contentManage), true);
+  assert.equal(hasTenantPermission(TENANT_ROLE.approver, TENANT_PERMISSIONS.contentRead), true);
+  assert.equal(hasTenantPermission(TENANT_ROLE.approver, TENANT_PERMISSIONS.contentManage), false);
+  assert.equal(hasTenantPermission(TENANT_ROLE.analyst, TENANT_PERMISSIONS.contentManage), false);
+});
+
 test("unknown and malformed roles fail closed", () => {
   assert.equal(hasTenantPermission("unknown", TENANT_PERMISSIONS.brandsManage), false);
   assert.equal(hasTenantPermission(" ,unknown, ", TENANT_PERMISSIONS.brandsManage), false);

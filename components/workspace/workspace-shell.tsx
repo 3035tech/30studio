@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Building2, LayoutDashboard, UsersRound } from "lucide-react";
+import { Building2, CalendarDays, LayoutDashboard, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -10,7 +10,7 @@ import { Link } from "@/lib/i18n/routing";
 import { WORKSPACE_SECTION_IDS, type Locale } from "@/lib/constants";
 
 type WorkspaceOrganization = { id: string; name: string };
-type WorkspaceSection = "overview" | "brands" | "team";
+type WorkspaceSection = "overview" | "calendar" | "brands" | "team";
 
 type WorkspaceShellProps = {
   children: ReactNode;
@@ -39,6 +39,7 @@ export function WorkspaceShell({
   const languageLabel = nextLocale === "en" ? tNavigation("english") : tNavigation("portuguese");
   const sections = [
     { id: "overview" as const, href: WORKSPACE_SECTION_IDS.overview, icon: LayoutDashboard, label: tNavigation("overview") },
+    { id: "calendar" as const, href: WORKSPACE_SECTION_IDS.calendar, icon: CalendarDays, label: tNavigation("calendar") },
     { id: "brands" as const, href: WORKSPACE_SECTION_IDS.brands, icon: Building2, label: tNavigation("brands") },
     { id: "team" as const, href: WORKSPACE_SECTION_IDS.team, icon: UsersRound, label: tNavigation("team") },
   ];
@@ -46,7 +47,7 @@ export function WorkspaceShell({
   useEffect(() => {
     function syncActiveSection() {
       const sectionId = window.location.hash.slice(1);
-      setActiveSection(sectionId === WORKSPACE_SECTION_IDS.brands ? "brands" : sectionId === WORKSPACE_SECTION_IDS.team ? "team" : "overview");
+      setActiveSection(sectionId === WORKSPACE_SECTION_IDS.calendar ? "calendar" : sectionId === WORKSPACE_SECTION_IDS.brands ? "brands" : sectionId === WORKSPACE_SECTION_IDS.team ? "team" : "overview");
     }
 
     window.addEventListener("hashchange", syncActiveSection);

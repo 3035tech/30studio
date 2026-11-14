@@ -12,6 +12,7 @@ import { Link } from "@/lib/i18n/routing";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { TeamManagement } from "@/components/workspace/team-management";
 import { BrandKitEditor } from "@/components/brand/brand-kit-editor";
+import { EditorialCalendar } from "@/components/calendar/editorial-calendar";
 
 type AuthMode = "sign_in" | "sign_up";
 type BrandState = { organizationId: string | null; items: BrandListItem[]; pending: boolean; error: boolean };
@@ -324,6 +325,8 @@ export function WorkspaceEntry() {
           ) : null}
         </aside>
       </section>
+
+      <EditorialCalendar brands={currentBrands.items} />
 
       <section className="workspaceBrands" id={WORKSPACE_SECTION_IDS.brands} aria-labelledby="workspace-brands-title">
         <div className="workspaceHeading">

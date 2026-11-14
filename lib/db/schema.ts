@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import { boolean, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { BRAND_ASSET_KINDS, BRAND_ASSET_REVIEW_DECISIONS, BRAND_ASSET_STATUSES, BRAND_ASSET_STATUS, BRAND_KIT_VERSION_STATUSES, BRAND_KIT_VERSION_STATUS, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
+import { BRAND_ASSET_KINDS, BRAND_ASSET_REVIEW_DECISIONS, BRAND_ASSET_STATUSES, BRAND_ASSET_STATUS, BRAND_KIT_VERSION_STATUSES, BRAND_KIT_VERSION_STATUS, CONTENT_STATUSES, CONTENT_STATUS, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
 import { organization, user } from "@/lib/db/auth-schema";
 import type { BrandKitContent } from "@/lib/validation/brand-kits";
 
@@ -13,6 +13,7 @@ export const brandKitVersionStatus = pgEnum("brand_kit_version_status", BRAND_KI
 export const brandAssetStatus = pgEnum("brand_asset_status", BRAND_ASSET_STATUSES);
 export const brandAssetKind = pgEnum("brand_asset_kind", BRAND_ASSET_KINDS);
 export const brandAssetReviewDecision = pgEnum("brand_asset_review_decision", BRAND_ASSET_REVIEW_DECISIONS);
+export const contentStatus = pgEnum("content_status", CONTENT_STATUSES);
 
 export const brands = pgTable(
   "brands",
@@ -32,6 +33,28 @@ export const brands = pgTable(
     uniqueIndex("brands_organization_slug_unique").on(table.organizationId, table.slug),
     unique("brands_organization_id_unique").on(table.organizationId, table.id),
     index("brands_organization_id_idx").on(table.organizationId),
+  ],
+);
+
+export const contentItems = pgTable(
+  "content_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    brandId: uuid("brand_id").notNull(),
+    platform: socialPlatform("platform").notNull(),
+    title: text("title").notNull(),
+    status: contentStatus("status").notNull().default(CONTENT_STATUS.idea),
+    plannedAt: timestamp("planned_at", { withTimezone: true, mode: "date" }).notNull(),
+    timeZone: text("time_zone").notNull(),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "content_items_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    index("content_items_org_planned_idx").on(table.organizationId, table.plannedAt),
+    index("content_items_org_brand_planned_idx").on(table.organizationId, table.brandId, table.plannedAt),
   ],
 );
 
@@ -149,7 +172,11 @@ export const brandAssetReviews = pgTable(
   ],
 );
 
-export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles: many(socialProfiles), brandKitVersions: many(brandKitVersions), assets: many(brandAssets) }));
+export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles: many(socialProfiles), contentItems: many(contentItems), brandKitVersions: many(brandKitVersions), assets: many(brandAssets) }));
+export const contentItemRelations = relations(contentItems, ({ one }) => ({
+  brand: one(brands, { fields: [contentItems.brandId], references: [brands.id] }),
+  creator: one(user, { fields: [contentItems.createdBy], references: [user.id] }),
+}));
 export const socialProfileRelations = relations(socialProfiles, ({ one }) => ({
   brand: one(brands, { fields: [socialProfiles.brandId], references: [brands.id] }),
 }));

@@ -24,7 +24,8 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
 | Equipe: membros, papéis, convites e auditoria | Implementado nesta entrega | Convites exigem SMTP e e-mail verificado; teste de integração cobre criação, reenvio, cancelamento, aceite e trilha auditável. |
 | Brand Kit | Versões e primeira implementação da biblioteca de imagens | Snapshots imutáveis, URLs de fonte, upload privado por adaptador S3, verificação de hash/dimensões, revisão humana, direitos de uso e links de leitura temporários. Chaves temporárias são isoladas dos objetos finais. LocalStack validou upload, replay e limpeza de objeto. O comando diário remove uploads abandonados após 24 horas em lotes de até 100; falta agendar/monitorar no deploy. Configuração de bucket/IAM/CORS/backup, importação de templates editáveis e checagem automática de fontes seguem pendentes. |
-| OAuth, conteúdo, revisão, aprovação de conteúdo, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
+| Agenda editorial mensal | Primeira fatia em `feature/editorial-calendar` | Grade mensal PT/EN, filtros por marca/canal, criação de ideias por marca/canal, data, horário e fuso; endpoint tenant-scoped e persistência Drizzle. Migration e teste de integração estão escritos; a execução de integração aguarda PostgreSQL local. |
+| OAuth social, campanhas/editor, revisão, aprovação, publicação e analytics | Planejado | A agenda guarda ideias básicas por marca/canal. As versões editáveis, campanhas, aprovação e publicação ainda não têm fluxo funcional nesta branch. |
 
 ## Mapa de telas
 
@@ -104,14 +105,20 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 **Telas:** S03, S08, S09, S10.
 
-1. Definir estados de conteúdo e comandos de transição server-side.
-2. Implementar campanhas e ideias no escopo de tenant e marca.
+1. ~~Definir os estados iniciais do conteúdo no schema.~~ Concluído para ideias; as transições de revisão, aprovação e publicação seguem pendentes.
+2. ~~Implementar criação e listagem de ideias no escopo de tenant e marca.~~ Concluído no primeiro fluxo da agenda; campanhas e edição avançada seguem pendentes.
 3. Criar conteúdo canônico e variantes imutáveis por canal com snapshot da versão do Brand Kit e capacidades usadas.
 4. Validar copy e mídia contra o contrato do canal; preview deve refletir a variante que será submetida.
-5. Implementar calendário/lista, filtros, time zone e alteração de horário que sempre cria nova versão pendente de aprovação.
+5. Implementar calendário mensal com filtros por marca/canal e fuso local. ~~Exibir itens planejados e criar ideia vinculada a uma marca/canal.~~ Alterar horário com nova versão e aprovação pendente depende do fluxo de versões/aprovação.
 6. Cobrir concorrência de edição, tenant boundaries e criação repetida com testes.
 
-**Aceite da fase:** editor guarda rascunho recuperável após reinício; cada canal tem variante identificável; nenhuma alteração silenciosa altera uma versão já aprovada.
+**Aceite da fase:** parcial. A agenda mensal e a criação persistida de ideias estão implementadas na feature branch. Campanhas, editor, conteúdo completo, variantes por canal e versionamento com invalidação de aprovação continuam pendentes. PostgreSQL local é necessário para executar o teste de integração.
+
+### Pendências fora do código — agenda mensal
+
+1. Configurar `DATABASE_URL` de desenvolvimento e aplicar a migration para executar `calendar.test.ts` no PostgreSQL.
+2. Resolver a sequência das migrations antes de integrar: `feature/linkedin-oauth` e `feature/editorial-calendar` partiram de `develop` e ambas geraram uma migration `0009`.
+3. Depois da validação local e da reconciliação das migrations, integrar as branches pelo fluxo Git para disponibilizar as funcionalidades em `develop`.
 
 ### F5 — Revisão, aprovação e mídia
 
