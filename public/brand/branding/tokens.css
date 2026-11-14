@@ -1,0 +1,10 @@
+:root {
+  --brand-primary: #6A00FF;
+  --brand-accent: #FF8A00;
+  --brand-dark: #0B1B3B;
+  --brand-secondary: #8B5CF6;
+  --brand-surface: #F8FAFC;
+  --brand-text: #0B1B3B;
+  --brand-display-font: 'Sora', Inter, sans-serif;
+  --brand-ui-font: Inter, sans-serif;
+}

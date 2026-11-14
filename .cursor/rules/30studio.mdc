@@ -1,0 +1,6 @@
+---
+description: Shared product, security, database, design-system, i18n, and delivery rules for 30studio
+alwaysApply: true
+---
+
+Read and follow the repository root `AGENTS.md` for every task. `CLAUDE.md` points to the same shared contract. Do not duplicate or weaken those requirements in Cursor-specific rules.
