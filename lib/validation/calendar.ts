@@ -32,6 +32,26 @@ export const calendarItemCreateSchema = z.object({
   timeZone: validTimeZone,
 }).strict();
 
+const campaignPublicationSchema = z.object({
+  platform: z.enum(SOCIAL_PLATFORMS),
+  plannedAt: isoDateTime,
+  timeZone: validTimeZone,
+}).strict();
+
+export const calendarCampaignCreateSchema = z.object({
+  brandId: z.uuid(),
+  title: z.string().trim().min(1).max(CONTENT_LIMITS.titleCharacters),
+  brief: z.string().trim().min(1).max(CONTENT_LIMITS.campaignBriefCharacters),
+  publications: z.array(campaignPublicationSchema).min(1).max(CONTENT_LIMITS.maximumCampaignPublications),
+}).strict().refine((campaign) => new Set(campaign.publications.map((publication) => publication.platform)).size === campaign.publications.length);
+
+export const calendarCampaignCreateResponseSchema = z.object({
+  data: z.object({
+    campaignId: z.uuid(),
+    publications: z.array(z.object({ id: z.uuid(), platform: z.enum(SOCIAL_PLATFORMS) })),
+  }),
+});
+
 export const calendarItemUpdateSchema = calendarItemCreateSchema;
 
 export const calendarContentVersionSaveSchema = calendarItemCreateSchema.extend({
@@ -65,6 +85,8 @@ export const calendarItemSchema = z.object({
   id: z.uuid(),
   brandId: z.uuid(),
   brandName: z.string(),
+  campaignId: z.uuid().nullable(),
+  campaignTitle: z.string().nullable(),
   platform: z.enum(SOCIAL_PLATFORMS),
   title: z.string(),
   status: z.enum(CONTENT_STATUSES),
@@ -80,6 +102,7 @@ export const calendarResponseSchema = z.object({
 });
 
 export type CalendarItemCreateInput = z.infer<typeof calendarItemCreateSchema>;
+export type CalendarCampaignCreateInput = z.infer<typeof calendarCampaignCreateSchema>;
 export type CalendarItemUpdateInput = z.infer<typeof calendarItemUpdateSchema>;
 export type CalendarContentVersionSaveInput = z.infer<typeof calendarContentVersionSaveSchema>;
 export type CalendarItem = z.infer<typeof calendarItemSchema>;

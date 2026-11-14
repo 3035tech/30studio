@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
-import { createCalendarContentVersion, createCalendarIdea, getCalendarContentVersions, listCalendarItems } from "@/lib/db/repositories/calendar";
+import { createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, getCalendarContentVersions, listCalendarItems } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { organization, user } from "@/lib/db/schema";
 
@@ -100,6 +100,28 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.ok(firstVersion);
   assert.equal(firstVersion.versionNumber, 1);
   assert.equal((await listCalendarItems(ids.organizationA, { ...query, status: CONTENT_STATUS.draft })).data.length, 1);
+
+  const campaign = await createCalendarCampaign(ids.organizationA, ids.user, {
+    brandId: brandA.id,
+    title: "Enrollment campaign",
+    brief: "Invite families to try the new classes.",
+    publications: [
+      { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-20T15:00:00.000Z", timeZone: "America/Sao_Paulo" },
+      { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-22T18:30:00.000Z", timeZone: "America/Sao_Paulo" },
+    ],
+  });
+  assert.ok(campaign);
+  assert.equal(campaign.publications.length, 2);
+  const campaignItems = (await listCalendarItems(ids.organizationA, query)).data.filter((calendarItem) => calendarItem.campaignId === campaign.campaignId);
+  assert.equal(campaignItems.length, 2);
+  assert.deepEqual(campaignItems.map((calendarItem) => calendarItem.plannedAt.toISOString()), ["2026-11-20T15:00:00.000Z", "2026-11-22T18:30:00.000Z"]);
+  assert.equal(campaignItems.every((calendarItem) => calendarItem.campaignTitle === "Enrollment campaign"), true);
+  assert.equal(await createCalendarCampaign(ids.organizationA, ids.user, {
+    brandId: brandB.id,
+    title: "Cross-tenant campaign",
+    brief: "Must not be stored.",
+    publications: [{ platform: SOCIAL_PLATFORMS[0], plannedAt: plannedAt.toISOString(), timeZone: "America/Sao_Paulo" }],
+  }), null);
 
   const secondVersion = await createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
     brandId: brandA.id,

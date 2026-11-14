@@ -36,12 +36,32 @@ export const brands = pgTable(
   ],
 );
 
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    brandId: uuid("brand_id").notNull(),
+    title: text("title").notNull(),
+    brief: text("brief").notNull(),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "campaigns_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    unique("campaigns_org_id_brand_unique").on(table.organizationId, table.id, table.brandId),
+    index("campaigns_org_brand_created_idx").on(table.organizationId, table.brandId, table.createdAt),
+  ],
+);
+
 export const contentItems = pgTable(
   "content_items",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
     brandId: uuid("brand_id").notNull(),
+    campaignId: uuid("campaign_id"),
     platform: socialPlatform("platform").notNull(),
     title: text("title").notNull(),
     status: contentStatus("status").notNull().default(CONTENT_STATUS.idea),
@@ -53,6 +73,7 @@ export const contentItems = pgTable(
   },
   (table) => [
     foreignKey({ name: "content_items_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    foreignKey({ name: "content_items_org_campaign_brand_fk", columns: [table.organizationId, table.campaignId, table.brandId], foreignColumns: [campaigns.organizationId, campaigns.id, campaigns.brandId] }).onDelete("cascade"),
     index("content_items_org_planned_idx").on(table.organizationId, table.plannedAt),
     index("content_items_org_brand_planned_idx").on(table.organizationId, table.brandId, table.plannedAt),
   ],
@@ -212,8 +233,13 @@ export const brandAssetReviews = pgTable(
 );
 
 export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles: many(socialProfiles), contentItems: many(contentItems), brandKitVersions: many(brandKitVersions), assets: many(brandAssets) }));
+export const campaignRelations = relations(campaigns, ({ one, many }) => ({
+  brand: one(brands, { fields: [campaigns.brandId], references: [brands.id] }),
+  items: many(contentItems),
+}));
 export const contentItemRelations = relations(contentItems, ({ one }) => ({
   brand: one(brands, { fields: [contentItems.brandId], references: [brands.id] }),
+  campaign: one(campaigns, { fields: [contentItems.campaignId], references: [campaigns.id] }),
   creator: one(user, { fields: [contentItems.createdBy], references: [user.id] }),
 }));
 export const contentVersionRelations = relations(contentVersions, ({ one, many }) => ({

@@ -24,7 +24,7 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
 | Equipe: membros, papéis, convites e auditoria | Implementado nesta entrega | Convites exigem SMTP e e-mail verificado; teste de integração cobre criação, reenvio, cancelamento, aceite e trilha auditável. |
 | Brand Kit | Versões e primeira implementação da biblioteca de imagens | Snapshots imutáveis, URLs de fonte, upload privado por adaptador S3, verificação de hash/dimensões, revisão humana, direitos de uso e links de leitura temporários. Chaves temporárias são isoladas dos objetos finais. LocalStack validou upload, replay e limpeza de objeto. O comando diário remove uploads abandonados após 24 horas em lotes de até 100; falta agendar/monitorar no deploy. Configuração de bucket/IAM/CORS/backup, importação de templates editáveis e checagem automática de fontes seguem pendentes. |
-| Agenda e editor editorial | Em implementação em `feature/editorial-calendar` | Grade/lista PT/EN, filtros, edição/reagendamento; versões imutáveis de texto de referência e variante do canal, snapshot do Brand Kit aprovado e histórico. Migration aditiva e teste PostgreSQL escritos; ainda aguardam aplicação/execução em banco local. Editor atualmente grava uma variante por versão. |
+| Campanhas, agenda e editor editorial | Em implementação em `feature/editorial-calendar` | Campanha multimarca por tenant com briefing-base e uma publicação por rede selecionada; cada publicação possui dia/horário independentes. Grade/lista PT/EN, filtros, versões de copy e snapshot de Brand Kit aprovado. Migrations aditivas e testes PostgreSQL escritos; ainda aguardam aplicação/execução em banco local. |
 | OAuth social, campanhas/editor, revisão, aprovação, publicação e analytics | Planejado | A agenda guarda ideias básicas por marca/canal. As versões editáveis, campanhas, aprovação e publicação ainda não têm fluxo funcional nesta branch. |
 
 ## Mapa de telas
@@ -112,14 +112,14 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 5. Implementar calendário mensal com filtros por marca/canal/status e fuso local. ~~Exibir itens planejados e criar ideia vinculada a uma marca/canal.~~ O editor cria nova versão ao salvar copy, e não altera versões existentes; transições de aprovação e publicação continuam pendentes.
 6. Cobrir concorrência de edição, tenant boundaries e criação repetida com testes.
 
-**Aceite da fase:** parcial. A agenda mensal, criação de ideias e primeira fatia do editor/versionamento estão implementadas na feature branch. Campanhas, múltiplas variantes por item, preview de canal e invalidação de aprovação continuam pendentes. PostgreSQL local é necessário para aplicar a migration e executar o teste de integração.
+**Aceite da fase:** parcial. A agenda mensal, campanhas com agendas por rede e primeira fatia do editor/versionamento estão implementadas na feature branch. Geração de copy/imagem, múltiplas variantes por versão, preview de canal e invalidação de aprovação continuam pendentes. PostgreSQL local é necessário para aplicar as migrations e executar os testes de integração.
 
 ### Pendências fora do código — agenda mensal
 
 1. Configurar `DATABASE_URL` de desenvolvimento e aplicar a migration para executar `calendar.test.ts` no PostgreSQL.
 2. Resolver a sequência das migrations antes de integrar: `feature/linkedin-oauth` e `feature/editorial-calendar` partiram de `develop` e ambas geraram uma migration `0009`.
 3. Depois da validação local e da reconciliação das migrations, integrar as branches pelo fluxo Git para disponibilizar as funcionalidades em `develop`.
-4. Migration `0010_parallel_synch.sql` é aditiva. Rollback antes de usar o editor: reverter o código e migration; depois de existirem rascunhos versionados, exportar/reter os dados antes de remover `content_variants` e `content_versions`.
+4. Migrations `0010_adorable_magma.sql` e `0011_busy_silverclaw.sql` são aditivas. Rollback antes de usar o editor/campanhas: reverter o código e migrations; depois de existirem dados, exportar/reter campanhas, agendas e rascunhos antes de remover as tabelas relacionadas.
 
 ### F5 — Revisão, aprovação e mídia
 

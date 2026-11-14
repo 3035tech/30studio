@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CALENDAR, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
+import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
   const result = calendarItemCreateSchema.safeParse({
@@ -54,6 +54,22 @@ test("calendar content versions require bounded canonical and channel copy", () 
   assert.equal(calendarContentVersionSaveSchema.safeParse(validVersion).success, true);
   assert.equal(calendarContentVersionSaveSchema.safeParse({ ...validVersion, variantCopy: " " }).success, false);
   assert.equal(calendarContentVersionSaveSchema.safeParse({ ...validVersion, status: "approved" }).success, false);
+});
+
+test("campaign planning accepts independent channel schedules and rejects duplicate networks", () => {
+  const validCampaign = {
+    brandId: "11111111-1111-4111-8111-111111111111",
+    title: "Enrollment campaign",
+    brief: "Invite local families to try the new classes.",
+    publications: [
+      { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-15T12:00:00.000Z", timeZone: "UTC" },
+      { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-17T15:30:00.000Z", timeZone: "America/Sao_Paulo" },
+    ],
+  };
+  assert.equal(calendarCampaignCreateSchema.safeParse(validCampaign).success, true);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [] }).success, false);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [validCampaign.publications[0], validCampaign.publications[0]] }).success, false);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, organizationId: "another-tenant" }).success, false);
 });
 
 test("calendar query accepts one grid and rejects oversized or empty ranges", () => {

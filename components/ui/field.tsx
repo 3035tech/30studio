@@ -55,6 +55,19 @@ export function SelectField({ label, id, children, className = "", ...props }: S
   );
 }
 
+type CheckboxFieldProps = InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+};
+
+export function CheckboxField({ label, id, className = "", ...props }: CheckboxFieldProps) {
+  return (
+    <label className={`inline-flex min-h-10 items-center gap-2.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-studio-dark transition hover:border-studio-primary/50 has-[:checked]:border-studio-primary has-[:checked]:bg-studio-primary/5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-studio-primary ${className}`.trim()} htmlFor={id}>
+      <input id={id} className="size-4 accent-studio-primary" type="checkbox" {...props} />
+      <span>{label}</span>
+    </label>
+  );
+}
+
 type TextAreaFieldProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
   id: string;

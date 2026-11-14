@@ -2,8 +2,8 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { BRAND_KIT_VERSION_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
-import { brandKitVersions, brands, contentItems, contentVariants, contentVersions } from "@/lib/db/schema";
-import type { CalendarContentVersionSaveInput, CalendarItemCreateInput, CalendarItemUpdateInput } from "@/lib/validation/calendar";
+import { brandKitVersions, brands, campaigns, contentItems, contentVariants, contentVersions } from "@/lib/db/schema";
+import type { CalendarCampaignCreateInput, CalendarContentVersionSaveInput, CalendarItemCreateInput, CalendarItemUpdateInput } from "@/lib/validation/calendar";
 
 export type CalendarQuery = {
   start: Date;
@@ -28,6 +28,8 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
     id: contentItems.id,
     brandId: contentItems.brandId,
     brandName: brands.name,
+    campaignId: contentItems.campaignId,
+    campaignTitle: campaigns.title,
     platform: contentItems.platform,
     title: contentItems.title,
     status: contentItems.status,
@@ -37,6 +39,10 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
   }).from(contentItems).innerJoin(brands, and(
     eq(brands.organizationId, contentItems.organizationId),
     eq(brands.id, contentItems.brandId),
+  )).leftJoin(campaigns, and(
+    eq(campaigns.organizationId, contentItems.organizationId),
+    eq(campaigns.id, contentItems.campaignId),
+    eq(campaigns.brandId, contentItems.brandId),
   )).where(and(...conditions)).orderBy(asc(contentItems.plannedAt), asc(contentItems.createdAt))
     .limit(CONTENT_LIMITS.maximumCalendarItems + 1);
 
@@ -44,6 +50,40 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
     data: rows.slice(0, CONTENT_LIMITS.maximumCalendarItems),
     truncated: rows.length > CONTENT_LIMITS.maximumCalendarItems,
   };
+}
+
+export async function createCalendarCampaign(organizationId: string, userId: string, input: CalendarCampaignCreateInput) {
+  const database = getDatabase();
+  return database.transaction(async (transaction) => {
+    const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
+      eq(brands.organizationId, organizationId),
+      eq(brands.id, input.brandId),
+      eq(brands.isActive, true),
+    )).for("update").limit(1);
+    if (!brand) return null;
+
+    const [campaign] = await transaction.insert(campaigns).values({
+      organizationId,
+      brandId: input.brandId,
+      title: input.title,
+      brief: input.brief,
+      createdBy: userId,
+    }).returning({ id: campaigns.id });
+    if (!campaign) return null;
+
+    const publications = await transaction.insert(contentItems).values(input.publications.map((publication) => ({
+      organizationId,
+      brandId: input.brandId,
+      campaignId: campaign.id,
+      platform: publication.platform,
+      title: input.title,
+      status: CONTENT_STATUS.idea,
+      plannedAt: new Date(publication.plannedAt),
+      timeZone: publication.timeZone,
+      createdBy: userId,
+    }))).returning({ id: contentItems.id, platform: contentItems.platform });
+    return { campaignId: campaign.id, publications };
+  });
 }
 
 export async function createCalendarIdea(organizationId: string, userId: string, input: CalendarItemCreateInput) {

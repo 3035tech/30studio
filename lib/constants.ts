@@ -66,6 +66,8 @@ export const CONTENT_STATUS = {
 } as const;
 export const CONTENT_LIMITS = {
   titleCharacters: 180,
+  campaignBriefCharacters: 5_000,
+  maximumCampaignPublications: SOCIAL_PLATFORMS.length,
   canonicalCopyCharacters: 5_000,
   variantCopyCharacters: 5_000,
   maximumCalendarItems: 300,
@@ -89,6 +91,15 @@ export const CALENDAR_API_PATHS = {
   item: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}`,
   versions: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/versions`,
 } as const;
+export const CAMPAIGN_API_PATHS = { collection: "/api/campaigns" } as const;
+export const CAMPAIGN_FORM_FIELDS = {
+  platforms: "platforms",
+  publicationDatePrefix: "publication-date-",
+  publicationTimePrefix: "publication-time-",
+  publicationDate: (platform: SocialPlatform) => `publication-date-${platform}`,
+  publicationTime: (platform: SocialPlatform) => `publication-time-${platform}`,
+  platformCheckboxId: (platform: SocialPlatform) => `calendar-platform-${platform}`,
+} as const;
 export const CALENDAR_VIEW_MODES = ["month", "list"] as const;
 export type CalendarViewMode = (typeof CALENDAR_VIEW_MODES)[number];
 export const CALENDAR_VIEW_MODE = { month: "month", list: "list" } as const;
@@ -103,7 +114,10 @@ export const CALENDAR_UI_IDS = {
   section: WORKSPACE_SECTION_IDS.calendar,
   title: "editorial-calendar-title",
   filters: "editorial-calendar-filters",
-  newIdeaForm: "editorial-calendar-new-idea",
+  newCampaignForm: "editorial-calendar-new-campaign",
+  campaignTitle: "calendar-campaign-title",
+  campaignBrand: "calendar-campaign-brand",
+  campaignBrief: "calendar-campaign-brief",
   editTitle: "calendar-edit-title",
   editDescription: "calendar-edit-description",
   canonicalCopy: "calendar-canonical-copy",

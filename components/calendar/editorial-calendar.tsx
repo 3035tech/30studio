@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SelectField, TextAreaField, TextField } from "@/components/ui/field";
+import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale } from "@/lib/constants";
+import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { calendarCampaignCreateResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
 
 type CalendarState = {
   requestKey: string;
@@ -49,6 +49,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
   const [state, setState] = useState(INITIAL_STATE);
   const [formOpen, setFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>([SOCIAL_PLATFORMS[0]]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [refreshIndex, setRefreshIndex] = useState(0);
@@ -134,18 +135,29 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     setNotice("");
   }
 
-  function openIdeaForm(date: Date) {
+  function openCampaignForm(date: Date) {
     setSelectedDate(toLocalDateInputValue(date));
+    setSelectedPlatforms([SOCIAL_PLATFORMS[0]]);
     setFormOpen(true);
     setNotice("");
   }
 
-  async function createIdea(event: FormEvent<HTMLFormElement>) {
+  function togglePlatform(platform: SocialPlatform) {
+    setSelectedPlatforms((current) => current.includes(platform)
+      ? current.filter((selectedPlatform) => selectedPlatform !== platform)
+      : SOCIAL_PLATFORMS.filter((availablePlatform) => current.includes(availablePlatform) || availablePlatform === platform));
+  }
+
+  async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const localDateTime = new Date(`${String(form.get("date") ?? "")}T${String(form.get("time") ?? "")}`);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (Number.isNaN(localDateTime.getTime()) || !timeZone) {
+    const platforms = form.getAll(CAMPAIGN_FORM_FIELDS.platforms).filter((value): value is SocialPlatform => SOCIAL_PLATFORMS.some((platform) => platform === value));
+    const publications = platforms.map((platform) => ({
+      platform,
+      localDateTime: new Date(`${String(form.get(CAMPAIGN_FORM_FIELDS.publicationDate(platform)) ?? "")}T${String(form.get(CAMPAIGN_FORM_FIELDS.publicationTime(platform)) ?? "")}`),
+    }));
+    if (publications.length === 0 || publications.some((publication) => Number.isNaN(publication.localDateTime.getTime())) || !timeZone) {
       setNotice(t("createError"));
       return;
     }
@@ -153,21 +165,21 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     setBusy(true);
     setNotice("");
     try {
-      const response = await fetch(CALENDAR_API_PATHS.collection, {
+      const response = await fetch(CAMPAIGN_API_PATHS.collection, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandId: String(form.get("brandId") ?? ""),
-          platform: String(form.get("platform") ?? ""),
           title: String(form.get("title") ?? ""),
-          plannedAt: localDateTime.toISOString(),
-          timeZone,
+          brief: String(form.get("brief") ?? ""),
+          publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
         }),
       });
-      if (!response.ok) throw new Error("Calendar idea could not be created.");
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok || !calendarCampaignCreateResponseSchema.safeParse(payload).success) throw new Error("Calendar campaign could not be created.");
       setFormOpen(false);
-      setNotice(t("created"));
+      setNotice(t("campaignCreated", { count: publications.length }));
       setRefreshIndex((current) => current + 1);
     } catch {
       setNotice(t("createError"));
@@ -231,25 +243,32 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           <p className="entryDescription">{t("description")}</p>
         </div>
         {state.canManage && brands.length > 0 ? (
-          <Button type="button" onClick={() => openIdeaForm(new Date(month.getFullYear(), month.getMonth(), 1))}>
-            <CalendarPlus aria-hidden="true" size={17} />{t("newIdea")}
+          <Button type="button" onClick={() => openCampaignForm(new Date(month.getFullYear(), month.getMonth(), 1))}>
+            <CalendarPlus aria-hidden="true" size={17} />{t("newCampaign")}
           </Button>
         ) : null}
       </header>
 
       {formOpen && state.canManage ? (
-        <form className="editorialCalendar__form" id={CALENDAR_UI_IDS.newIdeaForm} onSubmit={(event) => void createIdea(event)}>
-          <TextField id="calendar-idea-title" name="title" label={t("ideaTitle")} maxLength={CONTENT_LIMITS.titleCharacters} required />
-          <SelectField id="calendar-idea-brand" name="brandId" label={t("brand")} defaultValue={brands[0]?.id ?? ""} required>
+        <form className="editorialCalendar__form editorialCalendar__campaignForm" id={CALENDAR_UI_IDS.newCampaignForm} onSubmit={(event) => void createCampaign(event)}>
+          <TextField id={CALENDAR_UI_IDS.campaignTitle} name="title" label={t("campaignTitle")} maxLength={CONTENT_LIMITS.titleCharacters} required />
+          <SelectField id={CALENDAR_UI_IDS.campaignBrand} name="brandId" label={t("brand")} defaultValue={brands[0]?.id ?? ""} required>
             {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
           </SelectField>
-          <SelectField id="calendar-idea-platform" name="platform" label={t("channel")} defaultValue={SOCIAL_PLATFORMS[0]} required>
-            {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
-          </SelectField>
-          <TextField id="calendar-idea-date" name="date" label={t("date")} type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} required />
-          <TextField id="calendar-idea-time" name="time" label={t("time")} type="time" defaultValue={CALENDAR.defaultPlannedTime} required />
+          <TextAreaField id="calendar-campaign-brief" name="brief" label={t("campaignBrief")} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
+          <fieldset className="editorialCalendar__platformPicker">
+            <legend>{t("selectChannels")}</legend>
+            <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
+          </fieldset>
+          <div className="editorialCalendar__publicationSchedules">
+            {selectedPlatforms.map((platform) => <fieldset className="editorialCalendar__publicationSchedule" key={platform}>
+              <legend>{t("channelSchedule", { platform: t(`platforms.${platform}`) })}</legend>
+              <TextField id={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} name={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} label={t("date")} type="date" defaultValue={selectedDate} required />
+              <TextField id={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} name={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} label={t("time")} type="time" defaultValue={CALENDAR.defaultPlannedTime} required />
+            </fieldset>)}
+          </div>
           <div className="editorialCalendar__formActions">
-            <Button type="submit" disabled={busy}>{busy ? t("saving") : t("saveIdea")}</Button>
+            <Button type="submit" disabled={busy}>{busy ? t("saving") : t("createCampaign")}</Button>
             <Button appearance="quiet" type="button" disabled={busy} onClick={() => setFormOpen(false)}>{t("cancel")}</Button>
           </div>
         </form>
@@ -311,7 +330,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             const outsideMonth = date.getMonth() !== month.getMonth();
             return (
               <article className={`editorialCalendar__day${outsideMonth ? " is-outside" : ""}${dateKey === today ? " is-today" : ""}`} key={dateKey} aria-label={new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(date)}>
-                <Button appearance="quiet" className="editorialCalendar__dayButton" type="button" disabled={!state.canManage || pending} aria-label={t("addIdeaOn", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date) })} onClick={() => openIdeaForm(date)}>
+                <Button appearance="quiet" className="editorialCalendar__dayButton" type="button" disabled={!state.canManage || pending} aria-label={t("addCampaignOn", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date) })} onClick={() => openCampaignForm(date)}>
                   <span>{date.getDate()}</span><Plus aria-hidden="true" size={14} />
                 </Button>
                 <ol className="editorialCalendar__items">
@@ -320,6 +339,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
                       <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
                       <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
                       <strong>{item.title}</strong>
+                      {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
                       <span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
                       <span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
                       </button>
@@ -340,6 +360,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
               <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
             </button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
+            {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
           </li>)}</ul>
         </section>)}
       </div>}
