@@ -4,9 +4,10 @@ import type { NextRequest } from "next/server";
 import { getAuth } from "@/lib/server/better-auth";
 import { member } from "@/lib/db/auth-schema";
 import { getDatabase } from "@/lib/db/client";
-import { API_ERROR_CODES, HTTP_STATUS, TENANT_ROLE_PERMISSIONS } from "@/lib/constants";
-import type { TenantPermission, TenantRole } from "@/lib/constants";
+import { API_ERROR_CODES, HTTP_STATUS } from "@/lib/constants";
+import type { TenantPermission } from "@/lib/constants";
 import { ApiError } from "@/lib/server/api-error";
+import { hasTenantPermission } from "@/lib/server/permissions";
 
 export type TenantContext = {
   userId: string;
@@ -30,10 +31,7 @@ export async function requireTenant(request: NextRequest, permission?: TenantPer
 
   if (!membership) throw new ApiError(API_ERROR_CODES.forbidden, HTTP_STATUS.forbidden);
   if (permission) {
-    const rolePermissions = membership.role.split(",").flatMap((role) =>
-      TENANT_ROLE_PERMISSIONS[role.trim() as TenantRole] ?? [],
-    );
-    if (!new Set<string>(rolePermissions).has(permission)) {
+    if (!hasTenantPermission(membership.role, permission)) {
       throw new ApiError(API_ERROR_CODES.forbidden, HTTP_STATUS.forbidden);
     }
   }
@@ -46,12 +44,20 @@ export async function requireTenant(request: NextRequest, permission?: TenantPer
 }
 
 export function assertSameOriginJsonRequest(request: Request) {
+  assertSameOriginRequest(request);
+  const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLocaleLowerCase("en");
+
+  if (contentType !== "application/json") {
+    throw new ApiError(API_ERROR_CODES.forbidden, HTTP_STATUS.forbidden);
+  }
+}
+
+export function assertSameOriginRequest(request: Request) {
   const configuredOrigin = process.env.STUDIO_PUBLIC_ORIGIN;
   const requestOrigin = request.headers.get("origin");
-  const contentType = request.headers.get("content-type")?.split(";")[0]?.trim().toLocaleLowerCase("en");
   const fetchSite = request.headers.get("sec-fetch-site");
 
-  if (!configuredOrigin || !requestOrigin || requestOrigin !== configuredOrigin || contentType !== "application/json") {
+  if (!configuredOrigin || !requestOrigin || requestOrigin !== configuredOrigin) {
     throw new ApiError(API_ERROR_CODES.forbidden, HTTP_STATUS.forbidden);
   }
   if (fetchSite && fetchSite !== "same-origin") {

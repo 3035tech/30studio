@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
 import { brands } from "@/lib/db/schema";
-import type { BrandCreateInput } from "@/lib/validation/brands";
+import type { BrandCreateInput, BrandUpdateInput } from "@/lib/validation/brands";
 
 const SLUG_SEPARATOR = "-";
 const EMPTY_SLUG_PREFIX = "brand";
@@ -42,4 +42,29 @@ export async function createBrand(input: BrandCreateInput, organizationId: strin
     .returning();
 
   return brand ?? null;
+}
+
+export async function updateBrand(brandId: string, input: BrandUpdateInput, organizationId: string) {
+  const [brand] = await getDatabase()
+    .update(brands)
+    .set({
+      ...input,
+      ...(input.description !== undefined ? { description: input.description || null } : {}),
+      ...(input.industry !== undefined ? { industry: input.industry || null } : {}),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(brands.id, brandId), eq(brands.organizationId, organizationId), eq(brands.isActive, true)))
+    .returning();
+
+  return brand ?? null;
+}
+
+export async function archiveBrand(brandId: string, organizationId: string) {
+  const [brand] = await getDatabase()
+    .update(brands)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(and(eq(brands.id, brandId), eq(brands.organizationId, organizationId), eq(brands.isActive, true)))
+    .returning({ id: brands.id });
+
+  return Boolean(brand);
 }

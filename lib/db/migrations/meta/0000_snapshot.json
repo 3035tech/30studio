@@ -1,5 +1,5 @@
 {
-  "id": "a46f918f-902e-471d-a52c-639c14d6decd",
+  "id": "3cc017a5-e661-486e-b6ad-f993b166202f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -95,27 +95,6 @@
           "method": "btree",
           "with": {}
         },
-        "brands_organization_id_unique": {
-          "name": "brands_organization_id_unique",
-          "columns": [
-            {
-              "expression": "organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "brands_organization_id_idx": {
           "name": "brands_organization_id_idx",
           "columns": [
@@ -161,7 +140,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "brands_organization_id_unique": {
+          "name": "brands_organization_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -295,8 +283,8 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "social_profiles_organization_id_brand_id_brands_organization_id_id_fk": {
-          "name": "social_profiles_organization_id_brand_id_brands_organization_id_id_fk",
+        "social_profiles_org_brand_fk": {
+          "name": "social_profiles_org_brand_fk",
           "tableFrom": "social_profiles",
           "tableTo": "brands",
           "columnsFrom": [

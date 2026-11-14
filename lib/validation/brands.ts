@@ -9,6 +9,12 @@ export const brandCreateSchema = z.object({
 
 export type BrandCreateInput = z.infer<typeof brandCreateSchema>;
 
+export const brandUpdateSchema = brandCreateSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+);
+
+export type BrandUpdateInput = z.infer<typeof brandUpdateSchema>;
+
 export const brandListItemSchema = z.object({
   id: z.string().uuid(),
   organizationId: z.string().min(1),

@@ -77,12 +77,17 @@
 .brandCount { margin: 0 0 4px; color: #526174; font-size: 13px; }
 .workspaceEmpty { padding: 25px; background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; color: #526174; font-size: 14px; }
 .brandCollection { margin: 0; padding: 0; list-style: none; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
-.brandCollection__item { min-height: 76px; padding: 12px 18px; display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(140px, .7fr); align-items: center; gap: 14px; border-bottom: 1px solid #edf2f7; }
+.brandCollection__item { min-height: 76px; padding: 12px 18px; display: grid; grid-template-columns: 42px minmax(0, 1fr) minmax(140px, .7fr) auto; align-items: center; gap: 14px; border-bottom: 1px solid #edf2f7; }
 .brandCollection__item:last-child { border-bottom: 0; }
 .brandCollection__mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 9px; background: #f0e9ff; color: var(--brand-primary); font-size: 12px; font-weight: 750; }
 .brandCollection__identity { min-width: 0; display: grid; gap: 4px; }
 .brandCollection__identity strong { color: var(--brand-dark); font-size: 14px; }
 .brandCollection__identity small, .brandCollection__social { overflow: hidden; color: #64748b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.brandCollection__actions { display: flex; gap: 4px; }
+.brandCollection__actions button { min-height: 36px; padding-inline: 10px; font-size: 12px; }
+.brandCollection__editor, .brandCollection__archive { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 12px; padding: 12px 0 6px; }
+.brandCollection__editorActions, .brandCollection__archive { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.brandCollection__archive p { flex: 1 1 100%; margin: 0; color: #526174; font-size: 13px; }
 .brandCreate { margin-top: 28px; padding: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
 .brandCreate__heading h2 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 .brandCreate__heading p { margin: 7px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
@@ -117,6 +122,8 @@
   .brandCreate__form > button { grid-column: 1; justify-self: stretch; }
   .brandCollection__item { grid-template-columns: 40px minmax(0, 1fr); gap: 10px; }
   .brandCollection__social { grid-column: 2; }
+  .brandCollection__actions, .brandCollection__editor, .brandCollection__archive { grid-column: 2; }
+  .brandCollection__editor { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {

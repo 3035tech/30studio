@@ -6,6 +6,8 @@ Before changing code, read [`AGENTS.md`](./AGENTS.md) and [`docs/PRODUCT_CONTEXT
 
 For approved 30studio logos, colors, typography, and usage rules, read [`docs/PRODUCT_BRAND.md`](./docs/PRODUCT_BRAND.md). The UI uses Tailwind CSS v4 over the official brand tokens, with shared accessible controls.
 
+The screen map, feature scope, delivery phases, dependencies, and acceptance criteria live in [`docs/PRODUCT_BACKLOG.md`](./docs/PRODUCT_BACKLOG.md). Interface copy is localized in Portuguese and English through `next-intl` message catalogs; code and technical identifiers stay in English.
+
 The repository uses Git Flow; see [`docs/GIT_WORKFLOW.md`](./docs/GIT_WORKFLOW.md) for branch and commit conventions.
 
 The current work is an initial product foundation. It is not a production release. Database credentials, auth/email delivery, social OAuth app credentials, customer Brand Kit import, and deployment are not configured. No social posts can be published.

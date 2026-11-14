@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API_ERROR_CODES, HTTP_STATUS } from "@/lib/constants";
+import { API_ERROR_CODES, HTTP_STATUS, TENANT_PERMISSIONS } from "@/lib/constants";
 import { createBrand, listBrands } from "@/lib/db/repositories/brands";
 import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const tenant = await requireTenant(request, "brands:read");
+    const tenant = await requireTenant(request, TENANT_PERMISSIONS.brandsRead);
     const brands = await listBrands(tenant.organizationId);
     return NextResponse.json({ data: brands }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const tenant = await requireTenant(request, "brands:manage");
+    const tenant = await requireTenant(request, TENANT_PERMISSIONS.brandsManage);
     assertSameOriginJsonRequest(request);
 
     let body: unknown;

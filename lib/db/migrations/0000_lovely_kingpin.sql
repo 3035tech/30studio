@@ -10,7 +10,8 @@ CREATE TABLE "brands" (
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_by" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "brands_organization_id_unique" UNIQUE("organization_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "social_profiles" (
@@ -106,7 +107,7 @@ CREATE TABLE "verification" (
 ALTER TABLE "brands" ADD CONSTRAINT "brands_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "brands" ADD CONSTRAINT "brands_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_organization_id_brand_id_brands_organization_id_id_fk" FOREIGN KEY ("organization_id","brand_id") REFERENCES "public"."brands"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_org_brand_fk" FOREIGN KEY ("organization_id","brand_id") REFERENCES "public"."brands"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -114,7 +115,6 @@ ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" 
 ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "brands_organization_slug_unique" ON "brands" USING btree ("organization_id","slug");--> statement-breakpoint
-CREATE UNIQUE INDEX "brands_organization_id_unique" ON "brands" USING btree ("organization_id","id");--> statement-breakpoint
 CREATE INDEX "brands_organization_id_idx" ON "brands" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "social_profiles_organization_brand_idx" ON "social_profiles" USING btree ("organization_id","brand_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "social_profiles_identity_unique" ON "social_profiles" USING btree ("brand_id","platform","handle");--> statement-breakpoint

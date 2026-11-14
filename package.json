@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --import tsx --test tests/unit/*.test.ts",
+    "test:integration": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"
@@ -40,6 +42,7 @@
     "eslint-config-next": "16.4.3",
     "postcss": "^8.5.33",
     "tailwindcss": "^4.3.5",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }

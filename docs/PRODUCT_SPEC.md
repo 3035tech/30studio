@@ -55,7 +55,7 @@ Show empty, loading, stale, partial-data, and failed states distinctly. Do not u
 
 ### Brand portfolio
 
-Searchable organization-scoped list of brands with logo/mark, purpose, active state, social profiles and connection health, next scheduled item, approval policy, and last activity. Create, archive, and edit brands. Selecting a brand opens tabs for Overview, Brand Kit, Channels, Competitors, Content, Analytics, and Access.
+Searchable organization-scoped list of brands with logo/mark, purpose, active state, social profiles and connection health, next scheduled item, approval policy, and last activity. Create, archive, and edit brands. Archiving removes a brand from active views while preserving its associated records for history. Selecting a brand opens tabs for Overview, Brand Kit, Channels, Competitors, Content, Analytics, and Access.
 
 ### Brand Kit
 

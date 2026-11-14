@@ -35,6 +35,8 @@ export function WorkspaceEntry() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [brands, setBrands] = useState<BrandState>(INITIAL_BRANDS);
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
+  const [archivingBrandId, setArchivingBrandId] = useState<string | null>(null);
   const [organizationName, setOrganizationName] = useState("");
   const [organizationSlug, setOrganizationSlug] = useState("");
 
@@ -154,15 +156,65 @@ export function WorkspaceEntry() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error();
-      await response.json();
       formElement.reset();
-      const refreshed = await fetch("/api/brands", { credentials: "same-origin", cache: "no-store" });
-      const parsed = brandListResponseSchema.safeParse(await refreshed.json());
-      if (!refreshed.ok || !parsed.success) throw new Error();
-      setBrands({ organizationId: activeOrganizationId, items: parsed.data.data, pending: false, error: false });
+      await reloadBrands(activeOrganization.id);
       setMessage(tWorkspace("brandAdded"));
     } catch {
       setMessage(tWorkspace("brandError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reloadBrands(organizationId: string) {
+    const response = await fetch("/api/brands", { credentials: "same-origin", cache: "no-store" });
+    const parsed = brandListResponseSchema.safeParse(await response.json());
+    if (!response.ok || !parsed.success) throw new Error();
+    setBrands({ organizationId, items: parsed.data.data, pending: false, error: false });
+  }
+
+  async function handleUpdateBrand(event: FormEvent<HTMLFormElement>, brandId: string) {
+    event.preventDefault();
+    if (!activeOrganizationId) return;
+    setBusy(true);
+    setMessage("");
+    const form = new FormData(event.currentTarget);
+
+    try {
+      const response = await fetch(`/api/brands/${brandId}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(form.get("name") ?? "").trim(),
+          description: String(form.get("description") ?? "").trim(),
+          industry: String(form.get("industry") ?? "").trim(),
+        }),
+      });
+      if (!response.ok) throw new Error();
+      await reloadBrands(activeOrganizationId);
+      setEditingBrandId(null);
+      setMessage(tPortfolio("brandUpdated"));
+    } catch {
+      setMessage(tPortfolio("updateError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleArchiveBrand(brandId: string) {
+    if (!activeOrganizationId) return;
+    setBusy(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/brands/${brandId}`, { method: "DELETE", credentials: "same-origin" });
+      if (!response.ok) throw new Error();
+      await reloadBrands(activeOrganizationId);
+      setArchivingBrandId(null);
+      setMessage(tPortfolio("brandArchived"));
+    } catch {
+      setMessage(tPortfolio("archiveError"));
     } finally {
       setBusy(false);
     }
@@ -262,6 +314,28 @@ export function WorkspaceEntry() {
                 <span className="brandCollection__mark" aria-hidden="true">{brand.name.slice(0, BRAND_LIMITS.markCharacters).toLocaleUpperCase()}</span>
                 <span className="brandCollection__identity"><strong>{brand.name}</strong><small>{brand.description || brand.industry || ""}</small></span>
                 <span className="brandCollection__social">{brand.socialProfiles.length === 0 ? tPortfolio("noChannels") : brand.socialProfiles.map((profile) => profile.displayName).join(", ")}</span>
+                <span className="brandCollection__actions">
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setEditingBrandId(brand.id); setArchivingBrandId(null); }}>{tPortfolio("editBrand")}</Button>
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setArchivingBrandId(brand.id); setEditingBrandId(null); }}>{tPortfolio("archiveBrand")}</Button>
+                </span>
+                {editingBrandId === brand.id ? (
+                  <form className="brandCollection__editor" onSubmit={(event) => void handleUpdateBrand(event, brand.id)}>
+                    <TextField id={`brand-name-${brand.id}`} name="name" label={tPortfolio("brandName")} defaultValue={brand.name} maxLength={BRAND_LIMITS.nameCharacters} required />
+                    <TextField id={`brand-description-${brand.id}`} name="description" label={tPortfolio("brandDescription")} defaultValue={brand.description ?? ""} maxLength={BRAND_LIMITS.descriptionCharacters} />
+                    <TextField id={`brand-industry-${brand.id}`} name="industry" label={tPortfolio("industry")} defaultValue={brand.industry ?? ""} maxLength={BRAND_LIMITS.industryCharacters} />
+                    <div className="brandCollection__editorActions">
+                      <Button type="submit" disabled={busy}>{busy ? tAuth("working") : tPortfolio("saveChanges")}</Button>
+                      <Button appearance="quiet" type="button" disabled={busy} onClick={() => setEditingBrandId(null)}>{tPortfolio("cancel")}</Button>
+                    </div>
+                  </form>
+                ) : null}
+                {archivingBrandId === brand.id ? (
+                  <div className="brandCollection__archive" role="group" aria-label={tPortfolio("archiveConfirmationLabel", { brand: brand.name })}>
+                    <p>{tPortfolio("archiveConfirmation", { brand: brand.name })}</p>
+                    <Button type="button" disabled={busy} onClick={() => void handleArchiveBrand(brand.id)}>{busy ? tAuth("working") : tPortfolio("confirmArchive")}</Button>
+                    <Button appearance="quiet" type="button" disabled={busy} onClick={() => setArchivingBrandId(null)}>{tPortfolio("cancel")}</Button>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

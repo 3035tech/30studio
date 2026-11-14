@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, foreignKey, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, foreignKey, index, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES } from "@/lib/constants";
 import { organization, user } from "@/lib/db/auth-schema";
 
@@ -24,7 +24,7 @@ export const brands = pgTable(
   },
   (table) => [
     uniqueIndex("brands_organization_slug_unique").on(table.organizationId, table.slug),
-    uniqueIndex("brands_organization_id_unique").on(table.organizationId, table.id),
+    unique("brands_organization_id_unique").on(table.organizationId, table.id),
     index("brands_organization_id_idx").on(table.organizationId),
   ],
 );
@@ -43,7 +43,7 @@ export const socialProfiles = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
-    foreignKey({ columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    foreignKey({ name: "social_profiles_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
     index("social_profiles_organization_brand_idx").on(table.organizationId, table.brandId),
     uniqueIndex("social_profiles_identity_unique").on(table.brandId, table.platform, table.handle),
   ],

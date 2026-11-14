@@ -46,7 +46,8 @@ Also read `docs/PRODUCT_CONTEXT.md` for the durable product and tenant model.
 ## Internationalization
 
 - Portuguese (`pt-BR`) and English (`en`) are supported from the first feature. Use `next-intl` and locale-prefixed routing.
-- Never place user-facing strings directly in components, API errors, or validation messages. Put messages in typed locale catalogs and keep keys aligned across languages.
+- Write all source code in English: identifiers, code-module filenames, comments, tests, fixtures, and technical configuration names. User-facing copy may be Portuguese or English only through localization catalogs.
+- Never place user-facing strings directly in components, API errors, or validation messages. Put every label, button, navigation item, empty/loading/error/success state, accessibility name, and validation message in locale catalogs and keep keys aligned across languages.
 - Format dates, numbers, and currencies through locale-aware formatters; do not concatenate localized values manually.
 
 ## Constants and types

@@ -88,15 +88,31 @@ export const BETTER_AUTH_ENV = {
   trustedOrigins: "BETTER_AUTH_TRUSTED_ORIGINS",
 } as const;
 
-export const TENANT_ROLES = ["owner", "admin", "editor", "approver", "analyst"] as const;
+export const TENANT_ROLE = {
+  owner: "owner",
+  admin: "admin",
+  editor: "editor",
+  approver: "approver",
+  analyst: "analyst",
+} as const;
+export const TENANT_ROLES = Object.values(TENANT_ROLE);
 export type TenantRole = (typeof TENANT_ROLES)[number];
+export const TENANT_PERMISSIONS = {
+  organizationManage: "organization:manage",
+  membersManage: "members:manage",
+  brandsRead: "brands:read",
+  brandsManage: "brands:manage",
+  contentRead: "content:read",
+  contentManage: "content:manage",
+  contentApprove: "content:approve",
+  analyticsRead: "analytics:read",
+} as const;
+export type TenantPermission = (typeof TENANT_PERMISSIONS)[keyof typeof TENANT_PERMISSIONS];
 
 export const TENANT_ROLE_PERMISSIONS = {
-  owner: ["organization:manage", "members:manage", "brands:read", "brands:manage", "content:read", "content:manage", "content:approve", "analytics:read"],
-  admin: ["members:manage", "brands:read", "brands:manage", "content:read", "content:manage", "content:approve", "analytics:read"],
-  editor: ["brands:read", "content:manage", "analytics:read"],
-  approver: ["brands:read", "content:read", "content:approve", "analytics:read"],
-  analyst: ["brands:read", "content:read", "analytics:read"],
+  [TENANT_ROLE.owner]: [TENANT_PERMISSIONS.organizationManage, TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.admin]: [TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.editor]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.approver]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.analyst]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.analyticsRead],
 } as const;
-
-export type TenantPermission = (typeof TENANT_ROLE_PERMISSIONS)[TenantRole][number];

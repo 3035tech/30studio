@@ -29,3 +29,11 @@ export function getDatabase() {
   globalDatabase.studioDatabase ??= createDatabase();
   return globalDatabase.studioDatabase.db;
 }
+
+export async function closeDatabase() {
+  const databaseState = globalDatabase.studioDatabase;
+  if (!databaseState) return;
+
+  await databaseState.pool.end();
+  delete globalDatabase.studioDatabase;
+}
