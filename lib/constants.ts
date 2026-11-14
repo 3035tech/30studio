@@ -3,6 +3,12 @@ export const PRODUCT = {
   groupName: "Grupo 3035",
 } as const;
 
+export const WORKSPACE_SECTION_IDS = {
+  overview: "workspace-overview",
+  brands: "workspace-brands",
+  createBrand: "workspace-create-brand",
+} as const;
+
 export const BRAND_ASSETS = {
   logoOnLight: "/brand/logos/logo-default.png",
   logoOnDark: "/brand/logos/logo-light.png",

@@ -14,7 +14,10 @@
     "notifications": "Notificações",
     "workspaceMenu": "Menu do espaço de trabalho",
     "userMenu": "Menu do usuário",
-    "switchLanguage": "Mudar idioma"
+    "switchLanguage": "Mudar idioma",
+    "workspaceNavigation": "Navegação do espaço de trabalho",
+    "english": "English",
+    "portuguese": "Português"
   },
   "auth": {
     "title": "30studio",
@@ -108,6 +111,12 @@
     "loadError": "Não foi possível carregar as marcas.",
     "createError": "Não foi possível criar a marca.",
     "serverSetupNeeded": "O acesso e o banco de dados ainda precisam ser configurados para este ambiente.",
+    "overviewTitle": "Organize seu espaço de marketing",
+    "overviewDescription": "Comece pelas marcas do workspace e configure cada uma no seu ritmo.",
+    "activeBrandCount": "{count, plural, one {# marca ativa} other {# marcas ativas}}",
+    "brandCountSummary": "Quantidade de marcas ativas neste espaço",
+    "viewBrands": "Ver marcas",
+    "brandsSectionDescription": "As marcas deste espaço ficam reunidas aqui.",
     "brandOptions": "Opções de {brand}",
     "socialProfileCount": "{count, plural, one {# perfil} other {# perfis}}",
     "demoNote": "Prévia inicial: as marcas serão carregadas do banco quando o ambiente estiver conectado."

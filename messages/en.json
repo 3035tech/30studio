@@ -14,7 +14,10 @@
     "notifications": "Notifications",
     "workspaceMenu": "Workspace menu",
     "userMenu": "User menu",
-    "switchLanguage": "Change language"
+    "switchLanguage": "Change language",
+    "workspaceNavigation": "Workspace navigation",
+    "english": "English",
+    "portuguese": "Português"
   },
   "auth": {
     "title": "30studio",
@@ -108,6 +111,12 @@
     "loadError": "Could not load brands.",
     "createError": "Could not create the brand.",
     "serverSetupNeeded": "Access and database still need to be configured for this environment.",
+    "overviewTitle": "Organize your marketing workspace",
+    "overviewDescription": "Start with your workspace brands and set each one up at your own pace.",
+    "activeBrandCount": "{count, plural, one {# active brand} other {# active brands}}",
+    "brandCountSummary": "Number of active brands in this workspace",
+    "viewBrands": "View brands",
+    "brandsSectionDescription": "All brands in this workspace are collected here.",
     "brandOptions": "Options for {brand}",
     "socialProfileCount": "{count, plural, one {# profile} other {# profiles}}",
     "demoNote": "Initial preview: brands will load from the database once this environment is connected."

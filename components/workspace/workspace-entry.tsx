@@ -5,10 +5,11 @@ import { useLocale, useTranslations } from "next-intl";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { SelectField, TextField } from "@/components/ui/field";
+import { TextField } from "@/components/ui/field";
 import { brandListResponseSchema, type BrandListItem } from "@/lib/validation/brands";
-import { AUTH_LIMITS, BRAND_LIMITS, type Locale } from "@/lib/constants";
+import { AUTH_LIMITS, BRAND_LIMITS, WORKSPACE_SECTION_IDS, type Locale } from "@/lib/constants";
 import { Link } from "@/lib/i18n/routing";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
 type AuthMode = "sign_in" | "sign_up";
 type BrandState = { organizationId: string | null; items: BrandListItem[]; pending: boolean; error: boolean };
@@ -281,30 +282,51 @@ export function WorkspaceEntry() {
   }
 
   return (
-    <main className="workspaceShell">
-      <header className="workspaceHeader">
-        <Link className="workspaceBrand" href="#workspace" aria-label={tWorkspace("title")}><BrandLogo /></Link>
-        <div className="workspaceHeaderActions">
-          <SelectField id="organization" label={tWorkspace("switchOrganization")} value={activeOrganization?.id ?? ""} onChange={(event) => void handleOrganizationChange(event.target.value)} disabled={busy}>
-            <option value="" disabled>{tWorkspace("switchOrganization")}</option>
-            {organizationOptions.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-          </SelectField>
-          <span className="workspaceEmail">{session?.user.email}</span>
-          <Link className="localeLink" href="/" locale={nextLocale} aria-label={tNavigation("switchLanguage")}>{locale === "pt" ? "EN" : "PT"}</Link>
-          <Button appearance="quiet" type="button" onClick={() => void handleSignOut()} disabled={busy}>{tWorkspace("signOut")}</Button>
+    <WorkspaceShell
+      organizations={organizationOptions}
+      activeOrganizationId={activeOrganization?.id ?? organizationOptions[0]?.id ?? ""}
+      userEmail={session?.user.email ?? ""}
+      nextLocale={nextLocale}
+      busy={busy}
+      onOrganizationChange={(organizationId) => void handleOrganizationChange(organizationId)}
+      onSignOut={() => void handleSignOut()}
+    >
+      {message ? <p className="entryMessage" role="status">{message}</p> : null}
+      {currentBrands.error ? <p className="entryMessage entryMessage--error" role="alert">{tWorkspace("loadError")}</p> : null}
+      <section className="workspaceOverview" id={WORKSPACE_SECTION_IDS.overview} aria-labelledby="workspace-overview-title">
+        <div className="workspaceOverview__intro">
+          <p className="entryKicker">{activeOrganization?.name ?? tWorkspace("title")}</p>
+          <h1 id="workspace-overview-title">{tPortfolio("overviewTitle")}</h1>
+          <p className="entryDescription">{tPortfolio("overviewDescription")}</p>
+          <div className="workspaceOverview__actions">
+            <Button asChild>
+              <a href={`#${WORKSPACE_SECTION_IDS.brands}`}>{tPortfolio("viewBrands")}</a>
+            </Button>
+            <Button appearance="quiet" asChild>
+              <a href={`#${WORKSPACE_SECTION_IDS.createBrand}`}>{tWorkspace("addBrand")}</a>
+            </Button>
+          </div>
         </div>
-      </header>
-      <section className="workspaceContent" id="workspace">
+        <aside className="workspaceOverview__summary" aria-label={tPortfolio("brandCountSummary")} aria-live="polite">
+          {currentBrands.pending ? <span>{tWorkspace("loadingBrands")}</span> : null}
+          {currentBrands.error ? <span>{tWorkspace("loadError")}</span> : null}
+          {!currentBrands.pending && !currentBrands.error ? (
+            <>
+              <strong>{currentBrands.items.length}</strong>
+              <span>{tPortfolio("activeBrandCount", { count: currentBrands.items.length })}</span>
+            </>
+          ) : null}
+        </aside>
+      </section>
+
+      <section className="workspaceBrands" id={WORKSPACE_SECTION_IDS.brands} aria-labelledby="workspace-brands-title">
         <div className="workspaceHeading">
           <div>
-            <p className="entryKicker">{activeOrganization?.name ?? tWorkspace("title")}</p>
-            <h1>{tPortfolio("title")}</h1>
-            <p className="entryDescription">{tPortfolio("subtitle")}</p>
+            <p className="entryKicker">{tPortfolio("eyebrow")}</p>
+            <h2 id="workspace-brands-title">{tPortfolio("title")}</h2>
+            <p className="entryDescription">{tPortfolio("brandsSectionDescription")}</p>
           </div>
-          <p className="brandCount">{tWorkspace("brandCount", { count: currentBrands.items.length })}</p>
         </div>
-        {message ? <p className="entryMessage" role="status">{message}</p> : null}
-        {currentBrands.error ? <p className="entryMessage entryMessage--error" role="alert">{tWorkspace("loadError")}</p> : null}
         {currentBrands.pending ? <p className="workspaceEmpty" aria-live="polite">{tWorkspace("loadingBrands")}</p> : null}
         {!currentBrands.pending && !currentBrands.error && currentBrands.items.length === 0 ? <p className="workspaceEmpty">{tWorkspace("emptyBrands")}</p> : null}
         {currentBrands.items.length > 0 ? (
@@ -340,7 +362,7 @@ export function WorkspaceEntry() {
             ))}
           </ul>
         ) : null}
-        <section className="brandCreate" aria-labelledby="brand-create-title">
+        <section className="brandCreate" id={WORKSPACE_SECTION_IDS.createBrand} aria-labelledby="brand-create-title">
           <div className="brandCreate__heading"><h2 id="brand-create-title">{tPortfolio("createTitle")}</h2><p>{tPortfolio("createDescription")}</p></div>
           <form className="brandCreate__form" onSubmit={handleCreateBrand}>
             <TextField id="brandName" name="brandName" label={tWorkspace("brandName")} maxLength={BRAND_LIMITS.nameCharacters} required />
@@ -350,6 +372,6 @@ export function WorkspaceEntry() {
           </form>
         </section>
       </section>
-    </main>
+    </WorkspaceShell>
   );
 }

@@ -62,7 +62,7 @@
 .localeLink:hover { background: rgb(139 92 246 / 12%); }
 
 .workspaceShell { min-height: 100vh; background: var(--brand-surface); color: var(--brand-text); }
-.workspaceHeader { min-height: 78px; padding: 14px clamp(18px, 5vw, 74px); display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+.workspaceHeader { min-height: 78px; padding: 14px clamp(18px, 4vw, 52px); display: flex; align-items: center; justify-content: space-between; gap: 24px; background: #fff; border-bottom: 1px solid #e2e8f0; }
 .workspaceBrand { display: inline-flex; align-items: center; text-decoration: none; }
 .workspaceBrand .brandLogo { width: 180px; }
 .workspaceHeaderActions { display: flex; align-items: center; gap: 16px; }
@@ -70,9 +70,24 @@
 .workspaceHeaderActions label { font-size: 12px; color: #526174; }
 .workspaceHeaderActions select { min-height: 38px; font-size: 13px; }
 .workspaceEmail { max-width: 220px; overflow: hidden; color: #526174; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.workspaceContent { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 54px 0 80px; }
-.workspaceHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+.workspaceFrame { width: min(calc(100% - 48px), 1440px); margin: 0 auto; padding: 34px 0 64px; display: grid; grid-template-columns: 218px minmax(0, 1fr); align-items: start; gap: clamp(28px, 5vw, 72px); }
+.workspaceNavigation { position: sticky; top: 104px; display: grid; gap: 6px; }
+.workspaceNavigation__link { min-height: 46px; padding: 10px 13px; display: flex; align-items: center; gap: 11px; border-left: 3px solid transparent; border-radius: 7px; color: var(--brand-text); font-size: 14px; font-weight: 550; text-decoration: none; transition: background-color .16s ease, color .16s ease; }
+.workspaceNavigation__link:hover { background: color-mix(in srgb, var(--brand-primary) 7%, white); }
+.workspaceNavigation__link.is-active { border-left-color: var(--brand-primary); background: color-mix(in srgb, var(--brand-primary) 10%, white); color: var(--brand-primary); font-weight: 700; }
+.workspaceContent { width: 100%; max-width: 1080px; min-width: 0; margin: 0; padding: 0 0 80px; }
+.workspaceOverview { min-height: 238px; padding: 32px clamp(24px, 4vw, 42px); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px; background: #fff; border: 1px solid #e2e8f0; border-left: 5px solid var(--brand-primary); border-radius: 12px; }
+.workspaceOverview .entryKicker { margin: 0 0 11px; }
+.workspaceOverview h1 { max-width: 18ch; margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: clamp(28px, 3vw, 40px); font-weight: 700; line-height: 1.15; letter-spacing: -.035em; }
+.workspaceOverview .entryDescription { margin-top: 10px; }
+.workspaceOverview__actions { margin-top: 23px; display: flex; flex-wrap: wrap; gap: 9px; }
+.workspaceOverview__summary { min-width: 178px; min-height: 112px; padding-left: 28px; display: grid; align-content: center; gap: 4px; border-left: 1px solid #e2e8f0; }
+.workspaceOverview__summary strong { color: var(--brand-primary); font-family: var(--brand-display-font); font-size: 54px; font-weight: 700; letter-spacing: -.055em; line-height: 1; }
+.workspaceOverview__summary span { max-width: 19ch; color: #526174; font-size: 13px; line-height: 1.4; }
+.workspaceBrands { margin-top: 52px; scroll-margin-top: 32px; }
+.workspaceHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .workspaceHeading .entryKicker { margin-top: 0; }
+.workspaceHeading h2 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 28px; font-weight: 700; letter-spacing: -.035em; }
 .workspaceHeading .entryDescription { margin-top: 8px; }
 .brandCount { margin: 0 0 4px; color: #526174; font-size: 13px; }
 .workspaceEmpty { padding: 25px; background: #fff; border: 1px dashed #cbd5e1; border-radius: 9px; color: #526174; font-size: 14px; }
@@ -100,9 +115,15 @@
   .brandLogo__light { display: none !important; }
   .brandLogo__dark { display: block !important; }
   .entryPanel, .workspaceHeader, .workspaceEmpty, .brandCollection, .brandCreate { background: #12264a; border-color: #344667; }
-  .entryPanel h1, .workspaceHeading h1, .brandCollection__identity strong, .brandCreate__heading h2 { color: #f8fafc; }
+  .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2 { color: #f8fafc; }
   .entryDescription, .entryLoading, .brandCount, .brandCollection__identity small, .brandCollection__social, .brandCreate__heading p, .workspaceHeaderActions label, .workspaceEmail { color: #cbd5e1; }
   .workspaceHeader { border-color: #344667; }
+  .workspaceNavigation__link { color: #e2e8f0; }
+  .workspaceNavigation__link:hover { background: rgb(139 92 246 / 15%); }
+  .workspaceNavigation__link.is-active { background: rgb(139 92 246 / 21%); color: #ddd6fe; }
+  .workspaceOverview { background: #12264a; border-color: #344667; border-left-color: var(--brand-primary); }
+  .workspaceOverview__summary { border-color: #344667; }
+  .workspaceOverview__summary span { color: #cbd5e1; }
   .brandCollection__item { border-color: #344667; }
   .brandCollection__mark { background: rgb(139 92 246 / 20%); color: #c4b5fd; }
   .workspaceHeaderActions input, .workspaceHeaderActions select, .brandCreate input, .entryPanel input { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
@@ -116,7 +137,16 @@
   .workspaceHeaderActions { width: 100%; flex-wrap: wrap; gap: 8px; }
   .workspaceHeaderActions > .grid { flex: 1; grid-template-columns: 1fr; gap: 5px; }
   .workspaceEmail { margin-left: auto; }
-  .workspaceContent { padding-top: 36px; }
+  .workspaceFrame { width: calc(100% - 36px); grid-template-columns: 1fr; gap: 27px; padding-top: 22px; }
+  .workspaceNavigation { position: static; display: flex; overflow-x: auto; padding: 0 0 4px; border-bottom: 1px solid #e2e8f0; }
+  .workspaceNavigation__link { flex: 0 0 auto; border-left: 0; border-bottom: 3px solid transparent; }
+  .workspaceNavigation__link.is-active { border-bottom-color: var(--brand-primary); }
+  .workspaceContent { padding-top: 0; }
+  .workspaceOverview { min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 26px 24px; }
+  .workspaceOverview__summary { min-width: 0; min-height: 0; padding: 17px 0 0; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 12px; border-left: 0; border-top: 1px solid #e2e8f0; }
+  .workspaceOverview__summary strong { font-size: 42px; }
+  .workspaceOverview__summary span { max-width: none; }
+  .workspaceBrands { margin-top: 38px; }
   .workspaceHeading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .brandCreate__form { grid-template-columns: 1fr; }
   .brandCreate__form > button { grid-column: 1; justify-self: stretch; }
@@ -129,11 +159,13 @@
 @media (max-width: 480px) {
   .entryShell { padding: 16px; }
   .entryPanel { padding: 26px 21px; }
-  .workspaceContent { width: calc(100% - 32px); }
+  .workspaceFrame { width: calc(100% - 28px); }
   .workspaceHeader { padding: 13px 16px; }
   .workspaceHeaderActions > .grid { min-width: 100%; }
   .workspaceEmail { margin: 4px auto 4px 0; }
-  .workspaceHeading h1 { font-size: 27px; }
+  .workspaceHeading h2 { font-size: 24px; }
+  .workspaceOverview { padding: 23px 19px; }
+  .workspaceOverview__actions { align-items: stretch; flex-direction: column; }
   .brandCreate { padding: 19px; }
 }
 
