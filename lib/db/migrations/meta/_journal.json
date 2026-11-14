@@ -36,6 +36,34 @@
       "when": 1794667120258,
       "tag": "0004_normal_nocturne",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794672605124,
+      "tag": "0005_brand_assets",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794674011903,
+      "tag": "0006_asset_rights_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794674144023,
+      "tag": "0007_asset_checksum_lookup",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794674340003,
+      "tag": "0008_asset_upload_key",
+      "breakpoints": true
     }
   ]
 }

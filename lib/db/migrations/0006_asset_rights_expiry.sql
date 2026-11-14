@@ -1,0 +1,1 @@
+ALTER TABLE "brand_assets" ADD COLUMN "rights_expires_at" date;

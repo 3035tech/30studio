@@ -58,6 +58,76 @@ export const BRAND_KIT_VERSION_STATUS = {
   approved: "approved",
   superseded: "superseded",
 } as const;
+export const BRAND_ASSET_STATUSES = ["upload_pending", "pending_review", "approved", "rejected"] as const;
+export type BrandAssetStatus = (typeof BRAND_ASSET_STATUSES)[number];
+export const BRAND_ASSET_STATUS = {
+  uploadPending: "upload_pending",
+  pendingReview: "pending_review",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+export const BRAND_ASSET_KINDS = ["logo", "template_reference", "other"] as const;
+export type BrandAssetKind = (typeof BRAND_ASSET_KINDS)[number];
+export const BRAND_ASSET_REVIEW_DECISIONS = ["approved", "rejected"] as const;
+export const BRAND_ASSET_REVIEW_DECISION = {
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+export const BRAND_ASSET_LIMITS = {
+  maximumBytes: 10 * 1024 * 1024,
+  maximumImagePixels: 20_000_000,
+  maximumFileNameCharacters: 180,
+  maximumSourceUrlCharacters: 2_048,
+  maximumLicenseCharacters: 500,
+  maximumAltTextCharacters: 500,
+  uploadExpirySeconds: 300,
+  downloadExpirySeconds: 60,
+  listItems: 100,
+  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] as const,
+} as const;
+export const BRAND_ASSET_EXTENSIONS_BY_MIME = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+  "image/webp": [".webp"],
+} as const;
+export const BRAND_ASSET_FORMATS_BY_MIME = {
+  "image/jpeg": "jpeg",
+  "image/png": "png",
+  "image/webp": "webp",
+} as const;
+export const BRAND_ASSET_API_PATHS = {
+  brands: "/api/brands",
+  segment: "assets",
+  finalizeAction: "finalize",
+  reviewAction: "review",
+  downloadAction: "download",
+} as const;
+export const BRAND_ASSET_ACTIONS = {
+  finalize: BRAND_ASSET_API_PATHS.finalizeAction,
+  review: BRAND_ASSET_API_PATHS.reviewAction,
+  download: BRAND_ASSET_API_PATHS.downloadAction,
+} as const;
+export const BRAND_ASSET_ENV = {
+  bucket: "STUDIO_ASSET_BUCKET",
+  region: "AWS_REGION",
+  endpoint: "STUDIO_ASSET_ENDPOINT",
+} as const;
+export function getBrandAssetsApiPath(brandId: string) {
+  return `${BRAND_ASSET_API_PATHS.brands}/${encodeURIComponent(brandId)}/${BRAND_ASSET_API_PATHS.segment}`;
+}
+export function getBrandAssetActionApiPath(brandId: string, assetId: string, action: typeof BRAND_ASSET_ACTIONS[keyof typeof BRAND_ASSET_ACTIONS]) {
+  return `${getBrandAssetsApiPath(brandId)}/${encodeURIComponent(assetId)}/${action}`;
+}
+export const BRAND_ASSET_UI_IDS = {
+  libraryPrefix: "brand-asset-library-",
+  filePrefix: "brand-asset-file-",
+  kindPrefix: "brand-asset-kind-",
+  sourcePrefix: "brand-asset-source-",
+  licensePrefix: "brand-asset-license-",
+  rightsExpiryPrefix: "brand-asset-rights-expiry-",
+  altTextPrefix: "brand-asset-alt-text-",
+  reviewNotePrefix: "brand-asset-review-note-",
+} as const;
 export const BRAND_KIT_LIMITS = {
   textCharacters: 2_000,
   itemCharacters: 200,
@@ -104,6 +174,9 @@ export const API_ERROR_CODES = {
   brandExists: "BRAND_EXISTS",
   brandNotFound: "BRAND_NOT_FOUND",
   profileExists: "PROFILE_EXISTS",
+  brandAssetNotFound: "BRAND_ASSET_NOT_FOUND",
+  brandAssetInvalid: "BRAND_ASSET_INVALID",
+  brandAssetStateConflict: "BRAND_ASSET_STATE_CONFLICT",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
   invitationNotFound: "INVITATION_NOT_FOUND",

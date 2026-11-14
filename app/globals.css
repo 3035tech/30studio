@@ -125,6 +125,26 @@
 .brandKitStatus--draft { background: #fff2dc; color: #8a4b00; }
 .brandKitStatus--approved { background: #dcfce7; color: #166534; }
 .brandKitStatus--superseded { background: #e2e8f0; color: #475569; }
+.brandAssetLibrary { margin-top: 26px; padding-top: 22px; border-top: 1px solid #dbe3ee; }
+.brandAssetLibrary__header h4 { margin: 0; color: var(--brand-dark); font-size: 15px; }
+.brandAssetLibrary__header p { margin: 6px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
+.brandAssetLibrary__upload { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px; margin-top: 17px; }
+.brandAssetLibrary__upload > button { justify-self: start; }
+.brandAssetLibrary__reviewNote { max-width: 720px; margin-top: 17px; }
+.brandAssetLibrary__state { margin: 14px 0; color: var(--brand-primary); font-size: 13px; }
+.brandAssetLibrary__state--error { color: #a34240; }
+.brandAssetLibrary__preview { display: grid; justify-items: start; gap: 12px; margin-top: 18px; padding: 16px; border: 1px solid #dbe3ee; border-radius: 9px; background: #fff; }
+.brandAssetLibrary__preview header { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brandAssetLibrary__preview h5 { margin: 0; color: var(--brand-dark); font-size: 14px; }
+.brandAssetLibrary__preview img { display: block; width: auto; height: auto; max-width: 100%; max-height: 420px; object-fit: contain; }
+.brandAssetLibrary__fileName { overflow-wrap: anywhere; font-weight: 650; }
+.brandAssetLibrary__fileDetails { display: grid; gap: 4px; }
+.brandAssetLibrary__fileDetails a, .brandAssetLibrary__fileDetails small { overflow-wrap: anywhere; color: var(--brand-primary); font-size: 11px; }
+.brandAssetLibrary__actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.brandAssetLibrary__actions button { min-height: 34px; padding-inline: 8px; font-size: 12px; }
+.brandAssetStatus { display: inline-flex; min-height: 26px; align-items: center; padding: 3px 9px; border-radius: 20px; background: color-mix(in srgb, var(--brand-secondary) 14%, white); color: var(--brand-dark); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.brandAssetStatus--approved { background: color-mix(in srgb, #15803d 14%, white); color: #166534; }
+.brandAssetStatus--rejected { background: color-mix(in srgb, #b91c1c 12%, white); color: #991b1b; }
 .brandCreate { margin-top: 28px; padding: 24px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; }
 .brandCreate__heading h2 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 .brandCreate__heading p { margin: 7px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
@@ -183,6 +203,14 @@
   .dataTable__scroll { background: #12264a; border-color: #344667; }
   .teamInviteForm { background: #12264a; border-color: #344667; }
   .brandKitEditor__form, .brandKitEditor__history { border-color: #344667; }
+  .brandAssetLibrary { border-color: #344667; }
+  .brandAssetLibrary__preview { background: #0b1b3b; border-color: #344667; }
+  .brandAssetLibrary__preview h5 { color: #f8fafc; }
+  .brandAssetLibrary__header h4 { color: #f8fafc; }
+  .brandAssetLibrary__header p { color: #cbd5e1; }
+  .brandAssetStatus { background: #344667; color: #e2e8f0; }
+  .brandAssetStatus--approved { background: rgb(21 128 61 / 28%); color: #bbf7d0; }
+  .brandAssetStatus--rejected { background: rgb(185 28 28 / 28%); color: #fecaca; }
   .brandKitEditor textarea, .brandKitEditor input { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
   .brandKitStatus--superseded { background: #344667; color: #e2e8f0; }
   .teamAccess__section h3 { color: #f8fafc; }
@@ -225,6 +253,7 @@
   .brandKitEditor { padding: 18px; }
   .brandKitEditor__header, .brandKitEditor__factsHeading { align-items: stretch; flex-direction: column; }
   .brandKitEditor__fields, .brandKitEditor__fact { grid-template-columns: 1fr; }
+  .brandAssetLibrary__upload { grid-template-columns: 1fr; }
   .brandKitEditor__error { align-items: flex-start; flex-direction: column; }
   .teamCollection__item { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .teamCollection__actions { align-items: stretch; flex-wrap: wrap; }

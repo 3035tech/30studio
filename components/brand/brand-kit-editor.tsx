@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
+import { BrandAssetLibrary } from "@/components/brand/brand-asset-library";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { TextAreaField, TextField } from "@/components/ui/field";
@@ -248,6 +249,7 @@ export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandN
           </section>
         </>
       )}
+      <BrandAssetLibrary key={brandId} brandId={brandId} />
     </section>
   );
 }

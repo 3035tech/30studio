@@ -1,0 +1,12 @@
+services:
+  localstack:
+    image: localstack/localstack:2026.10.7
+    environment:
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:?Set LOCALSTACK_AUTH_TOKEN in the shell}
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      PERSISTENCE: "0"
+    ports:
+      - "127.0.0.1:4566:4566"

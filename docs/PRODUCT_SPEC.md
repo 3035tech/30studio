@@ -121,7 +121,7 @@ Auth identity and organization membership are managed by Better Auth's organizat
 | CompetitorSource / Observation | Authorized source configuration and time-stamped public observation with provenance and data quality. |
 | Campaign | Organization/brand objective, audience, dates, owner, budget and measured outcomes. |
 | ContentItem / ContentVersion | Canonical brief and immutable channel-specific content revisions; exact Brand Kit and connector capability versions used. |
-| MediaAsset / ContentAsset | Private object key, checksum, dimensions/duration, rights, creator, variants and attachment to content version. |
+| MediaAsset / ContentAsset | Private tenant/brand object key, checksum, verified image dimensions, provenance/license, creator, immutable review decisions, variants and attachment to content version. The initial `brand_assets` slice supports raster brand images only. |
 | ReviewFinding / Comment | Automated/manual review findings and feedback tied to an immutable version. |
 | ApprovalPolicy / ApprovalDecision | Scoped required approvers/rule; append-only decision tied to version fingerprint, actor and time. |
 | PublicationJob / Attempt | Approved scheduled intent, idempotency key, external profile, remote ID, attempt history, retries and final status. |

@@ -2,6 +2,9 @@
   "name": "30studio",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,11 +12,15 @@
     "lint": "eslint .",
     "test": "node --import tsx --test tests/unit/*.test.ts",
     "test:integration": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
+    "test:localstack": "node --conditions=react-server --import tsx --test tests/integration/brand-assets-storage.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1169.0",
+    "@aws-sdk/s3-presigned-post": "3.1169.0",
+    "@aws-sdk/s3-request-presigner": "3.1169.0",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-slot": "1.2.4",
     "better-auth": "1.7.23",
@@ -28,6 +35,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "server-only": "^0.0.1",
+    "sharp": "0.35.5",
     "tailwind-merge": "3.3.1",
     "zod": "4.6.7"
   },
