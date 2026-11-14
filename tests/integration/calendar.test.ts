@@ -3,7 +3,8 @@ import { after, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
 import { CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
-import { createCalendarIdea, listCalendarItems } from "@/lib/db/repositories/calendar";
+import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
+import { createCalendarContentVersion, createCalendarIdea, getCalendarContentVersions, listCalendarItems } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { organization, user } from "@/lib/db/schema";
 
@@ -47,6 +48,19 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   const brandB = await createBrand({ name: "Calendar brand B" }, ids.organizationB, ids.user);
   assert.ok(brandA);
   assert.ok(brandB);
+  const brandKit = await createBrandKitVersion(ids.organizationA, brandA.id, ids.user, {
+    audience: "School owners",
+    toneOfVoice: "Clear and helpful",
+    colors: [],
+    fontFamilies: [],
+    keyMessages: [],
+    products: [],
+    verifiedFacts: [],
+    restrictedClaims: [],
+    callsToAction: [],
+  });
+  assert.ok(brandKit);
+  assert.ok(await approveBrandKitVersion(ids.organizationA, brandA.id, brandKit.id, ids.user));
 
   const plannedAt = new Date("2026-11-20T15:30:00.000Z");
   const item = await createCalendarIdea(ids.organizationA, ids.user, {
@@ -73,4 +87,44 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     timeZone: "America/Sao_Paulo",
   })), null);
   assert.equal((await listCalendarItems(ids.organizationA, { ...query, brandId: brandB.id })).data.length, 0);
+
+  const firstVersion = await createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Launch announcement",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "The verified source message.",
+    variantCopy: "A LinkedIn-specific draft.",
+  });
+  assert.ok(firstVersion);
+  assert.equal(firstVersion.versionNumber, 1);
+  assert.equal((await listCalendarItems(ids.organizationA, { ...query, status: CONTENT_STATUS.draft })).data.length, 1);
+
+  const secondVersion = await createCalendarContentVersion(ids.organizationA, ids.user, item.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Launch announcement",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "The updated verified source message.",
+    variantCopy: "The updated LinkedIn-specific draft.",
+  });
+  assert.equal(secondVersion?.versionNumber, 2);
+
+  const history = await getCalendarContentVersions(ids.organizationA, item.id);
+  assert.equal(history?.current?.versionNumber, 2);
+  assert.equal(history?.current?.brandKitVersionNumber, 1);
+  assert.equal(history?.current?.canonicalCopy, "The updated verified source message.");
+  assert.deepEqual(history?.history.map((version) => version.versionNumber), [2, 1]);
+  assert.equal(await getCalendarContentVersions(ids.organizationB, item.id), null);
+  assert.equal(await createCalendarContentVersion(ids.organizationB, ids.user, item.id, {
+    brandId: brandB.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Cross-tenant attempt",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "Must not be stored.",
+    variantCopy: "Must not be stored.",
+  }), null);
 });

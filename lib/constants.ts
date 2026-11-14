@@ -66,9 +66,13 @@ export const CONTENT_STATUS = {
 } as const;
 export const CONTENT_LIMITS = {
   titleCharacters: 180,
+  canonicalCopyCharacters: 5_000,
+  variantCopyCharacters: 5_000,
   maximumCalendarItems: 300,
   maximumVisibleCalendarItemsPerDay: 3,
+  maximumContentVersionsInHistory: 10,
 } as const;
+export const CONTENT_EDITABLE_STATUSES = [CONTENT_STATUS.idea, CONTENT_STATUS.draft] as const;
 export const CALENDAR = {
   daysPerWeek: 7,
   weeksPerView: 6,
@@ -83,6 +87,7 @@ export const CALENDAR = {
 export const CALENDAR_API_PATHS = {
   collection: "/api/calendar",
   item: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}`,
+  versions: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/versions`,
 } as const;
 export const CALENDAR_VIEW_MODES = ["month", "list"] as const;
 export type CalendarViewMode = (typeof CALENDAR_VIEW_MODES)[number];
@@ -101,6 +106,8 @@ export const CALENDAR_UI_IDS = {
   newIdeaForm: "editorial-calendar-new-idea",
   editTitle: "calendar-edit-title",
   editDescription: "calendar-edit-description",
+  canonicalCopy: "calendar-canonical-copy",
+  variantCopy: "calendar-variant-copy",
 } as const;
 
 export const BRAND_KIT_VERSION_STATUSES = ["draft", "approved", "superseded"] as const;

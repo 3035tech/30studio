@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CALENDAR, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
+import { calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
   const result = calendarItemCreateSchema.safeParse({
@@ -39,6 +39,21 @@ test("calendar idea updates accept only editable calendar fields", () => {
   assert.equal(result.success, true);
   assert.equal(calendarItemUpdateSchema.safeParse({ ...validUpdate, status: "approved" }).success, false);
   assert.equal(calendarItemUpdateSchema.safeParse({ ...validUpdate, organizationId: "another-tenant" }).success, false);
+});
+
+test("calendar content versions require bounded canonical and channel copy", () => {
+  const validVersion = {
+    brandId: "11111111-1111-4111-8111-111111111111",
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Product launch",
+    plannedAt: "2026-11-14T12:00:00.000Z",
+    timeZone: "UTC",
+    canonicalCopy: "A source draft for the campaign.",
+    variantCopy: "A LinkedIn version of the draft.",
+  };
+  assert.equal(calendarContentVersionSaveSchema.safeParse(validVersion).success, true);
+  assert.equal(calendarContentVersionSaveSchema.safeParse({ ...validVersion, variantCopy: " " }).success, false);
+  assert.equal(calendarContentVersionSaveSchema.safeParse({ ...validVersion, status: "approved" }).success, false);
 });
 
 test("calendar query accepts one grid and rejects oversized or empty ranges", () => {

@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SelectField, TextField } from "@/components/ui/field";
+import { SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type Locale } from "@/lib/constants";
+import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
 
 type CalendarState = {
   requestKey: string;
@@ -27,6 +27,10 @@ function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}`;
 }
 
+function isContentEditable(status: ContentStatus) {
+  return CONTENT_EDITABLE_STATUSES.some((editableStatus) => editableStatus === status);
+}
+
 export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly BrandListItem[] }) {
   const t = useTranslations("calendar");
   const locale = useLocale() as Locale;
@@ -36,6 +40,12 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
   const [statusFilter, setStatusFilter] = useState("");
   const [viewMode, setViewMode] = useState<CalendarViewMode>(CALENDAR_VIEW_MODE.month);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const [contentVersionState, setContentVersionState] = useState<{
+    itemId: string;
+    data: ReturnType<typeof calendarContentVersionResponseSchema.parse>["data"] | null;
+    error: boolean;
+  } | null>(null);
+  const [contentRefreshIndex, setContentRefreshIndex] = useState(0);
   const [state, setState] = useState(INITIAL_STATE);
   const [formOpen, setFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
@@ -79,6 +89,30 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     void load();
     return () => controller.abort();
   }, [brandFilter, end, platformFilter, requestKey, start, statusFilter]);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    const controller = new AbortController();
+    const loadVersions = async () => {
+      try {
+        const response = await fetch(CALENDAR_API_PATHS.versions(selectedItem.id), {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload: unknown = await response.json().catch(() => null);
+        if (!response.ok) throw new Error("Content history request failed.");
+        const parsed = calendarContentVersionResponseSchema.safeParse(payload);
+        if (!parsed.success) throw new Error("Content history response was invalid.");
+        setContentVersionState({ itemId: selectedItem.id, data: parsed.data.data, error: false });
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setContentVersionState({ itemId: selectedItem.id, data: null, error: true });
+      }
+    };
+    void loadVersions();
+    return () => controller.abort();
+  }, [contentRefreshIndex, selectedItem]);
 
   const visibleItems = state.requestKey === requestKey ? state.items : EMPTY_ITEMS;
   const pending = state.requestKey !== requestKey;
@@ -142,21 +176,21 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     }
   }
 
-  async function updateIdea(event: FormEvent<HTMLFormElement>) {
+  async function saveContentVersion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedItem) return;
     const form = new FormData(event.currentTarget);
     const localDateTime = new Date(`${String(form.get("date") ?? "")}T${String(form.get("time") ?? "")}`);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (Number.isNaN(localDateTime.getTime()) || !timeZone) {
-      setNotice(t("editError"));
+      setNotice(t("contentSaveError"));
       return;
     }
     setBusy(true);
     setNotice("");
     try {
-      const response = await fetch(CALENDAR_API_PATHS.item(selectedItem.id), {
-        method: "PATCH",
+      const response = await fetch(CALENDAR_API_PATHS.versions(selectedItem.id), {
+        method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,14 +199,16 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           title: String(form.get("title") ?? ""),
           plannedAt: localDateTime.toISOString(),
           timeZone,
+          canonicalCopy: String(form.get("canonicalCopy") ?? ""),
+          variantCopy: String(form.get("variantCopy") ?? ""),
         }),
       });
-      if (!response.ok) throw new Error("Calendar idea could not be updated.");
+      if (!response.ok) throw new Error("Calendar content could not be saved.");
       setSelectedItem(null);
-      setNotice(t("updated"));
+      setNotice(t("contentSaved"));
       setRefreshIndex((current) => current + 1);
     } catch {
-      setNotice(t("editError"));
+      setNotice(t("contentSaveError"));
     } finally {
       setBusy(false);
     }
@@ -281,7 +317,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
                 <ol className="editorialCalendar__items">
                   {dayItems.map((item) => (
                     <li className="editorialCalendar__item" key={item.id}>
-                      <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || item.status !== CONTENT_STATUS.idea} onClick={() => setSelectedItem(item)} aria-label={t("editIdea", { title: item.title })}>
+                      <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
                       <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
                       <strong>{item.title}</strong>
                       <span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
@@ -301,17 +337,17 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           <h3>{new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(new Date(`${dateKey}T12:00:00`))}</h3>
           <ul>{dayItems.map((item) => <li key={item.id}>
             <span className="editorialCalendar__listTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
-            <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || item.status !== CONTENT_STATUS.idea} onClick={() => setSelectedItem(item)} aria-label={t("editIdea", { title: item.title })}>
+            <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => setSelectedItem(item)} aria-label={t("editContent", { title: item.title })}>
               <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
             </button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
           </li>)}</ul>
         </section>)}
       </div>}
 
-      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy) setSelectedItem(null); }}>
+      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy) { setSelectedItem(null); setContentVersionState(null); } }}>
         {selectedItem ? <DialogContent aria-labelledby={CALENDAR_UI_IDS.editTitle} aria-describedby={CALENDAR_UI_IDS.editDescription}>
           <DialogHeader><DialogTitle id={CALENDAR_UI_IDS.editTitle}>{t("editTitle")}</DialogTitle><DialogDescription id={CALENDAR_UI_IDS.editDescription}>{t("editDescription")}</DialogDescription></DialogHeader>
-          <form className="editorialCalendar__editForm" onSubmit={(event) => void updateIdea(event)} key={selectedItem.id}>
+          {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form className="editorialCalendar__editForm" onSubmit={(event) => void saveContentVersion(event)} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
             <TextField id="calendar-edit-idea-title" name="title" label={t("ideaTitle")} defaultValue={selectedItem.title} maxLength={CONTENT_LIMITS.titleCharacters} required />
             <SelectField id="calendar-edit-idea-brand" name="brandId" label={t("brand")} defaultValue={selectedItem.brandId} required>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
@@ -321,8 +357,11 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             </SelectField>
             <TextField id="calendar-edit-idea-date" name="date" label={t("date")} type="date" defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} required />
             <TextField id="calendar-edit-idea-time" name="time" label={t("time")} type="time" defaultValue={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(selectedItem.plannedAt))} required />
-            <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy}>{busy ? t("saving") : t("saveChanges")}</Button><Button appearance="quiet" type="button" disabled={busy} onClick={() => setSelectedItem(null)}>{t("cancel")}</Button></div>
-          </form>
+            <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} defaultValue={contentVersionState.data.current?.canonicalCopy ?? ""} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
+            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} defaultValue={contentVersionState.data.current?.variantCopy ?? ""} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
+            {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
+            <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy} onClick={() => { setSelectedItem(null); setContentVersionState(null); }}>{t("cancel")}</Button></div>
+          </form> : null}
         </DialogContent> : null}
       </Dialog>
     </section>

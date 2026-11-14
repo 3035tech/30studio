@@ -71,6 +71,13 @@
       "when": 1794678754292,
       "tag": "0009_powerful_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794680722860,
+      "tag": "0010_adorable_magma",
+      "breakpoints": true
     }
   ]
 }

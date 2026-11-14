@@ -34,6 +34,33 @@ export const calendarItemCreateSchema = z.object({
 
 export const calendarItemUpdateSchema = calendarItemCreateSchema;
 
+export const calendarContentVersionSaveSchema = calendarItemCreateSchema.extend({
+  canonicalCopy: z.string().trim().min(1).max(CONTENT_LIMITS.canonicalCopyCharacters),
+  variantCopy: z.string().trim().min(1).max(CONTENT_LIMITS.variantCopyCharacters),
+}).strict();
+
+export const calendarContentVersionSchema = z.object({
+  versionNumber: z.number().int().positive(),
+  brandKitVersionNumber: z.number().int().positive().nullable(),
+  canonicalCopy: z.string(),
+  variantCopy: z.string(),
+  platform: z.enum(SOCIAL_PLATFORMS),
+  createdAt: z.iso.datetime(),
+});
+
+export const calendarContentHistoryEntrySchema = z.object({
+  versionNumber: z.number().int().positive(),
+  platform: z.enum(SOCIAL_PLATFORMS),
+  createdAt: z.iso.datetime(),
+});
+
+export const calendarContentVersionResponseSchema = z.object({
+  data: z.object({
+    current: calendarContentVersionSchema.nullable(),
+    history: z.array(calendarContentHistoryEntrySchema),
+  }),
+});
+
 export const calendarItemSchema = z.object({
   id: z.uuid(),
   brandId: z.uuid(),
@@ -54,4 +81,5 @@ export const calendarResponseSchema = z.object({
 
 export type CalendarItemCreateInput = z.infer<typeof calendarItemCreateSchema>;
 export type CalendarItemUpdateInput = z.infer<typeof calendarItemUpdateSchema>;
+export type CalendarContentVersionSaveInput = z.infer<typeof calendarContentVersionSaveSchema>;
 export type CalendarItem = z.infer<typeof calendarItemSchema>;

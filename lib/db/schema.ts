@@ -119,6 +119,45 @@ export const brandKitVersions = pgTable(
   ],
 );
 
+export const contentVersions = pgTable(
+  "content_versions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    contentItemId: uuid("content_item_id").notNull().references(() => contentItems.id, { onDelete: "cascade" }),
+    brandId: uuid("brand_id").notNull(),
+    versionNumber: integer("version_number").notNull(),
+    canonicalCopy: text("canonical_copy").notNull(),
+    brandKitVersionNumber: integer("brand_kit_version_number"),
+    createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "content_versions_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    foreignKey({ name: "content_versions_org_brand_kit_fk", columns: [table.organizationId, table.brandId, table.brandKitVersionNumber], foreignColumns: [brandKitVersions.organizationId, brandKitVersions.brandId, brandKitVersions.version] }).onDelete("cascade"),
+    unique("content_versions_org_id_unique").on(table.organizationId, table.id),
+    uniqueIndex("content_versions_item_number_unique").on(table.organizationId, table.contentItemId, table.versionNumber),
+    index("content_versions_item_created_idx").on(table.organizationId, table.contentItemId, table.createdAt),
+  ],
+);
+
+export const contentVariants = pgTable(
+  "content_variants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    contentVersionId: uuid("content_version_id").notNull(),
+    platform: socialPlatform("platform").notNull(),
+    copy: text("copy").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "content_variants_org_version_fk", columns: [table.organizationId, table.contentVersionId], foreignColumns: [contentVersions.organizationId, contentVersions.id] }).onDelete("cascade"),
+    uniqueIndex("content_variants_version_platform_unique").on(table.organizationId, table.contentVersionId, table.platform),
+    index("content_variants_org_platform_idx").on(table.organizationId, table.platform),
+  ],
+);
+
 export const brandAssets = pgTable(
   "brand_assets",
   {
@@ -176,6 +215,14 @@ export const brandRelations = relations(brands, ({ many }) => ({ socialProfiles:
 export const contentItemRelations = relations(contentItems, ({ one }) => ({
   brand: one(brands, { fields: [contentItems.brandId], references: [brands.id] }),
   creator: one(user, { fields: [contentItems.createdBy], references: [user.id] }),
+}));
+export const contentVersionRelations = relations(contentVersions, ({ one, many }) => ({
+  item: one(contentItems, { fields: [contentVersions.contentItemId], references: [contentItems.id] }),
+  brand: one(brands, { fields: [contentVersions.brandId], references: [brands.id] }),
+  variants: many(contentVariants),
+}));
+export const contentVariantRelations = relations(contentVariants, ({ one }) => ({
+  version: one(contentVersions, { fields: [contentVariants.contentVersionId], references: [contentVersions.id] }),
 }));
 export const socialProfileRelations = relations(socialProfiles, ({ one }) => ({
   brand: one(brands, { fields: [socialProfiles.brandId], references: [brands.id] }),
