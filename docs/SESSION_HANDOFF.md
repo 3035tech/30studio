@@ -34,7 +34,7 @@ This file preserves product decisions and the exact engineering state so another
   - `a4661f8 feat(calendar): add multi-channel campaigns`
   - `0b55558 feat(content): generate channel copy drafts`
   - `67804d6 feat(media): queue generated post images`
-- Do not assume current uncommitted work is committed. Check `git status` before continuing.
+- Latest campaign/editor delivery is committed as `c28eb09 feat(calendar): harden campaign and editing`. Check `git status` before continuing.
 
 ## Product functionality already present in the repo
 
@@ -48,7 +48,7 @@ This file preserves product decisions and the exact engineering state so another
 
 ## Current active work: finish campaign/editor slice
 
-The user asked to complete item 1 from the ordered roadmap: close campaigns and editor (persist and validate brief, calendar, channel copies, versions). The latest implementation changes are currently uncommitted in `feature/editorial-calendar`:
+The user asked to complete item 1 from the ordered roadmap: close campaigns and editor (persist and validate brief, calendar, channel copies, versions). The delivery is committed in `feature/editorial-calendar`:
 
 - Campaign creation now requires an idempotency key and stores a request fingerprint. Identical retries return the existing campaign; reusing a key with different details returns conflict. New migration `0014_remarkable_shaman.sql` adds nullable campaign `idempotency_key` and `request_fingerprint` columns plus a tenant/creator/key unique index.
 - Content version save now requires the expected current version number. The repository locks the item and returns conflict if another edit has advanced it; the route responds HTTP 409. Campaign-linked posts cannot silently change to a different brand or channel.
@@ -56,6 +56,7 @@ The user asked to complete item 1 from the ordered roadmap: close campaigns and 
 - Integration test coverage was added for campaign retries and conflicting payload reuse, concurrent version writes, and existing tenant isolation/campaign scheduling. Unit validation covers expected version and idempotency fields.
 - Campaign fingerprinting lives in `lib/server/campaign-idempotency.ts`; it normalizes publication ordering. A unit test verifies ordering stability and that changed campaign content changes the fingerprint.
 - `docs/PRODUCT_BACKLOG.md` now describes this status and remaining acceptance work.
+- Commit: `c28eb09 feat(calendar): harden campaign and editing`.
 
 ## Validation evidence and hard blocker
 
@@ -84,7 +85,7 @@ The campaign/editor main flow requested by the user is now validated. Do not cla
 
 ## Current next steps
 
-1. Re-check `git status`, review and commit the uncommitted campaign/editor implementation if appropriate; do not discard existing changes.
+1. Check `git status` and preserve any user changes before further work.
 2. If code changes continue, repeat unit, lint, TypeScript, production build, Drizzle check, and integration tests as relevant.
 3. Keep remaining F4 work visible: extra channel variants/capability snapshots and richer media contract preview/validation.
 4. Continue later with the separate approval-policy/content-review phase. Social OAuth, real publishing, analytics, competitive intelligence, SaaS billing/quotas, and production deployment remain outside this slice.
