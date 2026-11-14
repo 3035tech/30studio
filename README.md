@@ -16,4 +16,8 @@ The current work is an initial product foundation. It is not a production releas
 
 Install dependencies with `npm ci`, copy `.env.example` to `.env.local`, and configure a local PostgreSQL URL plus Better Auth settings before using authenticated routes. Generate auth tables with `npm run auth:generate`, generate the application migration with `npm run db:generate`, then review and apply migrations only to a development database with `npm run db:migrate`.
 
-The first data slice includes Better Auth users, organizations, memberships, and invitations, plus tenant-scoped brands and social-profile metadata. The API obtains the active organization from the authenticated session and checks the user's current membership and permission. A login/signup and workspace/brand entry screen is present; email delivery is unconfigured, so account verification and invitations are not ready for end users.
+The first data slice includes Better Auth users, organizations, memberships, and invitations, plus tenant-scoped brands, social-profile metadata, and team-access audit events. The team screen supports member role changes/removal, email invitations, cancellation/resend, and access history. Invitation acceptance requires a verified account with the invited email. Every data table uses the shared filter, sortable headers, and page-size selector.
+
+### Transactional email
+
+Account verification and invitations require an SMTP provider. Configure `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM_EMAIL`, and either implicit TLS (`SMTP_SECURE=true`, commonly port 465) or STARTTLS (`SMTP_SECURE=false`, `SMTP_REQUIRE_TLS=true`, commonly port 587). Add `SMTP_USER` and `SMTP_PASSWORD` together when the provider requires authentication. Production rejects plain unencrypted SMTP. Keep credentials in the deployment secret manager; `.env.example` contains no credentials. Local integration tests use an isolated Mailpit SMTP server.

@@ -41,12 +41,13 @@ Also read `docs/PRODUCT_CONTEXT.md` for the durable product and tenant model.
 - Read `docs/PRODUCT_BRAND.md` before changing the 30studio product identity. Use its assets and the shared `BrandLogo` component; do not confuse product identity with tenant-owned Brand Kits.
 - Before adding UI primitives, inspect existing components and approved libraries. Prefer Radix primitives for accessible behavior and Lucide icons where an icon is needed; style them through 30studio tokens and components.
 - Follow responsive layout, keyboard navigation, visible focus, screen-reader labels, sufficient contrast, reduced-motion preferences, and clear loading/empty/error/success states.
+- Every data table must provide a usable filter, clickable sortable headers for every column, and a page-size selector. Sorting must expose its current direction accessibly, and filtering/pagination must keep empty and result-count states localized.
 - Keep UX copy concise and user-oriented. Use sentence case. Avoid decorative labels, meaningless metrics, and actions that do not work.
 
 ## Internationalization
 
 - Portuguese (`pt-BR`) and English (`en`) are supported from the first feature. Use `next-intl` and locale-prefixed routing.
-- Write all source code in English: identifiers, code-module filenames, comments, tests, fixtures, and technical configuration names. User-facing copy may be Portuguese or English only through localization catalogs.
+- Write all source code and technical structure in English: directory and file names, identifiers, comments, tests, fixtures, and configuration names. Do not put Portuguese user-facing text in source; it belongs in the locale catalogs.
 - Never place user-facing strings directly in components, API errors, or validation messages. Put every label, button, navigation item, empty/loading/error/success state, accessibility name, and validation message in locale catalogs and keep keys aligned across languages.
 - Format dates, numbers, and currencies through locale-aware formatters; do not concatenate localized values manually.
 

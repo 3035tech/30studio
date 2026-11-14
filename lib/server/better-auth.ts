@@ -4,7 +4,9 @@ import { organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 import { getDatabase } from "@/lib/db/client";
-import { BETTER_AUTH_ENV } from "@/lib/constants";
+import { API_ERROR_CODES, BETTER_AUTH_ENV, EMAIL_DELIVERY_LIMITS, TEAM_AUDIT_ACTIONS, TEAM_INVITATION_LIMIT } from "@/lib/constants";
+import { sendInvitationEmail, sendVerificationEmail } from "@/lib/server/email";
+import { recordTeamAuditEvent } from "@/lib/db/repositories/team";
 
 const permissions = {
   ...defaultStatements,
@@ -38,6 +40,13 @@ function createAuth() {
     trustedOrigins,
     database: drizzleAdapter(getDatabase(), { provider: "pg" }),
     emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailVerification: {
+      sendOnSignUp: true,
+      sendOnSignIn: true,
+      autoSignInAfterVerification: true,
+      expiresIn: EMAIL_DELIVERY_LIMITS.verificationExpirySeconds,
+      sendVerificationEmail,
+    },
     plugins: [
       organization({
         ac: accessControl,
@@ -45,6 +54,56 @@ function createAuth() {
         allowUserToCreateOrganization: true,
         organizationLimit: 20,
         membershipLimit: 100,
+        invitationLimit: TEAM_INVITATION_LIMIT,
+        invitationExpiresIn: EMAIL_DELIVERY_LIMITS.invitationExpirySeconds,
+        requireEmailVerificationOnInvitation: true,
+        sendInvitationEmail: async (data) => {
+          try {
+            await sendInvitationEmail(data);
+          } catch {
+            await recordTeamAuditEvent({
+              organizationId: data.organization.id,
+              actorUserId: data.inviter.user.id,
+              targetEmail: data.email,
+              invitationId: data.id,
+              action: TEAM_AUDIT_ACTIONS.invitationDeliveryFailed,
+            });
+            throw new Error(API_ERROR_CODES.invitationDeliveryUnavailable);
+          }
+        },
+        organizationHooks: {
+          afterCreateInvitation: async ({ invitation, inviter }) => {
+            await recordTeamAuditEvent({
+              organizationId: invitation.organizationId,
+              actorUserId: inviter.id,
+              targetEmail: invitation.email,
+              invitationId: invitation.id,
+              action: TEAM_AUDIT_ACTIONS.invitationCreated,
+              newRole: invitation.role,
+            });
+          },
+          afterAcceptInvitation: async ({ invitation, member: acceptedMember, user: acceptedUser }) => {
+            await recordTeamAuditEvent({
+              organizationId: invitation.organizationId,
+              actorUserId: acceptedUser.id,
+              targetUserId: acceptedUser.id,
+              targetEmail: invitation.email,
+              invitationId: invitation.id,
+              action: TEAM_AUDIT_ACTIONS.invitationAccepted,
+              newRole: acceptedMember.role,
+            });
+          },
+          afterCancelInvitation: async ({ invitation, cancelledBy }) => {
+            await recordTeamAuditEvent({
+              organizationId: invitation.organizationId,
+              actorUserId: cancelledBy.id,
+              targetEmail: invitation.email,
+              invitationId: invitation.id,
+              action: TEAM_AUDIT_ACTIONS.invitationCancelled,
+              previousRole: invitation.role,
+            });
+          },
+        },
       }),
     ],
   });

@@ -87,6 +87,9 @@ export const API_ERROR_CODES = {
   profileExists: "PROFILE_EXISTS",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
+  invitationNotFound: "INVITATION_NOT_FOUND",
+  invitationDeliveryUnavailable: "INVITATION_DELIVERY_UNAVAILABLE",
+  invitationAlreadyExists: "INVITATION_ALREADY_EXISTS",
   serviceUnavailable: "SERVICE_UNAVAILABLE",
   internalError: "INTERNAL_ERROR",
 } as const;
@@ -94,14 +97,46 @@ export const API_ERROR_CODES = {
 export const TEAM_AUDIT_ACTIONS = {
   memberRoleChanged: "member_role_changed",
   memberRemoved: "member_removed",
+  invitationCreated: "invitation_created",
+  invitationResent: "invitation_resent",
+  invitationCancelled: "invitation_cancelled",
+  invitationAccepted: "invitation_accepted",
+  invitationDeliveryFailed: "invitation_delivery_failed",
 } as const;
-export const TEAM_AUDIT_ACTION_VALUES = [TEAM_AUDIT_ACTIONS.memberRoleChanged, TEAM_AUDIT_ACTIONS.memberRemoved] as const;
+export const TEAM_AUDIT_ACTION_VALUES = [
+  TEAM_AUDIT_ACTIONS.memberRoleChanged,
+  TEAM_AUDIT_ACTIONS.memberRemoved,
+  TEAM_AUDIT_ACTIONS.invitationCreated,
+  TEAM_AUDIT_ACTIONS.invitationResent,
+  TEAM_AUDIT_ACTIONS.invitationCancelled,
+  TEAM_AUDIT_ACTIONS.invitationAccepted,
+  TEAM_AUDIT_ACTIONS.invitationDeliveryFailed,
+] as const;
+export const INVITATION_STATUSES = ["pending", "accepted", "rejected", "canceled"] as const;
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+export const INVITATION_STATUS = {
+  pending: "pending",
+  accepted: "accepted",
+  rejected: "rejected",
+  canceled: "canceled",
+} as const;
 export const TEAM_MEMBER_LIMIT = 100;
+export const TEAM_INVITATION_LIMIT = 100;
+export const TEAM_AUDIT_LIMIT = 100;
+export const DATA_TABLE_PAGE_SIZES = [10, 25, 50] as const;
+export const DATA_TABLE_DEFAULT_PAGE_SIZE = 10;
+export const DATA_TABLE_FIELD_PREFIXES = {
+  filter: "data-table-filter-",
+  pageSize: "data-table-page-size-",
+} as const;
 export const TEAM_API_PATHS = {
   collection: "/api/team",
+  invitations: "/api/team/invitations",
+  audit: "/api/team/audit",
 } as const;
 export const TEAM_FORM_ID_PREFIXES = {
   role: "team-role-",
+  invite: "team-invite-",
 } as const;
 
 export const BETTER_AUTH_ENV = {
@@ -109,6 +144,31 @@ export const BETTER_AUTH_ENV = {
   url: "BETTER_AUTH_URL",
   trustedOrigins: "BETTER_AUTH_TRUSTED_ORIGINS",
 } as const;
+
+export const EMAIL_ENV = {
+  host: "SMTP_HOST",
+  port: "SMTP_PORT",
+  secure: "SMTP_SECURE",
+  requireTls: "SMTP_REQUIRE_TLS",
+  user: "SMTP_USER",
+  password: "SMTP_PASSWORD",
+  from: "MAIL_FROM_EMAIL",
+} as const;
+export const EMAIL_DELIVERY_LIMITS = {
+  connectionTimeoutMilliseconds: 10_000,
+  greetingTimeoutMilliseconds: 10_000,
+  socketTimeoutMilliseconds: 20_000,
+  verificationExpirySeconds: 3_600,
+  invitationExpirySeconds: 604_800,
+} as const;
+export const AUTH_QUERY_PARAMETERS = {
+  invitationId: "invitationId",
+} as const;
+export const EMAIL_ROUTES = {
+  invitationAccept: `/${DEFAULT_LOCALE}/accept-invitation`,
+} as const;
+export const INVITATION_PAGE_ROUTE = "/accept-invitation";
+export const INVITATION_ID_MAX_CHARACTERS = 256;
 
 export const TENANT_ROLE = {
   owner: "owner",

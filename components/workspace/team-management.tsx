@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
-import { TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_ROLES, TENANT_ROLE, TENANT_ROLES, WORKSPACE_SECTION_IDS, type TenantRole } from "@/lib/constants";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { TeamAccessManagement } from "@/components/workspace/team-access-management";
+import { TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_ROLES, TENANT_ROLE, TENANT_ROLES, WORKSPACE_SECTION_IDS, type Locale, type TenantRole } from "@/lib/constants";
 import { teamListResponseSchema, type TeamMember } from "@/lib/validation/team";
 
 type TeamData = {
@@ -25,6 +27,7 @@ export function TeamManagement({ organizationId }: { organizationId: string | nu
   const t = useTranslations("team");
   const tRoles = useTranslations("roles");
   const formatter = useFormatter();
+  const locale = useLocale() as Locale;
   const [teamData, setTeamData] = useState(INITIAL_TEAM_DATA);
   const [selectedRoles, setSelectedRoles] = useState<Record<string, TenantRole>>({});
   const [loadState, setLoadState] = useState(INITIAL_LOAD_STATE);
@@ -121,6 +124,32 @@ export function TeamManagement({ organizationId }: { organizationId: string | nu
     return true;
   }
 
+  const memberColumns: DataTableColumn<TeamMember>[] = [
+    { id: "name", label: t("memberName"), sortValue: (member) => member.name, render: (member) => <div className="teamCollection__identity"><strong>{member.name}</strong><span>{member.email}</span></div> },
+    { id: "joined", label: t("memberJoined"), sortValue: (member) => member.createdAt, render: (member) => formatter.dateTime(new Date(member.createdAt), { dateStyle: "medium" }) },
+    { id: "role", label: t("memberRole"), sortValue: (member) => tRoles(member.role), render: (member) => {
+      const manageable = canManageMember(member);
+      const selectedRole = selectedRoles[member.id] ?? member.role;
+      const roleChanged = selectedRole !== member.role;
+      return manageable ? <div className="teamCollection__actions">
+        <SelectField id={`${TEAM_FORM_ID_PREFIXES.role}${member.id}`} label={t("roleFor", { member: member.name })} value={selectedRole} disabled={busyMemberId === member.id} onChange={(event) => {
+          const role = TENANT_ROLES.find((candidate) => candidate === event.target.value);
+          if (role) setSelectedRoles((current) => ({ ...current, [member.id]: role }));
+        }}>
+          {TEAM_ROLES.filter((role) => role !== TENANT_ROLE.owner && (currentTeamData.actorRole === TENANT_ROLE.owner || role !== TENANT_ROLE.admin)).map((role) => <option key={role} value={role}>{tRoles(role)}</option>)}
+        </SelectField>
+        <Button type="button" disabled={!roleChanged || busyMemberId === member.id} onClick={() => void updateRole(member.id)}>{busyMemberId === member.id ? t("working") : t("saveRole")}</Button>
+      </div> : <span className="teamCollection__role">{tRoles(member.role)}</span>;
+    } },
+    { id: "actions", label: t("memberActions"), sortValue: (member) => member.name, render: (member) => !canManageMember(member) ? <span>{t("noMemberActions")}</span> : removingMemberId === member.id ? (
+      <div className="teamCollection__actions" role="group" aria-label={t("removeConfirmationLabel", { member: member.name })}>
+        <span>{t("removeConfirmation", { member: member.name })}</span>
+        <Button appearance="quiet" type="button" disabled={busyMemberId === member.id} onClick={() => setRemovingMemberId(null)}>{t("cancel")}</Button>
+        <Button type="button" disabled={busyMemberId === member.id} onClick={() => void removeMember(member.id)}>{t("confirmRemove")}</Button>
+      </div>
+    ) : <Button appearance="quiet" type="button" disabled={busyMemberId === member.id} onClick={() => setRemovingMemberId(member.id)}>{t("remove")}</Button> },
+  ];
+
   return (
     <section className="teamSection" id={WORKSPACE_SECTION_IDS.team} aria-labelledby="workspace-team-title">
       <div className="workspaceHeading">
@@ -139,58 +168,12 @@ export function TeamManagement({ organizationId }: { organizationId: string | nu
         </div>
       ) : null}
       {!currentLoadState.pending && !currentLoadState.hasError && !currentTeamData.canManage ? <p className="workspaceEmpty">{t("restricted")}</p> : null}
-      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage && currentTeamData.members.length === 0 ? <p className="workspaceEmpty">{t("empty")}</p> : null}
-      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage && currentTeamData.members.length > 0 ? (
-        <ul className="teamCollection">
-          {currentTeamData.members.map((member) => {
-            const canManageMemberRow = canManageMember(member);
-            const selectedRole = selectedRoles[member.id] ?? member.role;
-            const roleChanged = selectedRole !== member.role;
-
-            return (
-              <li className="teamCollection__item" key={member.id}>
-                <div className="teamCollection__identity">
-                  <strong>{member.name}</strong>
-                  <span>{member.email}</span>
-                </div>
-                <p className="teamCollection__joined">{t("joined", { date: formatter.dateTime(new Date(member.createdAt), { dateStyle: "medium" }) })}</p>
-                {canManageMemberRow ? (
-                  <div className="teamCollection__actions">
-                    <SelectField
-                      id={`${TEAM_FORM_ID_PREFIXES.role}${member.id}`}
-                      label={t("roleFor", { member: member.name })}
-                      value={selectedRole}
-                      disabled={busyMemberId === member.id}
-                      onChange={(event) => {
-                        const role = TENANT_ROLES.find((candidate) => candidate === event.target.value);
-                        if (role) setSelectedRoles((current) => ({ ...current, [member.id]: role }));
-                      }}
-                    >
-                      {TEAM_ROLES.filter((role) => role !== TENANT_ROLE.owner && (currentTeamData.actorRole === TENANT_ROLE.owner || role !== TENANT_ROLE.admin)).map((role) => (
-                        <option key={role} value={role}>{tRoles(role)}</option>
-                      ))}
-                    </SelectField>
-                    <Button type="button" disabled={!roleChanged || busyMemberId === member.id} onClick={() => void updateRole(member.id)}>
-                      {busyMemberId === member.id ? t("working") : t("saveRole")}
-                    </Button>
-                    {removingMemberId === member.id ? (
-                      <div className="teamCollection__confirmation" role="group" aria-label={t("removeConfirmationLabel", { member: member.name })}>
-                        <span>{t("removeConfirmation", { member: member.name })}</span>
-                        <Button appearance="quiet" type="button" disabled={busyMemberId === member.id} onClick={() => setRemovingMemberId(null)}>{t("cancel")}</Button>
-                        <Button type="button" disabled={busyMemberId === member.id} onClick={() => void removeMember(member.id)}>{t("confirmRemove")}</Button>
-                      </div>
-                    ) : (
-                      <Button appearance="quiet" type="button" disabled={busyMemberId === member.id} onClick={() => setRemovingMemberId(member.id)}>{t("remove")}</Button>
-                    )}
-                  </div>
-                ) : (
-                  <span className="teamCollection__role">{tRoles(member.role)}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <DataTable
+        id="team-members" rows={currentTeamData.members} columns={memberColumns} getRowId={(member) => member.id} initialSortColumnId="name"
+        searchValue={(member) => `${member.name} ${member.email} ${member.role}`} searchLabel={t("memberSearch")}
+        pageSizeLabel={t("tablePageSize")} emptyMessage={t("empty")} noMatchesMessage={t("tableNoMatches")} locale={locale}
+      /> : null}
+      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <TeamAccessManagement organizationId={organizationId ?? ""} canManage={currentTeamData.canManage} actorRole={currentTeamData.actorRole} /> : null}
     </section>
   );
 }

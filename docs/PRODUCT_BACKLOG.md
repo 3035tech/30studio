@@ -6,22 +6,23 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 - O tenant é a organização ativa validada no servidor. Toda leitura, gravação, busca e job usa o escopo da organização e, quando aplicável, da marca.
 - Os textos da interface são sempre chaves de `messages/pt.json` e `messages/en.json`, consumidas por `next-intl`. Não escrever labels ou mensagens visíveis diretamente em componentes.
-- Código, nomes de variáveis/funções/tipos, comentários, testes e configurações técnicas são escritos em inglês.
+- Código e estrutura técnica — incluindo nomes de pastas e arquivos, variáveis, funções, tipos, comentários, testes e configurações — são escritos em inglês. Textos da interface vêm somente dos catálogos i18n.
 - PostgreSQL é a fonte de verdade; operações de dados passam por Drizzle ORM e repositórios tipados.
 - IA prepara sugestões e conteúdo. Somente pessoas autorizadas aprovam; publicação revalida no backend a aprovação da versão exata.
 - 30studio contém o produto e seus fluxos. Não adicionar n8n ou Postiz como dependências operacionais.
 - Cada tela deve ter estados de carregamento, vazio, erro, sucesso e dados parciais/stale quando isso se aplicar. Nunca preencher o produto com métricas fictícias.
+- Toda tabela de dados deve oferecer filtro, cabeçalho clicável para ordenar cada coluna e seletor da quantidade de itens por página; estados e rótulos devem ser acessíveis e localizados.
 
 ## Estado atual
 
 | Área | Estado | Limite conhecido |
 |---|---|---|
 | Next.js, TypeScript, Tailwind v4, tema e identidade 30studio | Implementado no scaffold | Revisão visual automatizada ainda não foi comprovada neste ambiente. |
-| Better Auth, sessão, organizações e membros no schema Drizzle | Base implementada | Entrega de e-mail não configurada; cadastro/verificação não está pronto para clientes. |
+| Better Auth, sessão, organizações e membros no schema Drizzle | Implementado | SMTP transacional integrado; o provedor e as credenciais ainda precisam ser configurados no ambiente de deploy. |
 | Troca/criação de workspace e interface PT/EN | Implementado | Shell com Visão geral, Marcas e Equipe; as duas primeiras áreas são funcionais. |
 | Criar/listar marcas com escopo de tenant | Implementado | Depende de PostgreSQL configurado para uso real. |
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
-| Equipe: listar, alterar papel e remover associação | Em implementação | Auditoria é gravada na mesma transação; convites aguardam configuração de entrega de e-mail. |
+| Equipe: membros, papéis, convites e auditoria | Implementado nesta entrega | Convites exigem SMTP e e-mail verificado; teste de integração cobre criação, reenvio, cancelamento, aceite e trilha auditável. |
 | Brand Kit, OAuth, conteúdo, revisão, aprovação, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
 
 ## Mapa de telas
@@ -65,7 +66,7 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 **Telas:** S02, S15, S16.
 
-1. Implementar convites com expiração, aceite, cancelamento e reenvio idempotente.
+1. Implementar convites com expiração, aceite, cancelamento e reenvio pelo mesmo registro pendente.
 2. Permitir alterar papéis e remover membro sem remover a identidade global do usuário.
 3. Definir ações permitidas por papel e registrar mudanças de acesso em audit log append-only.
 4. Adicionar testes de autorização para todas as operações administrativas e casos de convite expirado/revogado.
@@ -172,8 +173,6 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 ## Ordem de trabalho imediata
 
-1. Validar a migração da auditoria e executar os testes de integração das rotas de equipe em PostgreSQL descartável.
-2. Configurar entrega de e-mail transacional antes de ativar convites, reenvio, cancelamento e aceite por link.
-3. Completar a trilha de auditoria consultável e testar a matriz de papéis com sessão Better Auth e isolamento tenant.
-4. Implementar Brand Kit versionado com importação rastreável de ativos e fatos aprovados.
-5. Só então avançar para OAuth, editor/conteúdo e aprovação; publicação permanece bloqueada até a política de aprovação e seus testes existirem.
+1. Configurar SMTP e segredos no ambiente de desenvolvimento/homologação antes de habilitar cadastro e convites para pessoas reais.
+2. Implementar Brand Kit versionado com importação rastreável de ativos e fatos aprovados.
+3. Só então avançar para OAuth, editor/conteúdo e aprovação; publicação permanece bloqueada até a política de aprovação e seus testes existirem.

@@ -1,13 +1,15 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
-import { API_ERROR_CODES, TEAM_AUDIT_ACTIONS, TEAM_MEMBER_LIMIT, TENANT_PERMISSIONS } from "@/lib/constants";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { API_ERROR_CODES, INVITATION_STATUS, TEAM_AUDIT_ACTIONS, TEAM_AUDIT_LIMIT, TEAM_INVITATION_LIMIT, TEAM_MEMBER_LIMIT, TENANT_PERMISSIONS } from "@/lib/constants";
 import type { TenantRole } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
-import { member, teamAuditEvents } from "@/lib/db/schema";
+import { invitation, member, teamAuditEvents, user } from "@/lib/db/schema";
 import { ApiError } from "@/lib/server/api-error";
 import { HTTP_STATUS } from "@/lib/constants";
 import { canManageTeamMember } from "@/lib/server/team-policy";
 import { hasTenantPermission } from "@/lib/server/permissions";
+import { invitationStatusSchema, tenantRoleSchema } from "@/lib/validation/team";
 
 export async function listTeamMembers(organizationId: string) {
   const members = await getDatabase().query.member.findMany({
@@ -25,6 +27,110 @@ export async function listTeamMembers(organizationId: string) {
     role: membership.role,
     createdAt: membership.createdAt.toISOString(),
   }));
+}
+
+export async function listTeamInvitations(organizationId: string) {
+  const inviter = alias(user, "team_invitation_inviter");
+  const rows = await getDatabase()
+    .select({
+      id: invitation.id,
+      email: invitation.email,
+      role: invitation.role,
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+      createdAt: invitation.createdAt,
+      inviterName: inviter.name,
+    })
+    .from(invitation)
+    .leftJoin(inviter, eq(inviter.id, invitation.inviterId))
+    .where(eq(invitation.organizationId, organizationId))
+    .orderBy(desc(invitation.createdAt), asc(invitation.id))
+    .limit(TEAM_INVITATION_LIMIT);
+
+  return rows.map((row) => ({
+    ...row,
+    role: tenantRoleSchema.parse(row.role),
+    status: invitationStatusSchema.parse(row.status),
+    expiresAt: row.expiresAt.toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    inviterName: row.inviterName ?? "",
+  }));
+}
+
+export async function getTeamInvitation(organizationId: string, invitationId: string) {
+  const [row] = await getDatabase()
+    .select({ id: invitation.id, email: invitation.email, role: invitation.role, status: invitation.status })
+    .from(invitation)
+    .where(and(eq(invitation.organizationId, organizationId), eq(invitation.id, invitationId)))
+    .limit(1);
+
+  return row ? { ...row, role: tenantRoleSchema.parse(row.role), status: invitationStatusSchema.parse(row.status) } : null;
+}
+
+export async function hasTeamMemberWithEmail(organizationId: string, email: string) {
+  const [existingMember] = await getDatabase()
+    .select({ id: member.id })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(and(eq(member.organizationId, organizationId), eq(user.email, email)))
+    .limit(1);
+
+  return Boolean(existingMember);
+}
+
+export async function hasPendingInvitationForEmail(organizationId: string, email: string) {
+  const [existingInvitation] = await getDatabase()
+    .select({ id: invitation.id })
+    .from(invitation)
+    .where(and(eq(invitation.organizationId, organizationId), eq(invitation.email, email), eq(invitation.status, INVITATION_STATUS.pending)))
+    .limit(1);
+
+  return Boolean(existingInvitation);
+}
+
+export async function listTeamAuditEvents(organizationId: string) {
+  const actor = alias(user, "team_audit_actor");
+  const target = alias(user, "team_audit_target");
+  const rows = await getDatabase()
+    .select({
+      id: teamAuditEvents.id,
+      action: teamAuditEvents.action,
+      actorName: actor.name,
+      actorEmail: actor.email,
+      targetName: target.name,
+      targetEmail: teamAuditEvents.targetEmail,
+      targetInvitationId: teamAuditEvents.invitationId,
+      previousRole: teamAuditEvents.previousRole,
+      newRole: teamAuditEvents.newRole,
+      occurredAt: teamAuditEvents.occurredAt,
+    })
+    .from(teamAuditEvents)
+    .leftJoin(actor, eq(actor.id, teamAuditEvents.actorUserId))
+    .leftJoin(target, eq(target.id, teamAuditEvents.targetUserId))
+    .where(eq(teamAuditEvents.organizationId, organizationId))
+    .orderBy(desc(teamAuditEvents.occurredAt), asc(teamAuditEvents.id))
+    .limit(TEAM_AUDIT_LIMIT);
+
+  return rows.map((row) => ({
+    ...row,
+    actorName: row.actorName ?? "",
+    actorEmail: row.actorEmail ?? "",
+    targetName: row.targetName ?? "",
+    occurredAt: row.occurredAt.toISOString(),
+  }));
+}
+
+export async function recordTeamAuditEvent(event: {
+  organizationId: string;
+  actorUserId: string;
+  action: (typeof TEAM_AUDIT_ACTIONS)[keyof typeof TEAM_AUDIT_ACTIONS];
+  targetUserId?: string | null;
+  targetEmail?: string | null;
+  invitationId?: string | null;
+  previousRole?: string | null;
+  newRole?: string | null;
+}) {
+  await getDatabase().insert(teamAuditEvents).values(event);
 }
 
 export async function updateTeamMemberRole(
