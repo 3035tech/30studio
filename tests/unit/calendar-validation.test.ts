@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CALENDAR, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
+import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema, contentMediaGenerationRequestSchema, contentMediaReviewSchema } from "@/lib/validation/calendar";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
   const result = calendarItemCreateSchema.safeParse({
@@ -70,6 +70,23 @@ test("campaign planning accepts independent channel schedules and rejects duplic
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [] }).success, false);
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [validCampaign.publications[0], validCampaign.publications[0]] }).success, false);
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, organizationId: "another-tenant" }).success, false);
+});
+
+test("content image generation requires an exact version and idempotency key", () => {
+  const validRequest = {
+    contentVersionId: "11111111-1111-4111-8111-111111111111",
+    idempotencyKey: "22222222-2222-4222-8222-222222222222",
+  };
+  assert.equal(contentMediaGenerationRequestSchema.safeParse(validRequest).success, true);
+  assert.equal(contentMediaGenerationRequestSchema.safeParse({ ...validRequest, contentVersionId: "not-a-uuid" }).success, false);
+  assert.equal(contentMediaGenerationRequestSchema.safeParse({ ...validRequest, organizationId: "client-chosen-tenant" }).success, false);
+});
+
+test("content image review accepts only final human decisions", () => {
+  assert.equal(contentMediaReviewSchema.safeParse({ decision: "approved", note: "Looks good." }).success, true);
+  assert.equal(contentMediaReviewSchema.safeParse({ decision: "rejected", note: null }).success, true);
+  assert.equal(contentMediaReviewSchema.safeParse({ decision: "queued", note: null }).success, false);
+  assert.equal(contentMediaReviewSchema.safeParse({ decision: "approved", note: "x".repeat(5_001) }).success, false);
 });
 
 test("calendar query accepts one grid and rejects oversized or empty ranges", () => {

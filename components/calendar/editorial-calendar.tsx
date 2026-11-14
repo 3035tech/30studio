@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, WandSpar
 import { Button } from "@/components/ui/button";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
 import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
@@ -430,6 +431,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} value={selectedCopy?.canonicalCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: event.target.value, variantCopy: current?.itemId === selectedItem.id ? current.variantCopy : selectedCopy?.variantCopy ?? "" }))} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
             <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value }))} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
             {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
+            <ContentMediaPanel key={`${selectedItem.id}-${contentVersionState.data.current?.id ?? "new"}`} itemId={selectedItem.id} versionId={contentVersionState.data.current?.id ?? null} versionNumber={contentVersionState.data.current?.versionNumber ?? null} />
             <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); }}>{t("cancel")}</Button></div>
           </form> : null}
         </DialogContent> : null}

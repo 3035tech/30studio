@@ -1,0 +1,2 @@
+ALTER TABLE "content_items" ADD CONSTRAINT "content_items_org_id_brand_unique" UNIQUE("organization_id","id","brand_id");--> statement-breakpoint
+ALTER TABLE "content_versions" ADD CONSTRAINT "content_versions_org_id_item_brand_unique" UNIQUE("organization_id","id","content_item_id","brand_id");

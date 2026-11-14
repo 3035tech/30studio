@@ -203,6 +203,39 @@
       "cancelled": "Cancelada"
     }
   },
+  "contentMedia": {
+    "title": "Imagens da publicação",
+    "versionLabel": "Vinculadas à versão {version} do texto salvo.",
+    "generate": "Gerar imagem",
+    "queueing": "Enviando…",
+    "privacy": "O texto e o Brand Kit aprovado são enviados ao provedor de imagens configurado. A imagem é privada e exige revisão antes de ser aprovada.",
+    "jobQueued": "Imagem adicionada à fila de geração.",
+    "generationUnavailable": "Geração de imagem ou armazenamento privado não está configurado.",
+    "generationLimit": "Esta versão já atingiu o limite de imagens. Salve uma nova versão do texto para continuar.",
+    "generationError": "Não foi possível solicitar a imagem. Tente novamente.",
+    "generationFailed": "A geração falhou após as tentativas disponíveis.",
+    "loading": "Carregando imagens…",
+    "processing": "A imagem está sendo preparada…",
+    "loadError": "Não foi possível carregar as imagens desta versão.",
+    "saveCopyFirst": "Salve o texto para gerar imagens ligadas a uma versão específica.",
+    "empty": "Nenhuma imagem gerada para esta versão.",
+    "reviewNote": "Nota da revisão",
+    "reviewing": "Revisando…",
+    "approve": "Aprovar imagem",
+    "reject": "Rejeitar",
+    "approved": "Imagem aprovada.",
+    "rejected": "Imagem rejeitada.",
+    "reviewError": "Não foi possível salvar a revisão da imagem.",
+    "dimensions": "{width} × {height}",
+    "statuses": {
+      "queued": "Na fila",
+      "processing": "Gerando",
+      "pending_review": "Aguardando revisão",
+      "approved": "Aprovada",
+      "rejected": "Rejeitada",
+      "failed": "Falhou"
+    }
+  },
   "team": {
     "eyebrow": "ACESSO AO WORKSPACE",
     "title": "Pessoas da equipe",

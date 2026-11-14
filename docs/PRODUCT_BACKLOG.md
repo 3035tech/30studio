@@ -141,8 +141,8 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 1. Implementar tarefas de IA limitadas e explícitas: ideias, variantes de copy, roteiro e proposta de carrossel. Parcial: o editor solicita uma sugestão canônica e uma variante por canal usando somente briefing e Brand Kit aprovado; a saída não é persistida até a pessoa revisar e salvar. O primeiro adapter usa AI SDK com provider OpenAI configurado no servidor; `OPENAI_MODEL` é configurável.
 2. Construir contexto apenas com organização autorizada, marca, Brand Kit aprovado e fontes permitidas; registrar modelo, fontes e uso.
 3. Adicionar conectores de pesquisa autorizados com proveniência e limites de dados; conteúdo externo é entrada não confiável e nunca vira instrução do agente.
-4. Implementar fila durável para trabalhos longos, limites de concorrência, retries finitos, dead-letter e retomada após reinício.
-5. Renderizar primeiro imagens/carrosséis; só adicionar vídeo quando limites de CPU/RAM e direitos de mídia tiverem sido validados.
+4. Implementar fila durável para trabalhos longos, limites de concorrência, retries finitos, dead-letter e retomada após reinício. Parcial: fila PostgreSQL para imagem tem idempotência por tenant, lease, `FOR UPDATE SKIP LOCKED`, quatro tentativas limitadas e falha terminal; falta homologar concorrência/reinício no banco e adicionar limites globais/custo por tenant.
+5. Renderizar primeiro imagens/carrosséis; só adicionar vídeo quando limites de CPU/RAM e direitos de mídia tiverem sido validados. Parcial: fila PostgreSQL e worker geram uma imagem WebP associada a versão salva; revisão da imagem é separada da aprovação do post. Ainda falta comparar carrossel/templates, preparar termos/direitos e implantar/monitorar o worker.
 6. Comparar bibliotecas, licença e custo antes de adotar geração de imagem/vídeo ou composição.
 
 **Aceite da fase:** job recupera estado após reinício, falhas têm retry limitado e rastreável, custo/contexto permanecem no tenant e saída de IA nunca muda permissões.

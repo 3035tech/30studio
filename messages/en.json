@@ -203,6 +203,39 @@
       "cancelled": "Cancelled"
     }
   },
+  "contentMedia": {
+    "title": "Post images",
+    "versionLabel": "Linked to saved copy version {version}.",
+    "generate": "Generate image",
+    "queueing": "Sending…",
+    "privacy": "The copy and approved Brand Kit are sent to the configured image provider. The image stays private and requires human review before approval.",
+    "jobQueued": "Image added to the generation queue.",
+    "generationUnavailable": "Image generation or private storage is not configured.",
+    "generationLimit": "This version has reached its image limit. Save a new copy version to continue.",
+    "generationError": "Could not request the image. Try again.",
+    "generationFailed": "Generation failed after the available attempts.",
+    "loading": "Loading images…",
+    "processing": "Preparing the image…",
+    "loadError": "Could not load images for this version.",
+    "saveCopyFirst": "Save the copy to generate images linked to an exact version.",
+    "empty": "No images have been generated for this version.",
+    "reviewNote": "Review note",
+    "reviewing": "Reviewing…",
+    "approve": "Approve image",
+    "reject": "Reject",
+    "approved": "Image approved.",
+    "rejected": "Image rejected.",
+    "reviewError": "Could not save the image review.",
+    "dimensions": "{width} × {height}",
+    "statuses": {
+      "queued": "Queued",
+      "processing": "Generating",
+      "pending_review": "Pending review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "failed": "Failed"
+    }
+  },
   "team": {
     "eyebrow": "WORKSPACE ACCESS",
     "title": "Team members",

@@ -46,6 +46,10 @@ function getS3Client() {
   return { bucket: config.bucket, client: clientState.client };
 }
 
+export function assertBrandAssetStorageConfigured() {
+  getStorageConfig();
+}
+
 export async function createBrandAssetUpload(asset: Pick<BrandAssetUpload, "contentType" | "sha256">, objectKey: string) {
   const { bucket, client } = getS3Client();
   return createPresignedPost(client, {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { eq, inArray } from "drizzle-orm";
-import { CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { CONTENT_MEDIA_STATUS, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
-import { createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, getCalendarContentVersions, listCalendarItems } from "@/lib/db/repositories/calendar";
+import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentMediaGeneration, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { organization, user } from "@/lib/db/schema";
 
@@ -133,6 +133,44 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     variantCopy: "The updated LinkedIn-specific draft.",
   });
   assert.equal(secondVersion?.versionNumber, 2);
+  assert.ok(secondVersion);
+
+  const imageJobKey = crypto.randomUUID();
+  const imageJobInput = {
+    organizationId: ids.organizationA,
+    itemId: item.id,
+    contentVersionId: secondVersion.id,
+    idempotencyKey: imageJobKey,
+    userId: ids.user,
+    modelId: "mock-image-model",
+    prompt: "A private image generation test prompt.",
+  };
+  const queuedImage = await enqueueContentMediaGeneration(imageJobInput);
+  assert.equal(queuedImage.kind, "created");
+  if (queuedImage.kind !== "created") return;
+  const repeatedImageRequest = await enqueueContentMediaGeneration(imageJobInput);
+  assert.equal(repeatedImageRequest.kind, "existing");
+  assert.equal(repeatedImageRequest.kind === "existing" ? repeatedImageRequest.assetId : "", queuedImage.assetId);
+  assert.equal((await enqueueContentMediaGeneration({ ...imageJobInput, organizationId: ids.organizationB, idempotencyKey: crypto.randomUUID() })).kind, "not_found");
+
+  const claimedImage = await claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA);
+  assert.equal(claimedImage?.id, queuedImage.assetId);
+  assert.ok(claimedImage?.claimedAt);
+  if (!claimedImage?.claimedAt) return;
+  assert.ok(await completeContentMediaJob({
+    organizationId: ids.organizationA,
+    id: claimedImage.id,
+    claimedAt: claimedImage.claimedAt,
+    contentType: "image/webp",
+    sizeBytes: 1_024,
+    width: 1_024,
+    height: 1_024,
+    sha256: "a".repeat(64),
+  }));
+  assert.ok(await reviewContentMedia(ids.organizationA, item.id, claimedImage.id, ids.user, CONTENT_MEDIA_STATUS.approved, "Image looks good."));
+  const reviewedMedia = await listContentMediaForVersion(ids.organizationA, item.id, secondVersion.id);
+  assert.equal(reviewedMedia.length, 1);
+  assert.equal(reviewedMedia[0]?.status, CONTENT_MEDIA_STATUS.approved);
 
   const history = await getCalendarContentVersions(ids.organizationA, item.id);
   assert.equal(history?.current?.versionNumber, 2);

@@ -1,6 +1,6 @@
 # Brand media storage
 
-The first media slice stores PNG, JPEG, and WebP brand images in a private S3-compatible bucket. The server uses AWS SDK for JavaScript v3 (Apache-2.0) for presigned uploads/downloads and Sharp (Apache-2.0) for bounded image decoding. It supports logos and visual template references; it does not import editable design templates, video, SVG, or archives. Node.js 20.9 or newer is required by the selected runtime dependencies.
+The brand library stores PNG, JPEG, and WebP brand images in a private S3-compatible bucket. The server uses AWS SDK for JavaScript v3 (Apache-2.0) for presigned uploads/downloads and Sharp (Apache-2.0) for bounded image decoding. It supports logos and visual template references; it does not import editable design templates, video, SVG, or archives. Node.js 20.9 or newer is required by the selected runtime dependencies.
 
 ## Request flow
 
@@ -32,9 +32,18 @@ See [tests/localstack/README.md](../tests/localstack/README.md). The compose fil
 
 LocalStack verifies SDK request signing and S3 API behavior. It does not prove AWS IAM policy correctness, S3 CORS behavior in a real browser, lifecycle rules, backup/restore, or production encryption settings.
 
+## Generated content images
+
+Image generation is separate from the brand library. Each job is stored in PostgreSQL and is bound by composite tenant, brand, post, and immutable content-version keys. Requests require a tenant idempotency key and each content version is limited to three image jobs. A worker claims due jobs with row locks, recovers expired leases, retries a bounded number of times, and marks exhausted jobs failed. Workers can run in parallel because each claim is leased to one process.
+
+The worker uses AI SDK's OpenAI image provider and Sharp to decode, resize/normalize as WebP, enforce a 20-megapixel/10 MiB bound, calculate SHA-256, and write to the same private bucket under `tenants/<organization>/brands/<brand>/content/<item>/<version>/`. Generated images enter `pending_review`; content approvers can approve or reject them. This media review does not approve the copy or authorize publication. Images stay private and previews use short-lived signed URLs. The generator asks for no text/logos, so approved logos and final layout still need to be placed by a human or a later rendering feature.
+
+The generator sends the saved channel copy and approved Brand Kit snapshot to the configured image provider only after a user requests it. Configure `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL` in the runtime secret/config system, and run `npm run worker:content-media` as a separate process with the database and S3 workload identity. Do not add either credential to Git. The worker is not started by `npm run start`; deployment wiring, autoscaling, resource limits, alerts and credential provisioning remain backlog work. Provider cost, retention terms and rights for generated images require review before production.
+
 ## Remaining media work
 
 - Configure production scheduling and monitoring for the bounded cleanup job.
 - Add version grouping, variant generation, usage references, and richer review history to the UI.
+- Add deletion/retention of generated images, retry/review audit views, worker observability, and cost/usage accounting.
 - Import official brand kits/templates from user-provided source archives with malware scanning and format-specific parsers.
 - Configure the dedicated bucket, CORS, runtime role, encryption, versioning, retention, and recovery through the approved infrastructure process before production.

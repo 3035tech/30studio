@@ -73,6 +73,28 @@ export const CONTENT_LIMITS = {
   maximumCalendarItems: 300,
   maximumVisibleCalendarItemsPerDay: 3,
   maximumContentVersionsInHistory: 10,
+  maximumGeneratedImagesPerVersion: 3,
+} as const;
+export const CONTENT_MEDIA_STATUSES = ["queued", "processing", "pending_review", "approved", "rejected", "failed"] as const;
+export type ContentMediaStatus = (typeof CONTENT_MEDIA_STATUSES)[number];
+export const CONTENT_MEDIA_STATUS = {
+  queued: "queued",
+  processing: "processing",
+  pendingReview: "pending_review",
+  approved: "approved",
+  rejected: "rejected",
+  failed: "failed",
+} as const;
+export const CONTENT_MEDIA_REVIEW_DECISIONS = [CONTENT_MEDIA_STATUS.approved, CONTENT_MEDIA_STATUS.rejected] as const;
+export const CONTENT_MEDIA_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
+export const CONTENT_MEDIA_WORKER = {
+  pollIntervalMilliseconds: 2_000,
+  leaseMilliseconds: 180_000,
+  maximumAttempts: CONTENT_MEDIA_RETRY_DELAYS_MS.length + 1,
+  maximumImageBytes: 10 * 1024 * 1024,
+  maximumImagePixels: 20_000_000,
+  outputFormat: "webp",
+  outputQuality: 82,
 } as const;
 export const CONTENT_EDITABLE_STATUSES = [CONTENT_STATUS.idea, CONTENT_STATUS.draft] as const;
 export const CALENDAR = {
@@ -95,10 +117,16 @@ export const CALENDAR_API_PATHS = {
 export const COPY_GENERATION = {
   timeoutMilliseconds: 30_000,
   maximumOutputTokens: 700,
+  imageTimeoutMilliseconds: 90_000,
 } as const;
 export const AI_PROVIDER_ENV = {
   apiKey: "OPENAI_API_KEY",
   model: "OPENAI_MODEL",
+  imageModel: "OPENAI_IMAGE_MODEL",
+} as const;
+export const CONTENT_MEDIA_API_PATHS = {
+  collection: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/media`,
+  review: (itemId: string, mediaId: string) => `/api/calendar/${encodeURIComponent(itemId)}/media/${encodeURIComponent(mediaId)}/review`,
 } as const;
 export const CAMPAIGN_API_PATHS = { collection: "/api/campaigns" } as const;
 export const CAMPAIGN_FORM_FIELDS = {
@@ -245,6 +273,7 @@ export const HTTP_STATUS = {
   forbidden: 403,
   notFound: 404,
   conflict: 409,
+  accepted: 202,
   unprocessable: 422,
   internalError: 500,
   unavailable: 503,
@@ -263,6 +292,11 @@ export const API_ERROR_CODES = {
   brandAssetInvalid: "BRAND_ASSET_INVALID",
   brandAssetStateConflict: "BRAND_ASSET_STATE_CONFLICT",
   calendarItemNotFound: "CALENDAR_ITEM_NOT_FOUND",
+  contentMediaNotFound: "CONTENT_MEDIA_NOT_FOUND",
+  contentMediaConflict: "CONTENT_MEDIA_CONFLICT",
+  contentMediaLimitReached: "CONTENT_MEDIA_LIMIT_REACHED",
+  contentMediaGenerationFailed: "CONTENT_MEDIA_GENERATION_FAILED",
+  contentMediaGenerationUnavailable: "CONTENT_MEDIA_GENERATION_UNAVAILABLE",
   aiServiceUnavailable: "AI_SERVICE_UNAVAILABLE",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",

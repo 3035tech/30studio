@@ -14,6 +14,7 @@
     "test:integration": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
     "test:localstack": "node --conditions=react-server --import tsx --test tests/integration/brand-assets-storage.test.ts",
     "maintenance:cleanup-brand-assets": "node --conditions=react-server --import tsx scripts/cleanup-brand-assets.ts",
+    "worker:content-media": "node --conditions=react-server --import tsx scripts/content-media-worker.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CALENDAR, CONTENT_LIMITS, CONTENT_STATUSES, DEFAULT_LOCALE, LOCALES, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { CALENDAR, CONTENT_LIMITS, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_STATUSES, DEFAULT_LOCALE, LOCALES, SOCIAL_PLATFORMS } from "@/lib/constants";
 
 const validTimeZone = z.string().trim().min(1).max(64).refine((timeZone) => {
   try {
@@ -60,6 +60,7 @@ export const calendarContentVersionSaveSchema = calendarItemCreateSchema.extend(
 }).strict();
 
 export const calendarContentVersionSchema = z.object({
+  id: z.uuid(),
   versionNumber: z.number().int().positive(),
   brandKitVersionNumber: z.number().int().positive().nullable(),
   canonicalCopy: z.string(),
@@ -67,6 +68,24 @@ export const calendarContentVersionSchema = z.object({
   platform: z.enum(SOCIAL_PLATFORMS),
   createdAt: z.iso.datetime(),
 });
+
+export const contentMediaSchema = z.object({
+  id: z.uuid(),
+  status: z.enum(CONTENT_MEDIA_STATUSES),
+  fileName: z.string(),
+  contentType: z.enum(["image/webp"]).nullable(),
+  sizeBytes: z.number().int().positive().nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  createdAt: z.iso.datetime(),
+  createdByName: z.string(),
+  reviewedAt: z.iso.datetime().nullable(),
+  previewUrl: z.url({ protocol: /^https?$/ }).nullable(),
+}).strict();
+export const contentMediaResponseSchema = z.object({ data: z.array(contentMediaSchema), canManage: z.boolean(), canReview: z.boolean() }).strict();
+export const contentMediaGenerationRequestSchema = z.object({ contentVersionId: z.uuid(), idempotencyKey: z.uuid() }).strict();
+export const contentMediaGenerationResponseSchema = z.object({ data: z.object({ id: z.uuid(), status: z.enum(CONTENT_MEDIA_STATUSES) }).strict() }).strict();
+export const contentMediaReviewSchema = z.object({ decision: z.enum(CONTENT_MEDIA_REVIEW_DECISIONS), note: z.string().trim().max(CONTENT_LIMITS.canonicalCopyCharacters).nullable() }).strict();
 
 export const calendarContentHistoryEntrySchema = z.object({
   versionNumber: z.number().int().positive(),
