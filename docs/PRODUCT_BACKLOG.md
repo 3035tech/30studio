@@ -18,10 +18,11 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 |---|---|---|
 | Next.js, TypeScript, Tailwind v4, tema e identidade 30studio | Implementado no scaffold | Revisão visual automatizada ainda não foi comprovada neste ambiente. |
 | Better Auth, sessão, organizações e membros no schema Drizzle | Base implementada | Entrega de e-mail não configurada; cadastro/verificação não está pronto para clientes. |
-| Troca/criação de workspace e interface PT/EN | Implementado no primeiro fluxo | Ainda não há shell completo de navegação do produto. |
+| Troca/criação de workspace e interface PT/EN | Implementado | Shell com Visão geral, Marcas e Equipe; as duas primeiras áreas são funcionais. |
 | Criar/listar marcas com escopo de tenant | Implementado | Depende de PostgreSQL configurado para uso real. |
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
-| Convites, Brand Kit, OAuth, conteúdo, revisão, aprovação, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
+| Equipe: listar, alterar papel e remover associação | Em implementação | Auditoria é gravada na mesma transação; convites aguardam configuração de entrega de e-mail. |
+| Brand Kit, OAuth, conteúdo, revisão, aprovação, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
 
 ## Mapa de telas
 
@@ -171,8 +172,8 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 ## Ordem de trabalho imediata
 
-1. Terminar revisão e integração de `feature/brand-management`, incluindo teste de persistência e isolamento quando PostgreSQL local estiver disponível.
-2. Configurar um ambiente local reproduzível e automatizar testes de tenant e RBAC.
-3. Criar o shell autenticado e a navegação das telas; ligar somente as rotas já funcionais.
-4. Implementar membros/convites e Brand Kit versionado.
+1. Validar a migração da auditoria e executar os testes de integração das rotas de equipe em PostgreSQL descartável.
+2. Configurar entrega de e-mail transacional antes de ativar convites, reenvio, cancelamento e aceite por link.
+3. Completar a trilha de auditoria consultável e testar a matriz de papéis com sessão Better Auth e isolamento tenant.
+4. Implementar Brand Kit versionado com importação rastreável de ativos e fatos aprovados.
 5. Só então avançar para OAuth, editor/conteúdo e aprovação; publicação permanece bloqueada até a política de aprovação e seus testes existirem.

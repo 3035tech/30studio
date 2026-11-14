@@ -10,6 +10,7 @@ import { brandListResponseSchema, type BrandListItem } from "@/lib/validation/br
 import { AUTH_LIMITS, BRAND_LIMITS, WORKSPACE_SECTION_IDS, type Locale } from "@/lib/constants";
 import { Link } from "@/lib/i18n/routing";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { TeamManagement } from "@/components/workspace/team-management";
 
 type AuthMode = "sign_in" | "sign_up";
 type BrandState = { organizationId: string | null; items: BrandListItem[]; pending: boolean; error: boolean };
@@ -34,6 +35,7 @@ export function WorkspaceEntry() {
   const { data: activeOrganization } = authClient.useActiveOrganization();
   const [authMode, setAuthMode] = useState<AuthMode>("sign_in");
   const [busy, setBusy] = useState(false);
+  const [isChangingOrganization, setIsChangingOrganization] = useState(false);
   const [message, setMessage] = useState("");
   const [brands, setBrands] = useState<BrandState>(INITIAL_BRANDS);
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
@@ -124,6 +126,7 @@ export function WorkspaceEntry() {
 
   async function handleOrganizationChange(organizationId: string) {
     setBusy(true);
+    setIsChangingOrganization(true);
     setMessage("");
     try {
       const result = await authClient.organization.setActive({ organizationId });
@@ -132,6 +135,7 @@ export function WorkspaceEntry() {
     } catch {
       setMessage(tWorkspace("organizationError"));
     } finally {
+      setIsChangingOrganization(false);
       setBusy(false);
     }
   }
@@ -372,6 +376,10 @@ export function WorkspaceEntry() {
           </form>
         </section>
       </section>
+      <TeamManagement
+        key={isChangingOrganization ? "organization-switch" : activeOrganization?.id ?? "organization-pending"}
+        organizationId={isChangingOrganization ? null : activeOrganization?.id ?? null}
+      />
     </WorkspaceShell>
   );
 }

@@ -5,12 +5,15 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { GET as listBrandsRoute, POST as createBrandRoute } from "@/app/api/brands/route";
 import { PATCH as updateBrandRoute } from "@/app/api/brands/[brandId]/route";
-import { API_ERROR_CODES, BETTER_AUTH_ENV, HTTP_STATUS, TENANT_ROLE } from "@/lib/constants";
+import { DELETE as removeTeamMemberRoute, PATCH as updateTeamMemberRoute } from "@/app/api/team/[memberId]/route";
+import { GET as listTeamRoute } from "@/app/api/team/route";
+import { API_ERROR_CODES, BETTER_AUTH_ENV, HTTP_STATUS, TEAM_AUDIT_ACTIONS, TENANT_ROLE } from "@/lib/constants";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
-import { brands, member, organization, session, user } from "@/lib/db/schema";
+import { brands, member, organization, session, teamAuditEvents, user } from "@/lib/db/schema";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { getAuth } from "@/lib/server/better-auth";
 import { brandListResponseSchema } from "@/lib/validation/brands";
+import { teamListResponseSchema } from "@/lib/validation/team";
 
 const TEST_ORIGIN = "http://localhost:3000";
 const TEST_EMAIL = `route-test-${crypto.randomUUID()}@example.invalid`;
@@ -20,6 +23,7 @@ const ORGANIZATION_IDS = {
   active: `route-test-active-${crypto.randomUUID()}`,
   other: `route-test-other-${crypto.randomUUID()}`,
 } as const;
+const TEAMMATE_USER_ID = `route-test-teammate-${crypto.randomUUID()}`;
 
 const signUpResponseSchema = z.object({
   token: z.string().min(1).nullable(),
@@ -35,6 +39,9 @@ let testSessionToken: string | undefined;
 let sessionCookie = "";
 let testBrandAId: string | undefined;
 let testBrandBId: string | undefined;
+let ownerMemberId: string | undefined;
+let activeTeammateMemberId: string | undefined;
+let otherTeammateMemberId: string | undefined;
 
 before(async () => {
   process.env[BETTER_AUTH_ENV.secret] = TEST_SECRET;
@@ -75,17 +82,26 @@ before(async () => {
   assert.notEqual(sessionCookie, "");
 
   const createdAt = new Date();
+  await database.insert(user).values({
+    id: TEAMMATE_USER_ID,
+    name: "Route test teammate",
+    email: `route-test-teammate-${crypto.randomUUID()}@example.invalid`,
+    emailVerified: true,
+    createdAt,
+    updatedAt: createdAt,
+  });
   await database.insert(organization).values([
     { id: ORGANIZATION_IDS.active, name: "Active test tenant", slug: ORGANIZATION_IDS.active, createdAt },
     { id: ORGANIZATION_IDS.other, name: "Other test tenant", slug: ORGANIZATION_IDS.other, createdAt },
   ]);
-  await database.insert(member).values({
-    id: `route-test-member-${crypto.randomUUID()}`,
-    organizationId: ORGANIZATION_IDS.active,
-    userId: testUserId,
-    role: TENANT_ROLE.owner,
-    createdAt,
-  });
+  ownerMemberId = `route-test-member-${crypto.randomUUID()}`;
+  activeTeammateMemberId = `route-test-member-${crypto.randomUUID()}`;
+  otherTeammateMemberId = `route-test-member-${crypto.randomUUID()}`;
+  await database.insert(member).values([
+    { id: ownerMemberId, organizationId: ORGANIZATION_IDS.active, userId: testUserId, role: TENANT_ROLE.owner, createdAt },
+    { id: activeTeammateMemberId, organizationId: ORGANIZATION_IDS.active, userId: TEAMMATE_USER_ID, role: TENANT_ROLE.editor, createdAt },
+    { id: otherTeammateMemberId, organizationId: ORGANIZATION_IDS.other, userId: TEAMMATE_USER_ID, role: TENANT_ROLE.editor, createdAt },
+  ]);
   await database.update(session)
     .set({ activeOrganizationId: ORGANIZATION_IDS.active })
     .where(eq(session.token, testSessionToken));
@@ -104,6 +120,7 @@ after(async () => {
   try {
     await database.delete(organization).where(inArray(organization.id, Object.values(ORGANIZATION_IDS)));
     if (testUserId) await database.delete(user).where(eq(user.id, testUserId));
+    await database.delete(user).where(eq(user.id, TEAMMATE_USER_ID));
   } finally {
     await closeDatabase();
   }
@@ -114,6 +131,9 @@ test("brand routes enforce session, active membership, tenant scope, and role pe
   assert.ok(testSessionToken);
   assert.ok(testBrandAId);
   assert.ok(testBrandBId);
+  assert.ok(ownerMemberId);
+  assert.ok(activeTeammateMemberId);
+  assert.ok(otherTeammateMemberId);
 
   const database = getDatabase();
   const unauthenticatedResponse = await listBrandsRoute(new NextRequest(`${TEST_ORIGIN}/api/brands`));
@@ -122,6 +142,52 @@ test("brand routes enforce session, active membership, tenant scope, and role pe
   const authenticatedRequest = () => new NextRequest(`${TEST_ORIGIN}/api/brands`, {
     headers: { cookie: sessionCookie },
   });
+
+  const teamResponse = await listTeamRoute(new NextRequest(`${TEST_ORIGIN}/api/team`, { headers: { cookie: sessionCookie } }));
+  assert.equal(teamResponse.status, HTTP_STATUS.ok);
+  const teamBody = teamListResponseSchema.parse(await teamResponse.json());
+  assert.deepEqual(teamBody.data.map((teamMember) => teamMember.id), [ownerMemberId, activeTeammateMemberId].sort());
+  assert.equal(teamBody.canManage, true);
+
+  const crossTenantTeamUpdate = await updateTeamMemberRoute(
+    new NextRequest(`${TEST_ORIGIN}/api/team/${otherTeammateMemberId}`, {
+      method: "PATCH",
+      headers: { cookie: sessionCookie, origin: TEST_ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ role: TENANT_ROLE.analyst }),
+    }),
+    { params: Promise.resolve({ memberId: otherTeammateMemberId }) },
+  );
+  assert.equal(crossTenantTeamUpdate.status, HTTP_STATUS.notFound);
+
+  const updateTeammate = await updateTeamMemberRoute(
+    new NextRequest(`${TEST_ORIGIN}/api/team/${activeTeammateMemberId}`, {
+      method: "PATCH",
+      headers: { cookie: sessionCookie, origin: TEST_ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ role: TENANT_ROLE.approver }),
+    }),
+    { params: Promise.resolve({ memberId: activeTeammateMemberId }) },
+  );
+  assert.equal(updateTeammate.status, HTTP_STATUS.ok);
+  const roleChangeEvent = await database.query.teamAuditEvents.findFirst({
+    where: and(eq(teamAuditEvents.organizationId, ORGANIZATION_IDS.active), eq(teamAuditEvents.action, TEAM_AUDIT_ACTIONS.memberRoleChanged)),
+  });
+  assert.equal(roleChangeEvent?.previousRole, TENANT_ROLE.editor);
+  assert.equal(roleChangeEvent?.newRole, TENANT_ROLE.approver);
+
+  const removeTeammate = await removeTeamMemberRoute(
+    new NextRequest(`${TEST_ORIGIN}/api/team/${activeTeammateMemberId}`, {
+      method: "DELETE",
+      headers: { cookie: sessionCookie, origin: TEST_ORIGIN },
+    }),
+    { params: Promise.resolve({ memberId: activeTeammateMemberId }) },
+  );
+  assert.equal(removeTeammate.status, HTTP_STATUS.ok);
+  assert.equal(await database.query.member.findFirst({ where: eq(member.id, activeTeammateMemberId) }), undefined);
+  assert.ok(await database.query.teamAuditEvents.findFirst({
+    where: and(eq(teamAuditEvents.organizationId, ORGANIZATION_IDS.active), eq(teamAuditEvents.action, TEAM_AUDIT_ACTIONS.memberRemoved)),
+  }));
+  assert.ok(await database.query.user.findFirst({ where: eq(user.id, TEAMMATE_USER_ID) }));
+
   const listResponse = await listBrandsRoute(authenticatedRequest());
   assert.equal(listResponse.status, HTTP_STATUS.ok);
   const listBody = brandListResponseSchema.parse(await listResponse.json());

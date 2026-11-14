@@ -7,6 +7,7 @@ export const WORKSPACE_SECTION_IDS = {
   overview: "workspace-overview",
   brands: "workspace-brands",
   createBrand: "workspace-create-brand",
+  team: "workspace-team",
 } as const;
 
 export const BRAND_ASSETS = {
@@ -84,8 +85,23 @@ export const API_ERROR_CODES = {
   brandExists: "BRAND_EXISTS",
   brandNotFound: "BRAND_NOT_FOUND",
   profileExists: "PROFILE_EXISTS",
+  teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
+  teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
   serviceUnavailable: "SERVICE_UNAVAILABLE",
   internalError: "INTERNAL_ERROR",
+} as const;
+
+export const TEAM_AUDIT_ACTIONS = {
+  memberRoleChanged: "member_role_changed",
+  memberRemoved: "member_removed",
+} as const;
+export const TEAM_AUDIT_ACTION_VALUES = [TEAM_AUDIT_ACTIONS.memberRoleChanged, TEAM_AUDIT_ACTIONS.memberRemoved] as const;
+export const TEAM_MEMBER_LIMIT = 100;
+export const TEAM_API_PATHS = {
+  collection: "/api/team",
+} as const;
+export const TEAM_FORM_ID_PREFIXES = {
+  role: "team-role-",
 } as const;
 
 export const BETTER_AUTH_ENV = {
@@ -102,6 +118,7 @@ export const TENANT_ROLE = {
   analyst: "analyst",
 } as const;
 export const TENANT_ROLES = Object.values(TENANT_ROLE);
+export const TEAM_ROLES = TENANT_ROLES;
 export type TenantRole = (typeof TENANT_ROLES)[number];
 export const TENANT_PERMISSIONS = {
   organizationManage: "organization:manage",

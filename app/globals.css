@@ -85,6 +85,7 @@
 .workspaceOverview__summary strong { color: var(--brand-primary); font-family: var(--brand-display-font); font-size: 54px; font-weight: 700; letter-spacing: -.055em; line-height: 1; }
 .workspaceOverview__summary span { max-width: 19ch; color: #526174; font-size: 13px; line-height: 1.4; }
 .workspaceBrands { margin-top: 52px; scroll-margin-top: 32px; }
+.teamSection { margin-top: 52px; scroll-margin-top: 32px; }
 .workspaceHeading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .workspaceHeading .entryKicker { margin-top: 0; }
 .workspaceHeading h2 { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 28px; font-weight: 700; letter-spacing: -.035em; }
@@ -108,14 +109,26 @@
 .brandCreate__heading p { margin: 7px 0 0; color: #526174; font-size: 13px; line-height: 1.5; }
 .brandCreate__form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 16px; margin-top: 22px; }
 .brandCreate__form > button { grid-column: 2; justify-self: end; min-width: 170px; }
+.teamCollection { margin: 0; padding: 0; list-style: none; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+.teamCollection__item { min-height: 82px; padding: 14px 18px; display: grid; grid-template-columns: minmax(170px, 1fr) minmax(120px, .55fr) minmax(320px, 1.5fr); align-items: center; gap: 20px; border-bottom: 1px solid #edf2f7; }
+.teamCollection__item:last-child { border-bottom: 0; }
+.teamCollection__identity { min-width: 0; display: grid; gap: 4px; }
+.teamCollection__identity strong { overflow: hidden; color: var(--brand-dark); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.teamCollection__identity span, .teamCollection__joined, .teamCollection__role { overflow: hidden; margin: 0; color: #64748b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.teamCollection__actions { display: flex; align-items: end; gap: 8px; }
+.teamCollection__actions > .grid { flex: 1 1 150px; }
+.teamCollection__actions button { flex: 0 0 auto; }
+.teamCollection__confirmation { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.teamCollection__confirmation span { flex: 1 1 100%; color: #526174; font-size: 12px; line-height: 1.45; }
+.teamSection__error { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 
 @media (prefers-color-scheme: dark) {
   :root { color-scheme: dark; }
   body, .entryShell, .entryLoading, .workspaceShell { background: var(--brand-dark); color: #f8fafc; }
   .brandLogo__light { display: none !important; }
   .brandLogo__dark { display: block !important; }
-  .entryPanel, .workspaceHeader, .workspaceEmpty, .brandCollection, .brandCreate { background: #12264a; border-color: #344667; }
-  .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2 { color: #f8fafc; }
+  .entryPanel, .workspaceHeader, .workspaceEmpty, .brandCollection, .brandCreate, .teamCollection { background: #12264a; border-color: #344667; }
+  .entryPanel h1, .workspaceOverview h1, .workspaceHeading h2, .brandCollection__identity strong, .brandCreate__heading h2, .teamCollection__identity strong { color: #f8fafc; }
   .entryDescription, .entryLoading, .brandCount, .brandCollection__identity small, .brandCollection__social, .brandCreate__heading p, .workspaceHeaderActions label, .workspaceEmail { color: #cbd5e1; }
   .workspaceHeader { border-color: #344667; }
   .workspaceNavigation__link { color: #e2e8f0; }
@@ -125,8 +138,10 @@
   .workspaceOverview__summary { border-color: #344667; }
   .workspaceOverview__summary span { color: #cbd5e1; }
   .brandCollection__item { border-color: #344667; }
+  .teamCollection__item { border-color: #344667; }
+  .teamCollection__identity span, .teamCollection__joined, .teamCollection__role, .teamCollection__confirmation span { color: #cbd5e1; }
   .brandCollection__mark { background: rgb(139 92 246 / 20%); color: #c4b5fd; }
-  .workspaceHeaderActions input, .workspaceHeaderActions select, .brandCreate input, .entryPanel input { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
+  .workspaceHeaderActions input, .workspaceHeaderActions select, .brandCreate input, .entryPanel input, .teamCollection select { background: #0b1b3b; border-color: #526174; color: #f8fafc; }
   .brandCollection { border-color: #344667; }
   .workspaceEmpty { border-style: dashed; }
   .localeLink { color: #f8fafc; }
@@ -147,6 +162,7 @@
   .workspaceOverview__summary strong { font-size: 42px; }
   .workspaceOverview__summary span { max-width: none; }
   .workspaceBrands { margin-top: 38px; }
+  .teamSection { margin-top: 38px; }
   .workspaceHeading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .brandCreate__form { grid-template-columns: 1fr; }
   .brandCreate__form > button { grid-column: 1; justify-self: stretch; }
@@ -154,6 +170,11 @@
   .brandCollection__social { grid-column: 2; }
   .brandCollection__actions, .brandCollection__editor, .brandCollection__archive { grid-column: 2; }
   .brandCollection__editor { grid-template-columns: 1fr; }
+  .teamCollection__item { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .teamCollection__actions { align-items: stretch; flex-wrap: wrap; }
+  .teamCollection__actions > .grid { flex-basis: 100%; }
+  .teamCollection__confirmation { width: 100%; }
+  .teamSection__error { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 480px) {

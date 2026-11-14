@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Building2, LayoutDashboard } from "lucide-react";
+import { Building2, LayoutDashboard, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -10,7 +10,7 @@ import { Link } from "@/lib/i18n/routing";
 import { WORKSPACE_SECTION_IDS, type Locale } from "@/lib/constants";
 
 type WorkspaceOrganization = { id: string; name: string };
-type WorkspaceSection = "overview" | "brands";
+type WorkspaceSection = "overview" | "brands" | "team";
 
 type WorkspaceShellProps = {
   children: ReactNode;
@@ -40,11 +40,13 @@ export function WorkspaceShell({
   const sections = [
     { id: "overview" as const, href: WORKSPACE_SECTION_IDS.overview, icon: LayoutDashboard, label: tNavigation("overview") },
     { id: "brands" as const, href: WORKSPACE_SECTION_IDS.brands, icon: Building2, label: tNavigation("brands") },
+    { id: "team" as const, href: WORKSPACE_SECTION_IDS.team, icon: UsersRound, label: tNavigation("team") },
   ];
 
   useEffect(() => {
     function syncActiveSection() {
-      setActiveSection(window.location.hash === `#${WORKSPACE_SECTION_IDS.brands}` ? "brands" : "overview");
+      const sectionId = window.location.hash.slice(1);
+      setActiveSection(sectionId === WORKSPACE_SECTION_IDS.brands ? "brands" : sectionId === WORKSPACE_SECTION_IDS.team ? "team" : "overview");
     }
 
     window.addEventListener("hashchange", syncActiveSection);

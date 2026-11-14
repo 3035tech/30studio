@@ -1,12 +1,13 @@
 import { relations } from "drizzle-orm";
 import { boolean, foreignKey, index, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES } from "@/lib/constants";
+import { SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
 import { organization, user } from "@/lib/db/auth-schema";
 
 export * from "@/lib/db/auth-schema";
 
 export const socialPlatform = pgEnum("social_platform", SOCIAL_PLATFORMS);
 export const socialProfileStatus = pgEnum("social_profile_status", SOCIAL_PROFILE_STATUSES);
+export const teamAuditAction = pgEnum("team_audit_action", TEAM_AUDIT_ACTION_VALUES);
 
 export const brands = pgTable(
   "brands",
@@ -46,6 +47,24 @@ export const socialProfiles = pgTable(
     foreignKey({ name: "social_profiles_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
     index("social_profiles_organization_brand_idx").on(table.organizationId, table.brandId),
     uniqueIndex("social_profiles_identity_unique").on(table.brandId, table.platform, table.handle),
+  ],
+);
+
+export const teamAuditEvents = pgTable(
+  "team_audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    actorUserId: text("actor_user_id").notNull(),
+    targetUserId: text("target_user_id").notNull(),
+    action: teamAuditAction("action").notNull(),
+    previousRole: text("previous_role"),
+    newRole: text("new_role"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("team_audit_events_org_occurred_idx").on(table.organizationId, table.occurredAt),
+    index("team_audit_events_org_target_idx").on(table.organizationId, table.targetUserId),
   ],
 );
 
