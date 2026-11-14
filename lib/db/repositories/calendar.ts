@@ -195,6 +195,50 @@ export async function getCalendarContentVersions(organizationId: string, itemId:
   };
 }
 
+export async function getCalendarCopyGenerationContext(organizationId: string, itemId: string, brandId: string) {
+  const database = getDatabase();
+  const [item] = await database.select({
+    brandId: contentItems.brandId,
+    title: contentItems.title,
+    campaignId: contentItems.campaignId,
+    campaignBrief: campaigns.brief,
+  }).from(contentItems).innerJoin(brands, and(
+    eq(brands.organizationId, contentItems.organizationId),
+    eq(brands.id, contentItems.brandId),
+  )).leftJoin(campaigns, and(
+    eq(campaigns.organizationId, contentItems.organizationId),
+    eq(campaigns.id, contentItems.campaignId),
+    eq(campaigns.brandId, contentItems.brandId),
+  )).where(and(
+    eq(contentItems.organizationId, organizationId),
+    eq(contentItems.id, itemId),
+    eq(brands.isActive, true),
+    inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
+  )).limit(1);
+  if (!item) return null;
+  if (item.campaignId && item.brandId !== brandId) return null;
+
+  const [brand] = await database.select({
+    id: brands.id,
+    name: brands.name,
+    description: brands.description,
+    industry: brands.industry,
+  }).from(brands).where(and(
+    eq(brands.organizationId, organizationId),
+    eq(brands.id, brandId),
+    eq(brands.isActive, true),
+  )).limit(1);
+  if (!brand) return null;
+
+  const [brandKit] = await database.select({ version: brandKitVersions.version, content: brandKitVersions.content }).from(brandKitVersions).where(and(
+    eq(brandKitVersions.organizationId, organizationId),
+    eq(brandKitVersions.brandId, brandId),
+    eq(brandKitVersions.status, BRAND_KIT_VERSION_STATUS.approved),
+  )).orderBy(desc(brandKitVersions.version)).limit(1);
+
+  return { title: item.title, campaignBrief: item.campaignBrief, brandId: brand.id, brandName: brand.name, brandDescription: brand.description, industry: brand.industry, brandKit };
+}
+
 export async function createCalendarContentVersion(organizationId: string, userId: string, itemId: string, input: CalendarContentVersionSaveInput) {
   const database = getDatabase();
   return database.transaction(async (transaction) => {

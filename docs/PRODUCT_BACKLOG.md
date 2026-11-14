@@ -138,7 +138,7 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 **Telas:** S06, S09, S10, S13, S17.
 
-1. Implementar tarefas de IA limitadas e explícitas: ideias, variantes de copy, roteiro e proposta de carrossel.
+1. Implementar tarefas de IA limitadas e explícitas: ideias, variantes de copy, roteiro e proposta de carrossel. Parcial: o editor solicita uma sugestão canônica e uma variante por canal usando somente briefing e Brand Kit aprovado; a saída não é persistida até a pessoa revisar e salvar. O primeiro adapter usa AI SDK com provider OpenAI configurado no servidor; `OPENAI_MODEL` é configurável.
 2. Construir contexto apenas com organização autorizada, marca, Brand Kit aprovado e fontes permitidas; registrar modelo, fontes e uso.
 3. Adicionar conectores de pesquisa autorizados com proveniência e limites de dados; conteúdo externo é entrada não confiável e nunca vira instrução do agente.
 4. Implementar fila durável para trabalhos longos, limites de concorrência, retries finitos, dead-letter e retomada após reinício.

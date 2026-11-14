@@ -19,11 +19,13 @@
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"
   },
   "dependencies": {
+    "@ai-sdk/openai": "3.0.143",
     "@aws-sdk/client-s3": "3.1169.0",
     "@aws-sdk/s3-presigned-post": "3.1169.0",
     "@aws-sdk/s3-request-presigner": "3.1169.0",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-slot": "1.2.4",
+    "ai": "6.0.330",
     "better-auth": "1.7.23",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",

@@ -90,6 +90,15 @@ export const CALENDAR_API_PATHS = {
   collection: "/api/calendar",
   item: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}`,
   versions: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/versions`,
+  generateCopy: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/copy-draft`,
+} as const;
+export const COPY_GENERATION = {
+  timeoutMilliseconds: 30_000,
+  maximumOutputTokens: 700,
+} as const;
+export const AI_PROVIDER_ENV = {
+  apiKey: "OPENAI_API_KEY",
+  model: "OPENAI_MODEL",
 } as const;
 export const CAMPAIGN_API_PATHS = { collection: "/api/campaigns" } as const;
 export const CAMPAIGN_FORM_FIELDS = {
@@ -123,6 +132,7 @@ export const CALENDAR_UI_IDS = {
   canonicalCopy: "calendar-canonical-copy",
   variantCopy: "calendar-variant-copy",
 } as const;
+export const CALENDAR_FORM_FIELDS = { brandId: "brandId", platform: "platform" } as const;
 
 export const BRAND_KIT_VERSION_STATUSES = ["draft", "approved", "superseded"] as const;
 export type BrandKitVersionStatus = (typeof BRAND_KIT_VERSION_STATUSES)[number];
@@ -253,6 +263,7 @@ export const API_ERROR_CODES = {
   brandAssetInvalid: "BRAND_ASSET_INVALID",
   brandAssetStateConflict: "BRAND_ASSET_STATE_CONFLICT",
   calendarItemNotFound: "CALENDAR_ITEM_NOT_FOUND",
+  aiServiceUnavailable: "AI_SERVICE_UNAVAILABLE",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
   invitationNotFound: "INVITATION_NOT_FOUND",

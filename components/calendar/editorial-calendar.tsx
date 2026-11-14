@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale, type SocialPlatform } from "@/lib/constants";
+import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarCampaignCreateResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { calendarCampaignCreateResponseSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
 
 type CalendarState = {
   requestKey: string;
@@ -46,11 +46,13 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     error: boolean;
   } | null>(null);
   const [contentRefreshIndex, setContentRefreshIndex] = useState(0);
+  const [generatedCopy, setGeneratedCopy] = useState<{ itemId: string; canonicalCopy: string; variantCopy: string } | null>(null);
   const [state, setState] = useState(INITIAL_STATE);
   const [formOpen, setFormOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>([SOCIAL_PLATFORMS[0]]);
   const [busy, setBusy] = useState(false);
+  const [generatingCopy, setGeneratingCopy] = useState(false);
   const [notice, setNotice] = useState("");
   const [refreshIndex, setRefreshIndex] = useState(0);
 
@@ -118,6 +120,15 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
   const visibleItems = state.requestKey === requestKey ? state.items : EMPTY_ITEMS;
   const pending = state.requestKey !== requestKey;
   const hasError = !pending && state.error;
+  const selectedCopy = selectedItem && contentVersionState?.itemId === selectedItem.id && contentVersionState.data
+    ? generatedCopy?.itemId === selectedItem.id
+      ? generatedCopy
+      : {
+        itemId: selectedItem.id,
+        canonicalCopy: contentVersionState.data.current?.canonicalCopy ?? "",
+        variantCopy: contentVersionState.data.current?.variantCopy ?? "",
+      }
+    : null;
   const eventsByDate = useMemo(() => {
     const events = new Map<string, CalendarItem[]>();
     for (const item of visibleItems) {
@@ -170,7 +181,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          brandId: String(form.get("brandId") ?? ""),
+          brandId: String(form.get(CALENDAR_FORM_FIELDS.brandId) ?? ""),
           title: String(form.get("title") ?? ""),
           brief: String(form.get("brief") ?? ""),
           publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
@@ -206,7 +217,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          brandId: String(form.get("brandId") ?? ""),
+          brandId: String(form.get(CALENDAR_FORM_FIELDS.brandId) ?? selectedItem.brandId),
           platform: String(form.get("platform") ?? ""),
           title: String(form.get("title") ?? ""),
           plannedAt: localDateTime.toISOString(),
@@ -223,6 +234,38 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
       setNotice(t("contentSaveError"));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function generateCopyDraft(event: MouseEvent<HTMLButtonElement>) {
+    if (!selectedItem) return;
+    const form = event.currentTarget.form;
+    const platform = form?.elements.namedItem(CALENDAR_FORM_FIELDS.platform);
+    const brandField = form?.elements.namedItem(CALENDAR_FORM_FIELDS.brandId);
+    const selectedPlatform = platform instanceof HTMLSelectElement ? platform.value : selectedItem.platform;
+    const selectedBrandId = brandField instanceof HTMLSelectElement ? brandField.value : selectedItem.brandId;
+    setGeneratingCopy(true);
+    setNotice("");
+    try {
+      const response = await fetch(CALENDAR_API_PATHS.generateCopy(selectedItem.id), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId: selectedBrandId, locale, platform: selectedPlatform }),
+      });
+      if (response.status === 503) {
+        setNotice(t("generationUnavailable"));
+        return;
+      }
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = calendarCopyDraftResponseSchema.safeParse(payload);
+      if (!response.ok || !parsed.success) throw new Error("Copy generation failed.");
+      setGeneratedCopy({ itemId: selectedItem.id, ...parsed.data.data });
+      setNotice(t("copyGenerated"));
+    } catch {
+      setNotice(t("generationError"));
+    } finally {
+      setGeneratingCopy(false);
     }
   }
 
@@ -365,23 +408,29 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         </section>)}
       </div>}
 
-      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy) { setSelectedItem(null); setContentVersionState(null); } }}>
+      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy && !generatingCopy) { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); } }}>
         {selectedItem ? <DialogContent aria-labelledby={CALENDAR_UI_IDS.editTitle} aria-describedby={CALENDAR_UI_IDS.editDescription}>
           <DialogHeader><DialogTitle id={CALENDAR_UI_IDS.editTitle}>{t("editTitle")}</DialogTitle><DialogDescription id={CALENDAR_UI_IDS.editDescription}>{t("editDescription")}</DialogDescription></DialogHeader>
           {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form className="editorialCalendar__editForm" onSubmit={(event) => void saveContentVersion(event)} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
             <TextField id="calendar-edit-idea-title" name="title" label={t("ideaTitle")} defaultValue={selectedItem.title} maxLength={CONTENT_LIMITS.titleCharacters} required />
-            <SelectField id="calendar-edit-idea-brand" name="brandId" label={t("brand")} defaultValue={selectedItem.brandId} required>
+            <SelectField id="calendar-edit-idea-brand" name={CALENDAR_FORM_FIELDS.brandId} label={t("brand")} defaultValue={selectedItem.brandId} disabled={Boolean(selectedItem.campaignId)} required>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </SelectField>
-            <SelectField id="calendar-edit-idea-platform" name="platform" label={t("channel")} defaultValue={selectedItem.platform} required>
+            <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} required>
               {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
             </SelectField>
             <TextField id="calendar-edit-idea-date" name="date" label={t("date")} type="date" defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} required />
             <TextField id="calendar-edit-idea-time" name="time" label={t("time")} type="time" defaultValue={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(selectedItem.plannedAt))} required />
-            <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} defaultValue={contentVersionState.data.current?.canonicalCopy ?? ""} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
-            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} defaultValue={contentVersionState.data.current?.variantCopy ?? ""} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
+            <div className="editorialCalendar__generationAction">
+              <Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={(event) => void generateCopyDraft(event)}>
+                <WandSparkles aria-hidden="true" size={16} />{generatingCopy ? t("generatingCopy") : t("generateCopy")}
+              </Button>
+              <p>{t("generatedCopyReview")}</p>
+            </div>
+            <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} value={selectedCopy?.canonicalCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: event.target.value, variantCopy: current?.itemId === selectedItem.id ? current.variantCopy : selectedCopy?.variantCopy ?? "" }))} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
+            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value }))} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
             {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
-            <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy} onClick={() => { setSelectedItem(null); setContentVersionState(null); }}>{t("cancel")}</Button></div>
+            <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); }}>{t("cancel")}</Button></div>
           </form> : null}
         </DialogContent> : null}
       </Dialog>

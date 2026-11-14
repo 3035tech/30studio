@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CALENDAR, CONTENT_LIMITS, CONTENT_STATUSES, DEFAULT_LOCALE, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { CALENDAR, CONTENT_LIMITS, CONTENT_STATUSES, DEFAULT_LOCALE, LOCALES, SOCIAL_PLATFORMS } from "@/lib/constants";
 
 const validTimeZone = z.string().trim().min(1).max(64).refine((timeZone) => {
   try {
@@ -80,6 +80,14 @@ export const calendarContentVersionResponseSchema = z.object({
     history: z.array(calendarContentHistoryEntrySchema),
   }),
 });
+
+export const calendarCopyDraftRequestSchema = z.object({ brandId: z.uuid(), locale: z.enum(LOCALES), platform: z.enum(SOCIAL_PLATFORMS) }).strict();
+export const calendarCopyDraftResponseSchema = z.object({
+  data: z.object({
+    canonicalCopy: z.string().trim().min(1).max(CONTENT_LIMITS.canonicalCopyCharacters),
+    variantCopy: z.string().trim().min(1).max(CONTENT_LIMITS.variantCopyCharacters),
+  }).strict(),
+}).strict();
 
 export const calendarItemSchema = z.object({
   id: z.uuid(),

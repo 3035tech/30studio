@@ -157,6 +157,8 @@
 .studioDialog__title { margin: 0; color: var(--brand-dark); font-family: var(--brand-display-font); font-size: 20px; font-weight: 700; letter-spacing: -.025em; }
 .studioDialog__description { margin: 7px 0 0; color: #64748b; font-size: 12px; line-height: 1.5; }
 .editorialCalendar__editForm { display: grid; gap: 13px; }
+.editorialCalendar__generationAction { display: grid; gap: 5px; justify-items: start; }
+.editorialCalendar__generationAction p { margin: 0; color: var(--brand-muted); font-size: 12px; line-height: 1.5; }
 .editorialCalendar__versionHistory { padding: 12px 14px; border: 1px solid #dbe3ee; border-radius: 8px; background: color-mix(in srgb, var(--brand-surface) 55%, white); color: var(--brand-dark); font-size: 11px; }
 .editorialCalendar__versionHistory ol { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 18px; color: #526174; }
 .editorialCalendar__editForm .editorialCalendar__formActions { justify-content: flex-end; margin-top: 4px; }
