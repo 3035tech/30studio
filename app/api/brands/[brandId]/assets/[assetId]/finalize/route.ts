@@ -44,8 +44,13 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       throw error;
     }
     await storeVerifiedBrandAsset(storageInput.data, asset.objectKey, verified.bytes);
-    const completed = await completeBrandAssetUpload(tenant.organizationId, brandId, assetId, verified.width, verified.height);
-    if (!completed) throw new ApiError(API_ERROR_CODES.brandAssetStateConflict, HTTP_STATUS.conflict);
+    try {
+      const completed = await completeBrandAssetUpload(tenant.organizationId, brandId, assetId, verified.width, verified.height);
+      if (!completed) throw new ApiError(API_ERROR_CODES.brandAssetStateConflict, HTTP_STATUS.conflict);
+    } catch (error) {
+      await deleteBrandAssetObject(asset.objectKey).catch(() => undefined);
+      throw error;
+    }
     await deleteBrandAssetObject(asset.uploadKey).catch(() => undefined);
     return NextResponse.json({ data: { id: assetId, status: BRAND_ASSET_STATUS.pendingReview, width: verified.width, height: verified.height } }, {
       headers: { "Cache-Control": "no-store" },

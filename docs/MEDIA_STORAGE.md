@@ -9,7 +9,9 @@ The first media slice stores PNG, JPEG, and WebP brand images in a private S3-co
 3. The authenticated finalize request reads the temporary object through the server SDK, checks size/type/metadata, computes SHA-256 from the stored bytes, decodes the image with Sharp under a 20-megapixel limit, and writes those exact verified bytes to a separate final object key. Only then does the asset enter `pending_review`; the temporary object is deleted best-effort.
 4. A brand manager approves or rejects the immutable asset. Each decision is appended to `brand_asset_reviews`. Only approved assets are visible to ordinary brand readers. Authorized previews use a 60-second presigned GET URL.
 
-Invalid bytes are deleted and the pending database record is removed. A still-valid presigned upload can only modify the temporary key; it cannot replace the verified final object after review. Storage outages preserve the pending record so an upload can be finalized after recovery. Abandoned pending uploads and their objects need a scheduled cleanup policy before production.
+Invalid bytes are deleted and the pending database record is removed. A still-valid presigned upload can only modify the temporary key; it cannot replace the verified final object after review. Storage outages preserve the pending record so an upload can be finalized after recovery. Abandoned uploads are eligible for cleanup after 24 hours.
+
+Run `npm run maintenance:cleanup-brand-assets` daily with the application database and storage credentials. The bounded job processes at most 100 records per run, deletes each staging object before removing its still-pending database record, and leaves failures for a later retry. Schedule it from the deployment environment; multiple copies are safe because the final database delete rechecks the pending state and age.
 
 ## Runtime configuration
 
@@ -32,7 +34,7 @@ LocalStack verifies SDK request signing and S3 API behavior. It does not prove A
 
 ## Remaining media work
 
-- Add a bounded cleanup job for expired `upload_pending` rows and objects.
+- Configure production scheduling and monitoring for the bounded cleanup job.
 - Add version grouping, variant generation, usage references, and richer review history to the UI.
 - Import official brand kits/templates from user-provided source archives with malware scanning and format-specific parsers.
 - Configure the dedicated bucket, CORS, runtime role, encryption, versioning, retention, and recovery through the approved infrastructure process before production.

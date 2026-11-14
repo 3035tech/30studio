@@ -10,9 +10,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --import tsx --test tests/unit/*.test.ts",
+    "test": "node --conditions=react-server --import tsx --test tests/unit/*.test.ts",
     "test:integration": "node --conditions=react-server --import tsx --test tests/integration/*.test.ts",
     "test:localstack": "node --conditions=react-server --import tsx --test tests/integration/brand-assets-storage.test.ts",
+    "maintenance:cleanup-brand-assets": "node --conditions=react-server --import tsx scripts/cleanup-brand-assets.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"

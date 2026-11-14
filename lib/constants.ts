@@ -81,6 +81,8 @@ export const BRAND_ASSET_LIMITS = {
   maximumLicenseCharacters: 500,
   maximumAltTextCharacters: 500,
   uploadExpirySeconds: 300,
+  abandonedUploadRetentionSeconds: 86_400,
+  cleanupBatchSize: 100,
   downloadExpirySeconds: 60,
   listItems: 100,
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"] as const,

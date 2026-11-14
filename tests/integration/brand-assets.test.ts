@@ -5,10 +5,11 @@ import { NextRequest } from "next/server";
 import { GET as listAssetsRoute } from "@/app/api/brands/[brandId]/assets/route";
 import { POST as reviewAssetRoute } from "@/app/api/brands/[brandId]/assets/[assetId]/review/route";
 import { GET as downloadAssetRoute } from "@/app/api/brands/[brandId]/assets/[assetId]/download/route";
-import { API_ERROR_CODES, BRAND_ASSET_KINDS, BRAND_ASSET_STATUS, BRAND_ASSET_REVIEW_DECISION, BRAND_ASSET_REVIEW_DECISIONS, BETTER_AUTH_ENV, HTTP_STATUS, TENANT_ROLE } from "@/lib/constants";
+import { API_ERROR_CODES, BRAND_ASSET_KINDS, BRAND_ASSET_LIMITS, BRAND_ASSET_STATUS, BRAND_ASSET_REVIEW_DECISION, BRAND_ASSET_REVIEW_DECISIONS, BETTER_AUTH_ENV, HTTP_STATUS, TENANT_ROLE } from "@/lib/constants";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { brandAssetReviews, brandAssets, member, organization, session, user } from "@/lib/db/schema";
 import { createBrand } from "@/lib/db/repositories/brands";
+import { listAbandonedBrandAssetUploads, removeAbandonedBrandAssetUpload } from "@/lib/db/repositories/brand-assets";
 import { getAuth } from "@/lib/server/better-auth";
 import { brandAssetsResponseSchema } from "@/lib/validation/brand-assets";
 
@@ -141,4 +142,30 @@ test("brand asset visibility and decisions remain inside the active tenant", asy
     body: JSON.stringify({ decision: BRAND_ASSET_REVIEW_DECISION.rejected, note: null }),
   }), { params: Promise.resolve({ brandId: activeBrandId, assetId: ASSET_IDS.approved }) });
   assert.equal(deniedReview.status, HTTP_STATUS.forbidden);
+});
+
+test("abandoned brand asset uploads are selected and removed only after retention", async () => {
+  const assetId = crypto.randomUUID();
+  const cutoff = new Date(Date.now() - BRAND_ASSET_LIMITS.abandonedUploadRetentionSeconds * 1_000);
+  const createdAt = new Date(cutoff.getTime() - 1_000);
+  await getDatabase().insert(brandAssets).values({
+    id: assetId,
+    organizationId: ORGANIZATION_IDS.active,
+    brandId: activeBrandId,
+    createdBy: ownerId,
+    objectKey: `test/expired-final/${assetId}`,
+    uploadKey: `staging/test/expired/${assetId}`,
+    kind: BRAND_ASSET_KINDS[0],
+    status: BRAND_ASSET_STATUS.uploadPending,
+    fileName: "abandoned.png",
+    contentType: "image/png",
+    sizeBytes: 10,
+    sha256: "d".repeat(64),
+    createdAt,
+  });
+
+  const candidates = await listAbandonedBrandAssetUploads(cutoff, BRAND_ASSET_LIMITS.cleanupBatchSize);
+  assert.ok(candidates.some((candidate) => candidate.id === assetId));
+  assert.equal(await removeAbandonedBrandAssetUpload(assetId, cutoff), true);
+  assert.equal(await removeAbandonedBrandAssetUpload(assetId, cutoff), false);
 });

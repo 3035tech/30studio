@@ -4,7 +4,8 @@ import { after, before, test } from "node:test";
 import { CreateBucketCommand, DeleteBucketCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { BRAND_ASSET_LIMITS } from "@/lib/constants";
-import { createBrandAssetUpload, storeVerifiedBrandAsset, verifyBrandAssetUpload } from "@/lib/server/brand-asset-storage";
+import { createBrandAssetUpload, deleteBrandAssetObject, storeVerifiedBrandAsset, verifyBrandAssetUpload } from "@/lib/server/brand-asset-storage";
+import { runBrandAssetCleanup } from "@/lib/server/brand-asset-cleanup";
 import { ApiError } from "@/lib/server/api-error";
 
 const endpoint = process.env.STUDIO_ASSET_ENDPOINT;
@@ -85,5 +86,14 @@ test("verified final assets stay unchanged when an upload URL is replayed", { sk
   const tamperedResponse = await fetch(tamperedUpload.url, { method: "POST", body: tamperedForm });
   assert.equal(tamperedResponse.ok, true);
   await assert.rejects(verifyBrandAssetUpload(tamperedInput, tamperedKey), (error: unknown) => error instanceof ApiError);
+
+  const cleanup = await runBrandAssetCleanup({
+    findAbandoned: async () => [{ id: assetIds.tampered, uploadKey: tamperedKey }],
+    deleteObject: deleteBrandAssetObject,
+    removeIfStillAbandoned: async () => true,
+    now: () => new Date(Date.now() + BRAND_ASSET_LIMITS.abandonedUploadRetentionSeconds * 1_000),
+  });
+  assert.deepEqual(cleanup, { examined: 1, removed: 1, failed: 0 });
+  await assert.rejects(client.send(new GetObjectCommand({ Bucket: bucket, Key: tamperedKey })));
   assert.ok(BRAND_ASSET_LIMITS.maximumBytes > imageBytes.byteLength);
 });

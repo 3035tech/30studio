@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { BRAND_ASSET_LIMITS, BRAND_ASSET_REVIEW_DECISION, BRAND_ASSET_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
@@ -42,6 +42,23 @@ export async function removePendingBrandAsset(organizationId: string, brandId: s
     eq(brandAssets.id, assetId),
     eq(brandAssets.status, BRAND_ASSET_STATUS.uploadPending),
   ));
+}
+
+export async function listAbandonedBrandAssetUploads(cutoff: Date, limit: number) {
+  return getDatabase().select({ id: brandAssets.id, uploadKey: brandAssets.uploadKey })
+    .from(brandAssets)
+    .where(and(eq(brandAssets.status, BRAND_ASSET_STATUS.uploadPending), lt(brandAssets.createdAt, cutoff)))
+    .orderBy(asc(brandAssets.createdAt))
+    .limit(limit);
+}
+
+export async function removeAbandonedBrandAssetUpload(assetId: string, cutoff: Date) {
+  const [removed] = await getDatabase().delete(brandAssets).where(and(
+    eq(brandAssets.id, assetId),
+    eq(brandAssets.status, BRAND_ASSET_STATUS.uploadPending),
+    lt(brandAssets.createdAt, cutoff),
+  )).returning({ id: brandAssets.id });
+  return Boolean(removed);
 }
 
 export async function getBrandAssetForTenant(organizationId: string, brandId: string, assetId: string) {

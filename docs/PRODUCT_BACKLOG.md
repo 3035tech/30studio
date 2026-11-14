@@ -23,7 +23,7 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 | Criar/listar marcas com escopo de tenant | Implementado | Depende de PostgreSQL configurado para uso real. |
 | Editar/arquivar marca | Integrado em `develop` | Lint, TypeScript, build, migração Drizzle, 5 testes unitários e 2 testes de integração passaram em PostgreSQL descartável. As rotas exercitam sessão Better Auth, tenant ativo, associação atual, papel e isolamento por organização. |
 | Equipe: membros, papéis, convites e auditoria | Implementado nesta entrega | Convites exigem SMTP e e-mail verificado; teste de integração cobre criação, reenvio, cancelamento, aceite e trilha auditável. |
-| Brand Kit | Versões e primeira implementação da biblioteca de imagens | Snapshots imutáveis, URLs de fonte, upload privado por adaptador S3, verificação de hash/dimensões, revisão humana, direitos de uso e links de leitura temporários. Chaves de envio temporário são isoladas dos objetos finais. Teste de integração LocalStack aguarda token local; configuração de bucket/IAM/CORS/backup, limpeza de uploads abandonados, importação de templates editáveis e checagem automática de fontes seguem pendentes. |
+| Brand Kit | Versões e primeira implementação da biblioteca de imagens | Snapshots imutáveis, URLs de fonte, upload privado por adaptador S3, verificação de hash/dimensões, revisão humana, direitos de uso e links de leitura temporários. Chaves temporárias são isoladas dos objetos finais. LocalStack validou upload, replay e limpeza de objeto. O comando diário remove uploads abandonados após 24 horas em lotes de até 100; falta agendar/monitorar no deploy. Configuração de bucket/IAM/CORS/backup, importação de templates editáveis e checagem automática de fontes seguem pendentes. |
 | OAuth, conteúdo, revisão, aprovação de conteúdo, publicação e analytics | Planejado | Sem tabelas/fluxos funcionais ainda. |
 
 ## Mapa de telas
@@ -80,11 +80,11 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 
 1. Criar detalhes da marca com abas; manter arquivos e fatos separados por tenant/marca.
 2. ~~Definir schema versionado do Brand Kit para identidade, tom, audiência, produtos, claims aprovados, restrições e CTAs.~~ Concluído: snapshots imutáveis são vinculados ao tenant e à marca.
-3. Implementar armazenamento privado de logos e imagens de referência com checksum, origem, dimensões e revisão humana; não marcar arquivos enviados como aprovados automaticamente. Código e teste S3 via LocalStack preparados para PNG/JPEG/WebP; execução do LocalStack aguarda token local. Templates editáveis, SVG, vídeo e arquivos compactados seguem fora do escopo.
+3. Implementar armazenamento privado de logos e imagens de referência com checksum, origem, dimensões e revisão humana; não marcar arquivos enviados como aprovados automaticamente. Concluído para PNG/JPEG/WebP, com checksum e revisão. LocalStack validou upload, proteção contra replay e exclusão do staging. Templates editáveis, SVG, vídeo e arquivos compactados seguem fora do escopo.
 4. ~~Permitir salvar rascunhos, aprovar uma versão e consultar versões anteriores.~~ Concluído. Nova edição cria nova versão; aprovação antiga não pode ser reaplicada.
 5. ~~Adicionar autorização de leitura/edição e testes de tenant para versões.~~ Concluído. Ativos usam autorização por organização/marca; leitura comum mostra apenas itens aprovados e revisão fica restrita a owner/admin.
 
-6. Completar aceite do armazenamento executando o teste S3 via LocalStack, adicionando limpeza de upload pendente, teste de CORS no navegador e homologação de bucket/role/política/backups quando a infraestrutura for autorizada. O teste de rotas já cobre escopo de dois tenants e revisão por papel.
+6. ~~Completar teste S3 via LocalStack e limpeza de upload pendente.~~ Concluído para S3 local e job bounded; teste das rotas cobre escopo de dois tenants e revisão por papel. Permanecem teste de CORS no navegador e homologação de bucket/role/política/backups quando a infraestrutura for autorizada.
 
 **Aceite da fase:** a marca mostra sua versão aprovada de identidade e conhecimento, com fonte rastreável; conteúdo externo ou importado não vira fato aprovado sem ação humana.
 
@@ -177,6 +177,6 @@ Este plano transforma a visão de `PRODUCT_SPEC.md` em telas, atividades sequenc
 ## Ordem de trabalho imediata
 
 1. Configurar SMTP no ambiente de desenvolvimento/homologação antes de habilitar cadastro e convites para pessoas reais.
-2. Fechar o aceite de mídia com LocalStack, testes de autorização por tenant, limpeza de uploads e plano de configuração de S3 privado.
+2. Agendar e monitorar a limpeza de uploads no deploy; validar CORS no navegador e homologar armazenamento privado quando a infraestrutura for autorizada.
 3. Importar materiais oficiais de marca e templates editáveis com parser e análise de segurança.
 4. Só então avançar para OAuth, editor/conteúdo e aprovação; publicação permanece bloqueada até a política de aprovação e seus testes existirem.
