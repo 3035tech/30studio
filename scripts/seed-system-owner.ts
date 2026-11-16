@@ -46,7 +46,7 @@ async function seedSystemOwner() {
       .where(eq(organization.slug, BOOTSTRAP_OWNER.organizationSlug)).limit(1);
     const [existingUser] = await transaction.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
 
-    if (existingOrganization && existingUser) {
+    if (existingUser && existingOrganization) {
       const [ownerMembership] = await transaction.select({ id: member.id }).from(member).where(and(
         eq(member.organizationId, existingOrganization.id),
         eq(member.userId, existingUser.id),
@@ -54,12 +54,12 @@ async function seedSystemOwner() {
       )).limit(1);
       if (ownerMembership) return false;
     }
-    if (existingOrganization || existingUser) {
-      throw new Error("Bootstrap identity conflicts with existing workspace data; no changes were made.");
+    if (existingUser) {
+      throw new Error("Bootstrap identity conflicts with existing user data; no changes were made.");
     }
 
     const userId = randomUUID();
-    const organizationId = randomUUID();
+    const organizationId = existingOrganization?.id ?? randomUUID();
     await transaction.insert(user).values({
       id: userId,
       name: BOOTSTRAP_OWNER.userName,
@@ -77,12 +77,14 @@ async function seedSystemOwner() {
       createdAt: now,
       updatedAt: now,
     });
-    await transaction.insert(organization).values({
-      id: organizationId,
-      name: BOOTSTRAP_OWNER.organizationName,
-      slug: BOOTSTRAP_OWNER.organizationSlug,
-      createdAt: now,
-    });
+    if (!existingOrganization) {
+      await transaction.insert(organization).values({
+        id: organizationId,
+        name: BOOTSTRAP_OWNER.organizationName,
+        slug: BOOTSTRAP_OWNER.organizationSlug,
+        createdAt: now,
+      });
+    }
     await transaction.insert(member).values({
       id: randomUUID(),
       organizationId,
