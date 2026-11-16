@@ -501,6 +501,13 @@ export const DATABASE_LIMITS = {
   idleTimeoutMilliseconds: 30_000,
 } as const;
 
+export const AUTH_STORAGE = {
+  redisUrlEnvironmentName: "REDIS_URL",
+  redisKeyPrefix: "30studio:auth:",
+  redisConnectTimeoutMilliseconds: 5_000,
+  redisMaxRetriesPerRequest: 1,
+} as const;
+
 export const HTTP_STATUS = {
   ok: 200,
   created: 201,

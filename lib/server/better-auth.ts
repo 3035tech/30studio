@@ -1,11 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { redisStorage } from "@better-auth/redis-storage";
 import { organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 import { getDatabase } from "@/lib/db/client";
-import { API_ERROR_CODES, BETTER_AUTH_ENV, EMAIL_DELIVERY_LIMITS, TEAM_AUDIT_ACTIONS, TEAM_INVITATION_LIMIT } from "@/lib/constants";
+import { API_ERROR_CODES, AUTH_STORAGE, BETTER_AUTH_ENV, EMAIL_DELIVERY_LIMITS, TEAM_AUDIT_ACTIONS, TEAM_INVITATION_LIMIT } from "@/lib/constants";
 import { sendInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "@/lib/server/email";
+import { getRedisClient } from "@/lib/server/redis";
 import { recordTeamAuditEvent } from "@/lib/db/repositories/team";
 
 const permissions = {
@@ -34,12 +36,19 @@ function createAuth() {
     throw new Error("Better Auth configuration is incomplete.");
   }
 
+  const redisClient = getRedisClient();
+
   return betterAuth({
     appName: "30studio",
     baseURL: authUrl,
     secret: authSecret,
     trustedOrigins,
     database: drizzleAdapter(getDatabase(), { provider: "pg" }),
+    ...(redisClient ? {
+      secondaryStorage: redisStorage({ client: redisClient, keyPrefix: AUTH_STORAGE.redisKeyPrefix }),
+      session: { storeSessionInDatabase: true },
+      verification: { storeInDatabase: true },
+    } : {}),
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,

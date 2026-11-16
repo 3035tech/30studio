@@ -18,6 +18,10 @@ function createDatabase() {
     connectionTimeoutMillis: DATABASE_LIMITS.connectionTimeoutMilliseconds,
     idleTimeoutMillis: DATABASE_LIMITS.idleTimeoutMilliseconds,
   });
+  pool.on("connect", () => console.info("Connected to PostgreSQL."));
+  pool.on("error", (error: Error) => {
+    console.error("PostgreSQL connection error.", { errorName: error.name });
+  });
 
   return { pool, db: drizzle(pool, { schema }) };
 }
