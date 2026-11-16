@@ -21,6 +21,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed:local": "node --conditions=react-server --import tsx scripts/seed-local-user.ts",
+    "db:seed:system-owner": "node --conditions=react-server --import tsx scripts/seed-system-owner.ts",
     "db:seed:demo": "node --conditions=react-server --import tsx scripts/seed-local-demo-data.ts",
     "auth:generate": "auth generate --adapter drizzle --dialect postgresql --config lib/db/auth-schema.config.ts --output lib/db/auth-schema.ts --yes"
   },
