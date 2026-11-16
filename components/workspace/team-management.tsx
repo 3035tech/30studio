@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { TeamAccessManagement } from "@/components/workspace/team-access-management";
+import { ApprovalPolicySettings } from "@/components/workspace/approval-policy-settings";
+import type { BrandListItem } from "@/lib/validation/brands";
 import { TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_ROLES, TENANT_ROLE, TENANT_ROLES, WORKSPACE_SECTION_IDS, type Locale, type TenantRole } from "@/lib/constants";
 import { teamListResponseSchema, type TeamMember } from "@/lib/validation/team";
 
@@ -23,7 +25,7 @@ type TeamLoadState = { organizationId: string | null; pending: boolean; hasError
 
 const INITIAL_LOAD_STATE: TeamLoadState = { organizationId: null, pending: true, hasError: false };
 
-export function TeamManagement({ organizationId }: { organizationId: string | null }) {
+export function TeamManagement({ organizationId, brands }: { organizationId: string | null; brands: BrandListItem[] }) {
   const t = useTranslations("team");
   const tRoles = useTranslations("roles");
   const formatter = useFormatter();
@@ -174,6 +176,7 @@ export function TeamManagement({ organizationId }: { organizationId: string | nu
         pageSizeLabel={t("tablePageSize")} emptyMessage={t("empty")} noMatchesMessage={t("tableNoMatches")} locale={locale}
       /> : null}
       {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <TeamAccessManagement organizationId={organizationId ?? ""} canManage={currentTeamData.canManage} actorRole={currentTeamData.actorRole} /> : null}
+      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <ApprovalPolicySettings brands={brands} /> : null}
     </section>
   );
 }

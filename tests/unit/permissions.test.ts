@@ -11,6 +11,14 @@ test("brand management permission follows the tenant role policy", () => {
   assert.equal(hasTenantPermission(TENANT_ROLE.analyst, TENANT_PERMISSIONS.brandsManage), false);
 });
 
+test("only the workspace owner can manage organization settings", () => {
+  assert.equal(hasTenantPermission(TENANT_ROLE.owner, TENANT_PERMISSIONS.organizationManage), true);
+  assert.equal(hasTenantPermission(TENANT_ROLE.admin, TENANT_PERMISSIONS.organizationManage), false);
+  assert.equal(hasTenantPermission(TENANT_ROLE.editor, TENANT_PERMISSIONS.organizationManage), false);
+  assert.equal(hasTenantPermission(TENANT_ROLE.approver, TENANT_PERMISSIONS.organizationManage), false);
+  assert.equal(hasTenantPermission(TENANT_ROLE.analyst, TENANT_PERMISSIONS.organizationManage), false);
+});
+
 test("calendar access separates content readers from idea creators", () => {
   assert.equal(hasTenantPermission(TENANT_ROLE.editor, TENANT_PERMISSIONS.contentRead), true);
   assert.equal(hasTenantPermission(TENANT_ROLE.editor, TENANT_PERMISSIONS.contentManage), true);

@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     if (!brand) throw new ApiError(API_ERROR_CODES.brandExists, HTTP_STATUS.conflict);
 
     return NextResponse.json(
-      { data: { ...brand, socialProfiles: [] } },
+      { data: { ...brand, socialProfiles: [], brandKitStatus: null } },
       { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

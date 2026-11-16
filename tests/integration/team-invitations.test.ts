@@ -20,12 +20,14 @@ const TEST_SECRET = "30studio-invitation-test-secret-is-not-used-outside-tests";
 const ORGANIZATION_ID = `invitation-test-org-${crypto.randomUUID()}`;
 const OTHER_ORGANIZATION_ID = `invitation-test-other-org-${crypto.randomUUID()}`;
 const OTHER_INVITEE_EMAIL = `other-tenant-invite-${crypto.randomUUID()}@example.invalid`;
+const MAILPIT_API_URL = process.env.MAILPIT_API_URL;
 
 let ownerUserId = "";
 let ownerSessionCookie = "";
 let ownerSessionToken = "";
 
 before(async () => {
+  if (!MAILPIT_API_URL) return;
   process.env[BETTER_AUTH_ENV.secret] = TEST_SECRET;
   process.env[BETTER_AUTH_ENV.url] = TEST_ORIGIN;
   process.env[BETTER_AUTH_ENV.trustedOrigins] = TEST_ORIGIN;
@@ -87,13 +89,15 @@ after(async () => {
   }
 });
 
-test("tenant invitations can be created, resent, cancelled, and audited without cross-tenant exposure", async () => {
+test("tenant invitations can be created, resent, cancelled, and audited without cross-tenant exposure", {
+  skip: MAILPIT_API_URL ? false : "Set MAILPIT_API_URL and SMTP settings to run invitation email integration tests.",
+}, async () => {
   const database = getDatabase();
   const requestHeaders = { cookie: ownerSessionCookie, origin: TEST_ORIGIN, "content-type": "application/json" };
   const createResponse = await createInvitationRoute(new NextRequest(`${TEST_ORIGIN}/api/team/invitations`, {
     method: "POST", headers: requestHeaders, body: JSON.stringify({ email: INVITEE_EMAIL, role: TENANT_ROLE.editor }),
   }));
-  assert.equal(createResponse.status, HTTP_STATUS.created);
+  assert.equal(createResponse.status, HTTP_STATUS.created, await createResponse.clone().text());
   const createdBody = await createResponse.json() as { data: { id: string } };
 
   const invitationList = await listInvitationsRoute(new NextRequest(`${TEST_ORIGIN}/api/team/invitations`, { headers: { cookie: ownerSessionCookie } }));
@@ -112,13 +116,13 @@ test("tenant invitations can be created, resent, cancelled, and audited without 
   }), { params: Promise.resolve({ invitationId: foreignInvitation.id }) });
   assert.equal(foreignCancelResponse.status, HTTP_STATUS.notFound);
 
-  const mailpitResponse = await fetch("http://127.0.0.1:8025/api/v1/messages");
+  const mailpitResponse = await fetch(`${MAILPIT_API_URL}/api/v1/messages`);
   assert.equal(mailpitResponse.status, HTTP_STATUS.ok);
   const mailpit = await mailpitResponse.json() as { messages: Array<{ To: Array<{ Address: string }>; ID: string }> };
   assert.ok(mailpit.messages.some((message) => message.To.some((recipient) => recipient.Address === INVITEE_EMAIL)));
   const invitationEmail = mailpit.messages.find((message) => message.To.some((recipient) => recipient.Address === INVITEE_EMAIL));
   assert.ok(invitationEmail);
-  const invitationEmailResponse = await fetch(`http://127.0.0.1:8025/api/v1/message/${invitationEmail.ID}`);
+  const invitationEmailResponse = await fetch(`${MAILPIT_API_URL}/api/v1/message/${invitationEmail.ID}`);
   const invitationEmailBody = await invitationEmailResponse.json() as { Text: string };
   assert.ok(invitationEmailBody.Text.includes(`/pt/accept-invitation?invitationId=${createdBody.data.id}`));
 

@@ -1,0 +1,2 @@
+ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_org_profile_prerequisite_unique" UNIQUE("organization_id","id");--> statement-breakpoint
+ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_org_brand_profile_prerequisite_unique" UNIQUE("organization_id","brand_id","id");

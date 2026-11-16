@@ -28,10 +28,16 @@ The application uses the PNG wordmark to preserve the kit's exact letter shapes 
 |---|---|---|
 | Primary | `#6A00FF` | Main actions, focus, and active states |
 | Accent | `#FF8A00` | Secondary emphasis; pair with dark text when used as a fill |
-| Dark | `#0B1B3B` | Main text and dark surfaces |
+| Strong text | `#334155` | Headings and primary text on light surfaces |
 | Secondary | `#8B5CF6` | Supporting highlights |
-| Surface | `#F8FAFC` | Light page background |
-| Text | `#0B1B3B` | Main text on light surfaces |
+| Surface | `#FFFFFF` | Main page background |
+| Text | `#334155` | Main text on light surfaces |
+| Muted text | `#64748B` | Supporting text and secondary labels |
+| Page | `#F7F8FC` | Soft app canvas behind white panels |
+| Line | `#E2E8F0` | Quiet separators and panel borders |
+| Strong line | `#CBD5E1` | Form control borders |
+| Primary soft | `#F3ECFF` | Selected navigation and subtle purple states |
+| Accent soft | `#FFF4E5` | Subtle orange supporting states |
 
 - Display: Sora.
 - Interface: Inter.
@@ -45,6 +51,7 @@ The application uses the PNG wordmark to preserve the kit's exact letter shapes 
 - Select the light or dark logo variant for the actual surface. Keep adequate clear space and don't place the wordmark over busy imagery.
 - Keep body copy in Inter and headings in Sora. Use the shared `Button`, `TextField`, `SelectField`, and `BrandLogo` components rather than unstyled browser controls.
 - Use the primary purple for high-priority actions. Use the orange accent sparingly and preserve readable contrast; never make color the only status cue.
+- Use the page, line, and soft-color tokens for visual hierarchy; reserve shadows for floating or grouped surfaces and keep them low contrast.
 - Preserve visible keyboard focus, responsive layouts, reduced-motion preferences, and both system light/dark modes.
 - User-facing copy remains in the `pt` and `en` next-intl catalogs. Translate the tagline and metadata per locale.
 

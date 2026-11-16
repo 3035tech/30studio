@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BRAND_LIMITS, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES } from "@/lib/constants";
+import { BRAND_KIT_VERSION_STATUSES, BRAND_LIMITS, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES } from "@/lib/constants";
 
 export const brandCreateSchema = z.object({
   name: z.string().trim().min(1).max(BRAND_LIMITS.nameCharacters),
@@ -25,6 +25,7 @@ export const brandListItemSchema = z.object({
   isActive: z.boolean(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  brandKitStatus: z.enum(BRAND_KIT_VERSION_STATUSES).nullable(),
   socialProfiles: z.array(z.object({
     id: z.string().uuid(),
     organizationId: z.string().min(1),

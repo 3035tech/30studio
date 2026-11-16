@@ -1,26 +1,30 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { eq, inArray } from "drizzle-orm";
-import { CONTENT_MEDIA_STATUS, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { inArray } from "drizzle-orm";
+import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
-import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentMediaGeneration, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
+import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentCarouselGeneration, enqueueContentMediaGeneration, getCalendarContentReviewContext, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
-import { organization, user } from "@/lib/db/schema";
+import { decideContentApproval, getContentApprovalState, submitContentForApproval } from "@/lib/db/repositories/content-approvals";
+import { saveContentApprovalPolicy } from "@/lib/db/repositories/content-approval-policies";
+import { organization, socialProfileCredentials, socialProfiles, user } from "@/lib/db/schema";
 
 const ids = {
   user: `calendar-test-user-${crypto.randomUUID()}`,
+  reviewer: `calendar-test-reviewer-${crypto.randomUUID()}`,
+  secondReviewer: `calendar-test-reviewer-two-${crypto.randomUUID()}`,
   organizationA: `calendar-test-org-a-${crypto.randomUUID()}`,
   organizationB: `calendar-test-org-b-${crypto.randomUUID()}`,
 } as const;
-let userCreated = false;
+let usersCreated = false;
 let organizationsCreated = false;
 
 after(async () => {
   const database = getDatabase();
   try {
     if (organizationsCreated) await database.delete(organization).where(inArray(organization.id, [ids.organizationA, ids.organizationB]));
-    if (userCreated) await database.delete(user).where(eq(user.id, ids.user));
+    if (usersCreated) await database.delete(user).where(inArray(user.id, [ids.user, ids.reviewer, ids.secondReviewer]));
   } finally {
     await closeDatabase();
   }
@@ -29,15 +33,12 @@ after(async () => {
 test("calendar ideas are persisted by tenant and listed only within the requested brand and period", async () => {
   const database = getDatabase();
   const now = new Date();
-  await database.insert(user).values({
-    id: ids.user,
-    name: "Calendar integration test",
-    email: `${ids.user}@example.invalid`,
-    emailVerified: true,
-    createdAt: now,
-    updatedAt: now,
-  });
-  userCreated = true;
+  await database.insert(user).values([
+    { id: ids.user, name: "Calendar integration test", email: `${ids.user}@example.invalid`, emailVerified: true, createdAt: now, updatedAt: now },
+    { id: ids.reviewer, name: "Calendar reviewer test", email: `${ids.reviewer}@example.invalid`, emailVerified: true, createdAt: now, updatedAt: now },
+    { id: ids.secondReviewer, name: "Second calendar reviewer test", email: `${ids.secondReviewer}@example.invalid`, emailVerified: true, createdAt: now, updatedAt: now },
+  ]);
+  usersCreated = true;
   await database.insert(organization).values([
     { id: ids.organizationA, name: "Calendar tenant A", slug: ids.organizationA, createdAt: now },
     { id: ids.organizationB, name: "Calendar tenant B", slug: ids.organizationB, createdAt: now },
@@ -61,6 +62,26 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   });
   assert.ok(brandKit);
   assert.ok(await approveBrandKitVersion(ids.organizationA, brandA.id, brandKit.id, ids.user));
+  const socialProfileId = crypto.randomUUID();
+  await database.insert(socialProfiles).values({
+    id: socialProfileId,
+    organizationId: ids.organizationA,
+    brandId: brandA.id,
+    platform: "linkedin",
+    displayName: "LinkedIn approval test profile",
+    externalAccountId: "approval-test-profile",
+    connectedBy: ids.user,
+    connectedAt: now,
+    status: "connected",
+  });
+  await database.insert(socialProfileCredentials).values({
+    organizationId: ids.organizationA,
+    socialProfileId,
+    accessTokenCiphertext: "integration-test-ciphertext",
+    encryptionKeyVersion: 1,
+    scopes: ["w_member_social"],
+    updatedAt: now,
+  });
 
   const plannedAt = new Date("2026-11-20T15:30:00.000Z");
   const item = await createCalendarIdea(ids.organizationA, ids.user, {
@@ -102,6 +123,13 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.equal(firstVersion.kind, "created");
   if (firstVersion.kind !== "created") return;
   assert.equal(firstVersion.versionNumber, 1);
+  const savedVersion = await getCalendarContentVersions(ids.organizationA, item.id);
+  assert.equal(savedVersion?.current?.capabilitySnapshot?.platform, SOCIAL_PLATFORMS[0]);
+  assert.equal(savedVersion?.current?.capabilitySnapshot?.capabilityVersion, 1);
+  const contentReviewContext = await getCalendarContentReviewContext(ids.organizationA, item.id);
+  assert.equal(contentReviewContext?.version.id, firstVersion.id);
+  assert.equal(contentReviewContext?.brandKit?.version, 1);
+  assert.equal(await getCalendarContentReviewContext(ids.organizationB, item.id), null);
   assert.equal((await listCalendarItems(ids.organizationA, { ...query, status: CONTENT_STATUS.draft })).data.length, 1);
 
   const campaignInput = {
@@ -177,6 +205,7 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   const repeatedImageRequest = await enqueueContentMediaGeneration(imageJobInput);
   assert.equal(repeatedImageRequest.kind, "existing");
   assert.equal(repeatedImageRequest.kind === "existing" ? repeatedImageRequest.assetId : "", queuedImage.assetId);
+  assert.equal((await enqueueContentMediaGeneration({ ...imageJobInput, prompt: "Changed prompt with the same key" })).kind, "conflict");
   assert.equal((await enqueueContentMediaGeneration({ ...imageJobInput, organizationId: ids.organizationB, idempotencyKey: crypto.randomUUID() })).kind, "not_found");
 
   const claimedImage = await claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA);
@@ -197,6 +226,72 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   const reviewedMedia = await listContentMediaForVersion(ids.organizationA, item.id, secondVersion.id);
   assert.equal(reviewedMedia.length, 1);
   assert.equal(reviewedMedia[0]?.status, CONTENT_MEDIA_STATUS.approved);
+  const textCardPayload = { title: "Launch announcement", copy: "An approved static text card.", brandKit: null };
+  const queuedTextCard = await enqueueContentMediaGeneration({ ...imageJobInput, idempotencyKey: crypto.randomUUID(), modelId: CONTENT_MEDIA_TEMPLATE.textCardModelId, prompt: JSON.stringify(textCardPayload) });
+  assert.equal(queuedTextCard.kind, "created");
+  if (queuedTextCard.kind !== "created") return;
+  const claimedTextCard = await claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA);
+  assert.equal(claimedTextCard?.id, queuedTextCard.assetId);
+  assert.equal(claimedTextCard?.modelId, CONTENT_MEDIA_TEMPLATE.textCardModelId);
+  assert.deepEqual(JSON.parse(claimedTextCard?.prompt ?? "{}"), textCardPayload);
+
+  const carouselItem = await createCalendarIdea(ids.organizationA, ids.user, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Carousel integration test",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+  });
+  assert.ok(carouselItem);
+  const carouselVersion = await createCalendarContentVersion(ids.organizationA, ids.user, carouselItem.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Carousel integration test",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "One verified carousel statement with enough words to make three pages.",
+    variantCopy: "One verified carousel statement with enough words to make three pages.",
+    expectedVersionNumber: 0,
+  });
+  assert.ok(carouselVersion);
+  if (carouselVersion.kind !== "created") return;
+  const carouselInput = {
+    organizationId: ids.organizationA,
+    itemId: carouselItem.id,
+    contentVersionId: carouselVersion.id,
+    idempotencyKey: crypto.randomUUID(),
+    userId: ids.user,
+    modelId: CONTENT_MEDIA_TEMPLATE.textCardModelId,
+    prompts: Array.from({ length: CONTENT_MEDIA_CAROUSEL.pageCount }, (_, index) => JSON.stringify({ ...textCardPayload, copy: `Carousel page ${index + 1} content`, pageNumber: index + 1, pageCount: CONTENT_MEDIA_CAROUSEL.pageCount })),
+  };
+  const carousel = await enqueueContentCarouselGeneration(carouselInput);
+  assert.equal(carousel.kind, "created");
+  const replayedCarousel = await enqueueContentCarouselGeneration(carouselInput);
+  assert.equal(replayedCarousel.kind, "existing");
+  assert.equal((await enqueueContentCarouselGeneration({ ...carouselInput, prompts: ["changed", ...carouselInput.prompts.slice(1)] })).kind, "conflict");
+  if (carousel.kind !== "created") return;
+  for (let pageIndex = 0; pageIndex < CONTENT_MEDIA_CAROUSEL.pageCount; pageIndex += 1) {
+    const pageJob = await claimNextContentMediaJob(new Date(Date.now() + 10_000 + pageIndex), ids.organizationA);
+    assert.equal(pageJob?.carouselId, carouselInput.idempotencyKey);
+    assert.ok(pageJob?.claimedAt);
+    if (!pageJob?.claimedAt) return;
+    await completeContentMediaJob({
+      organizationId: ids.organizationA,
+      id: pageJob.id,
+      claimedAt: pageJob.claimedAt,
+      contentType: "image/webp",
+      sizeBytes: 1_024,
+      width: 1_080,
+      height: 1_080,
+      sha256: "b".repeat(64),
+    });
+  }
+  const pendingCarousel = await listContentMediaForVersion(ids.organizationA, carouselItem.id, carouselVersion.id);
+  assert.equal(pendingCarousel.filter((media) => media.carouselId === carouselInput.idempotencyKey).length, CONTENT_MEDIA_CAROUSEL.pageCount);
+  assert.deepEqual(pendingCarousel.filter((media) => media.carouselId === carouselInput.idempotencyKey).map((media) => media.pageNumber), [1, 2, 3]);
+  assert.ok(await reviewContentMedia(ids.organizationA, carouselItem.id, carousel.assetId, ids.reviewer, CONTENT_MEDIA_STATUS.approved, "Reviewed the full carousel."));
+  const reviewedCarousel = await listContentMediaForVersion(ids.organizationA, carouselItem.id, carouselVersion.id);
+  assert.equal(reviewedCarousel.filter((media) => media.carouselId === carouselInput.idempotencyKey && media.status === CONTENT_MEDIA_STATUS.approved).length, CONTENT_MEDIA_CAROUSEL.pageCount);
 
   const history = await getCalendarContentVersions(ids.organizationA, item.id);
   assert.equal(history?.current?.versionNumber, 2);
@@ -214,4 +309,64 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     variantCopy: "Must not be stored.",
     expectedVersionNumber: 0,
   }), null);
+
+  const approvalItem = await createCalendarIdea(ids.organizationA, ids.user, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Approval workflow test",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+  });
+  assert.ok(approvalItem);
+  const approvalVersion = await createCalendarContentVersion(ids.organizationA, ids.user, approvalItem.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Approval workflow test",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "Source copy for review.",
+    variantCopy: "Channel copy for review.",
+    expectedVersionNumber: 0,
+  });
+  assert.ok(approvalVersion);
+  if (approvalVersion.kind !== "created") return;
+  const submission = await submitContentForApproval(ids.organizationA, ids.user, approvalItem.id);
+  assert.equal(submission.kind, "created");
+  assert.equal((await submitContentForApproval(ids.organizationA, ids.user, approvalItem.id)).kind, "existing");
+  assert.equal((await decideContentApproval(ids.organizationA, ids.user, approvalItem.id, CONTENT_APPROVAL_STATUS.approved, null)).kind, "self_review");
+  const requestedChanges = await decideContentApproval(ids.organizationA, ids.reviewer, approvalItem.id, CONTENT_APPROVAL_STATUS.changesRequested, "Please make the CTA more specific.");
+  assert.equal(requestedChanges.kind, "decided");
+  assert.equal((await listCalendarItems(ids.organizationA, { ...query, status: CONTENT_STATUS.draft })).data.some((calendarItem) => calendarItem.id === approvalItem.id), true);
+
+  const revisedApprovalVersion = await createCalendarContentVersion(ids.organizationA, ids.user, approvalItem.id, {
+    brandId: brandA.id,
+    platform: SOCIAL_PLATFORMS[0],
+    title: "Approval workflow test",
+    plannedAt: plannedAt.toISOString(),
+    timeZone: "America/Sao_Paulo",
+    canonicalCopy: "Updated source copy for review.",
+    variantCopy: "Updated channel copy with a specific CTA.",
+    expectedVersionNumber: 1,
+  });
+  assert.ok(revisedApprovalVersion);
+  if (revisedApprovalVersion.kind !== "created") return;
+  const afterRevision = await getContentApprovalState(ids.organizationA, approvalItem.id);
+  assert.equal(afterRevision?.history[0]?.matchesCurrent, false);
+  assert.equal(afterRevision?.history[0]?.status, CONTENT_APPROVAL_STATUS.changesRequested);
+
+  assert.equal(await saveContentApprovalPolicy(ids.organizationA, ids.user, brandA.id, 2), true);
+  assert.equal((await submitContentForApproval(ids.organizationA, ids.user, approvalItem.id)).kind, "created");
+  const firstApproval = await decideContentApproval(ids.organizationA, ids.reviewer, approvalItem.id, CONTENT_APPROVAL_STATUS.approved, null);
+  assert.equal(firstApproval.kind, "partial");
+  if (firstApproval.kind === "partial") assert.deepEqual({ approved: firstApproval.approvedCount, required: firstApproval.requiredApprovals }, { approved: 1, required: 2 });
+  assert.equal((await decideContentApproval(ids.organizationA, ids.reviewer, approvalItem.id, CONTENT_APPROVAL_STATUS.approved, null)).kind, "already_decided");
+  assert.equal(await saveContentApprovalPolicy(ids.organizationA, ids.user, brandA.id, 1), true);
+  assert.equal((await getContentApprovalState(ids.organizationA, approvalItem.id))?.history[0]?.requiredApprovals, 2);
+  assert.equal((await decideContentApproval(ids.organizationA, ids.secondReviewer, approvalItem.id, CONTENT_APPROVAL_STATUS.approved, null)).kind, "decided");
+  const approvedState = await getContentApprovalState(ids.organizationA, approvalItem.id);
+  assert.equal(approvedState?.itemStatus, CONTENT_STATUS.scheduled);
+  assert.equal(approvedState?.history[0]?.matchesCurrent, true);
+  assert.equal(approvedState?.history[0]?.status, CONTENT_APPROVAL_STATUS.approved);
+  assert.equal(approvedState?.history[0]?.decisions.length, 2);
+  assert.equal(await getContentApprovalState(ids.organizationB, approvalItem.id), null);
 });

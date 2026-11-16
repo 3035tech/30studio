@@ -1,0 +1,1 @@
+ALTER TYPE "public"."competitor_source_status" ADD VALUE 'archived';

@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       brandId: searchParams.get(CALENDAR_QUERY_PARAMETERS.brandId) ?? undefined,
       platform: searchParams.get(CALENDAR_QUERY_PARAMETERS.platform) ?? undefined,
       status: searchParams.get(CALENDAR_QUERY_PARAMETERS.status) ?? undefined,
+      publicationStatus: searchParams.get(CALENDAR_QUERY_PARAMETERS.publicationStatus) ?? undefined,
     });
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
 
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       })),
       truncated: result.truncated,
       canManage: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentManage),
+      canReview: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentApprove),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return apiErrorResponse(error);

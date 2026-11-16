@@ -3,26 +3,35 @@ import { createHash } from "node:crypto";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateImage } from "ai";
 import sharp from "sharp";
-import { AI_PROVIDER_ENV, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_WORKER, COPY_GENERATION } from "@/lib/constants";
+import { AI_PROVIDER_ENV, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, COPY_GENERATION } from "@/lib/constants";
 import { claimNextContentMediaJob, completeContentMediaJob, expireExhaustedContentMediaJobs, failContentMediaJob } from "@/lib/db/repositories/calendar";
 import { storeVerifiedBrandAsset } from "@/lib/server/brand-asset-storage";
+import { renderTextCard } from "@/lib/server/content-media-template";
+import { textCardPayloadSchema } from "@/lib/validation/content-media-template";
 
 export type ContentMediaJob = Awaited<ReturnType<typeof claimNextContentMediaJob>>;
 
 async function renderAndStoreImage(job: NonNullable<ContentMediaJob>) {
-  const apiKey = process.env[AI_PROVIDER_ENV.apiKey];
-  if (!apiKey) throw new Error(CONTENT_MEDIA_STATUS.failed);
-
-  const openai = createOpenAI({ apiKey });
-  const { image } = await generateImage({
-    model: openai.image(job.modelId),
-    prompt: job.prompt,
-    n: 1,
-    maxRetries: 0,
-    abortSignal: AbortSignal.timeout(COPY_GENERATION.imageTimeoutMilliseconds),
-  });
-
-  const imageBytes = Buffer.from(image.uint8Array);
+  let imageBytes: Buffer;
+  if (job.modelId === CONTENT_MEDIA_TEMPLATE.textCardModelId) {
+    let payload: unknown;
+    try { payload = JSON.parse(job.prompt); } catch { throw new Error(CONTENT_MEDIA_STATUS.failed); }
+    const parsed = textCardPayloadSchema.safeParse(payload);
+    if (!parsed.success) throw new Error(CONTENT_MEDIA_STATUS.failed);
+    imageBytes = await renderTextCard(parsed.data);
+  } else {
+    const apiKey = process.env[AI_PROVIDER_ENV.apiKey];
+    if (!apiKey) throw new Error(CONTENT_MEDIA_STATUS.failed);
+    const openai = createOpenAI({ apiKey });
+    const { image } = await generateImage({
+      model: openai.image(job.modelId),
+      prompt: job.prompt,
+      n: 1,
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(COPY_GENERATION.imageTimeoutMilliseconds),
+    });
+    imageBytes = Buffer.from(image.uint8Array);
+  }
   if (imageBytes.byteLength === 0 || imageBytes.byteLength > CONTENT_MEDIA_WORKER.maximumImageBytes) throw new Error(CONTENT_MEDIA_STATUS.failed);
   const imagePipeline = sharp(imageBytes, { limitInputPixels: CONTENT_MEDIA_WORKER.maximumImagePixels, animated: false });
   const metadata = await imagePipeline.metadata();

@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
-import { brands } from "@/lib/db/schema";
+import { brandKitVersions, brands } from "@/lib/db/schema";
 import type { BrandCreateInput, BrandUpdateInput } from "@/lib/validation/brands";
 
 const SLUG_SEPARATOR = "-";
@@ -19,11 +19,26 @@ export function slugifyBrandName(name: string) {
 }
 
 export async function listBrands(organizationId: string) {
-  return getDatabase().query.brands.findMany({
+  const database = getDatabase();
+  const brandRows = await database.query.brands.findMany({
     with: { socialProfiles: true },
     where: and(eq(brands.organizationId, organizationId), eq(brands.isActive, true)),
     orderBy: [asc(brands.name)],
   });
+
+  if (brandRows.length === 0) return [];
+
+  const kitVersions = await database
+    .select({ brandId: brandKitVersions.brandId, status: brandKitVersions.status, version: brandKitVersions.version })
+    .from(brandKitVersions)
+    .where(and(eq(brandKitVersions.organizationId, organizationId), inArray(brandKitVersions.brandId, brandRows.map((brand) => brand.id))))
+    .orderBy(desc(brandKitVersions.version));
+  const latestKitStatus = new Map<string, typeof kitVersions[number]["status"]>();
+  for (const version of kitVersions) {
+    if (!latestKitStatus.has(version.brandId)) latestKitStatus.set(version.brandId, version.status);
+  }
+
+  return brandRows.map((brand) => ({ ...brand, brandKitStatus: latestKitStatus.get(brand.id) ?? null }));
 }
 
 export async function createBrand(input: BrandCreateInput, organizationId: string, createdBy: string) {

@@ -1,11 +1,12 @@
 import "server-only";
-import { createHash } from "node:crypto";
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client, type HeadObjectCommandOutput } from "@aws-sdk/client-s3";
+import { createHash, randomUUID } from "node:crypto";
+import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client, type HeadObjectCommandOutput } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import sharp from "sharp";
-import { API_ERROR_CODES, BRAND_ASSET_ENV, BRAND_ASSET_LIMITS, HTTP_STATUS } from "@/lib/constants";
+import { API_ERROR_CODES, BRAND_ASSET_ENV, BRAND_ASSET_LIMITS, HTTP_STATUS, SOCIAL_PUBLICATION_LIMITS } from "@/lib/constants";
 import type { BrandAssetUpload } from "@/lib/validation/brand-assets";
 import { ApiError } from "@/lib/server/api-error";
+import { isAllowedBrandAssetEndpoint } from "@/lib/server/brand-asset-endpoint";
 
 const MIME_BY_FORMAT = { jpeg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 
@@ -16,16 +17,7 @@ function getStorageConfig() {
   const region = process.env[BRAND_ASSET_ENV.region];
   const endpoint = process.env[BRAND_ASSET_ENV.endpoint];
   if (!bucket || !region) throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
-  if (endpoint) {
-    try {
-      const parsedEndpoint = new URL(endpoint);
-      if (!(["http:", "https:"].includes(parsedEndpoint.protocol) && ["localhost", "127.0.0.1", "::1", "[::1]"].includes(parsedEndpoint.hostname))) {
-        throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
-      }
-    } catch {
-      throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
-    }
-  }
+  if (endpoint && !isAllowedBrandAssetEndpoint(endpoint, process.env.NODE_ENV)) throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
   return { bucket, region, endpoint };
 }
 
@@ -136,4 +128,52 @@ export async function createBrandAssetDownload(objectKey: string, fileName: stri
     ResponseContentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     ResponseContentType: contentType,
   }), { expiresIn: BRAND_ASSET_LIMITS.downloadExpirySeconds });
+}
+
+export async function createInstagramPublicationImage(objectKey: string, expected: { sha256: string; sizeBytes: number; contentType: string }, organizationId: string, publicationJobId: string) {
+  const { bucket, client } = getS3Client();
+  const limits = SOCIAL_PUBLICATION_LIMITS.instagram;
+  const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: objectKey }));
+  if (!response.Body || response.ContentLength !== expected.sizeBytes || response.ContentType !== expected.contentType || !response.ContentLength || response.ContentLength > limits.maximumSourceImageBytes) throw new Error("Publication image is unavailable or too large.");
+  const bytes = Buffer.from(await response.Body.transformToByteArray());
+  if (bytes.byteLength !== response.ContentLength || createHash("sha256").update(bytes).digest("hex") !== expected.sha256) throw new Error("Publication image is incomplete.");
+  const encoded = await sharp(bytes, { limitInputPixels: BRAND_ASSET_LIMITS.maximumImagePixels, animated: false })
+    .rotate().toColourspace("srgb").resize({ width: limits.maximumImageWidth, withoutEnlargement: true })
+    .jpeg({ quality: 85, mozjpeg: true }).toBuffer({ resolveWithObject: true });
+  const aspectRatio = encoded.info.width / encoded.info.height;
+  if (!encoded.info.width || !encoded.info.height || aspectRatio < limits.minimumAspectRatio || aspectRatio > limits.maximumAspectRatio) throw new Error("Publication image aspect ratio is not supported.");
+  const jpeg = encoded.data;
+  if (!jpeg.byteLength || jpeg.byteLength > limits.maximumPublishedImageBytes) throw new Error("Publication image exceeds Instagram's image limit.");
+  const stagingKey = `social-publication-staging/${encodeURIComponent(organizationId)}/${publicationJobId}/${randomUUID()}.jpg`;
+  await client.send(new PutObjectCommand({
+    Bucket: bucket, Key: stagingKey, Body: jpeg, ContentLength: jpeg.byteLength,
+    ContentType: "image/jpeg", Metadata: { "created-at": new Date().toISOString() },
+  }));
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const url = await getSignedUrl(client, new GetObjectCommand({
+    Bucket: bucket, Key: stagingKey, ResponseContentType: "image/jpeg",
+  }), { expiresIn: limits.signedImageUrlLifetimeSeconds });
+  return { url, stagingKey };
+}
+
+export async function deleteSocialPublicationImage(stagingKey: string, organizationId: string, publicationJobId: string) {
+  const expectedPrefix = `social-publication-staging/${encodeURIComponent(organizationId)}/${publicationJobId}/`;
+  const fileName = stagingKey.startsWith(expectedPrefix) ? stagingKey.slice(expectedPrefix.length) : "";
+  if (!/^[\da-f-]{36}\.jpg$/u.test(fileName)) throw new Error("Publication image key is invalid.");
+  const { bucket, client } = getS3Client();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: stagingKey }));
+}
+
+export async function cleanupExpiredSocialPublicationImages(organizationId: string, now = new Date()) {
+  const { bucket, client } = getS3Client();
+  const prefix = `social-publication-staging/${encodeURIComponent(organizationId)}/`;
+  const cutoff = now.getTime() - SOCIAL_PUBLICATION_LIMITS.instagram.stagingRetentionMilliseconds;
+  let continuationToken: string | undefined;
+  for (let page = 0; page < 10; page += 1) {
+    const listed = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, MaxKeys: 1_000, ...(continuationToken ? { ContinuationToken: continuationToken } : {}) }));
+    const expired = (listed.Contents ?? []).filter((object) => object.Key?.startsWith(prefix) && object.Key.endsWith(".jpg") && object.LastModified && object.LastModified.getTime() < cutoff);
+    if (expired.length) await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: expired.flatMap(({ Key }) => Key ? [{ Key }] : []), Quiet: true } }));
+    if (!listed.IsTruncated || !listed.NextContinuationToken) break;
+    continuationToken = listed.NextContinuationToken;
+  }
 }

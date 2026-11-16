@@ -34,8 +34,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const generationContext = await getCalendarCopyGenerationContext(tenant.organizationId, itemId, parsed.data.brandId);
     if (!generationContext) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
-    const data = await generateChannelCopy({ ...generationContext, platform: parsed.data.platform }, parsed.data.locale);
-    if (!data) throw new ApiError(API_ERROR_CODES.aiServiceUnavailable, HTTP_STATUS.unavailable);
+    const generated = await generateChannelCopy({ ...generationContext, platform: parsed.data.platform }, parsed.data.locale);
+    if (!generated) throw new ApiError(API_ERROR_CODES.aiServiceUnavailable, HTTP_STATUS.unavailable);
+    const data = { ...generated, variantCopy: generated.variantOptions[0] };
 
     const response = calendarCopyDraftResponseSchema.safeParse({ data });
     if (!response.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);

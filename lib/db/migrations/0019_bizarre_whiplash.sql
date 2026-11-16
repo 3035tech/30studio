@@ -1,0 +1,1 @@
+ALTER TABLE "social_oauth_states" ADD COLUMN "nonce_ciphertext" text;

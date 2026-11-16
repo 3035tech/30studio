@@ -1,0 +1,1 @@
+ALTER TYPE "public"."social_publication_reconciliation_outcome" ADD VALUE 'retry';

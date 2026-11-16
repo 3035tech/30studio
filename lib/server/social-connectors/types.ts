@@ -1,0 +1,27 @@
+export type ProviderConfig = {
+  clientIdEnv: string;
+  clientSecretEnv: string;
+  clientKeyParameter?: string;
+  issuer: string;
+  jwksUri?: string;
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  tokenAuth: "basic" | "post";
+  scopes: readonly string[];
+  scopeSeparator?: string;
+  supportsPkce: boolean;
+  nonce?: boolean;
+  additionalAuthorizationParameters?: Readonly<Record<string, string>>;
+  codeExchangeKind?: "standard" | "facebook-query" | "form-post";
+  accountResponsePath: readonly (string | number)[];
+  accountIdField: string;
+  accountDisplayNamePath: readonly string[];
+  accountHandleField?: string;
+  accountEndpoint: string;
+  accountMethod?: "GET" | "POST";
+  accountFields?: string;
+  accountFieldsParameter?: "fields" | "part";
+  accountParameters?: Readonly<Record<string, string>>;
+  longLivedTokenExchange?: "facebook" | "instagram" | "threads";
+  refreshKind?: "oauth" | "tiktok" | "instagram" | "threads";
+};

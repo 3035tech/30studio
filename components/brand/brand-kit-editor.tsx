@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { BrandAssetLibrary } from "@/components/brand/brand-asset-library";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Disclosure } from "@/components/ui/disclosure";
 import { TextAreaField, TextField } from "@/components/ui/field";
 import { BRAND_KIT_LIMITS, BRAND_KIT_UI_IDS, BRAND_KIT_VERSION_STATUS, BRAND_KIT_API_PATHS, getBrandKitApiPath, type Locale } from "@/lib/constants";
 import { brandKitContentSchema, brandKitVersionsResponseSchema, type BrandKitContent, type BrandKitFact, type BrandKitVersion } from "@/lib/validation/brand-kits";
@@ -43,6 +44,7 @@ function parseStringList(value: string) {
 export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandName: string }) {
   const t = useTranslations("brandKit");
   const tTable = useTranslations("brandKitTable");
+  const tAssets = useTranslations("brandAssets");
   const formatter = useFormatter();
   const locale = useLocale() as Locale;
   const [versions, setVersions] = useState<BrandKitVersion[]>([]);
@@ -185,7 +187,6 @@ export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandN
   ];
   const editorId = `${BRAND_KIT_UI_IDS.editorPrefix}${brandId}`;
   const titleId = `${editorId}${BRAND_KIT_UI_IDS.titleSuffix}`;
-  const historyId = `${editorId}${BRAND_KIT_UI_IDS.historySuffix}`;
 
   return (
     <section className="brandKitEditor" aria-labelledby={titleId}>
@@ -221,7 +222,7 @@ export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandN
               {content.verifiedFacts.length === 0 ? <p className="brandKitEditor__emptyFacts">{t("noFacts")}</p> : content.verifiedFacts.map((fact, index) => (
                 <div className="brandKitEditor__fact" key={`${brandId}-fact-${index}`}>
                   <TextField id={`${editorId}-fact-${index}`} label={t("factStatement")} value={fact.statement} disabled={!canEdit || busy} maxLength={BRAND_KIT_LIMITS.itemCharacters} onChange={(event) => updateFact(index, "statement", event.target.value)} />
-                  <TextField id={`${editorId}-source-${index}`} label={t("sourceUrl")} type="url" value={fact.sourceUrl} disabled={!canEdit || busy} maxLength={BRAND_KIT_LIMITS.sources} onChange={(event) => updateFact(index, "sourceUrl", event.target.value)} />
+                  <TextField id={`${editorId}-source-${index}`} label={t("sourceUrl")} type="url" value={fact.sourceUrl} disabled={!canEdit || busy} maxLength={BRAND_KIT_LIMITS.sourceUrlCharacters} onChange={(event) => updateFact(index, "sourceUrl", event.target.value)} />
                   {canEdit ? <Button appearance="quiet" type="button" disabled={busy} aria-label={t("removeFact")} onClick={() => removeFact(index)}><Trash2 aria-hidden="true" size={16} /></Button> : null}
                 </div>
               ))}
@@ -231,25 +232,29 @@ export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandN
               {selectedVersion?.status === BRAND_KIT_VERSION_STATUS.draft ? <Button appearance="quiet" type="button" disabled={busy} onClick={() => void approveDraft()}>{t("approveVersion")}</Button> : null}
             </div> : null}
           </form>
-          <section className="brandKitEditor__history" aria-labelledby={historyId}>
-            <div className="brandKitEditor__historyHeading"><h4 id={historyId}>{t("historyTitle")}</h4><p>{t("historyDescription")}</p></div>
-            <DataTable
-              id={`brand-kit-history-${brandId}`}
-              rows={versions}
-              columns={versionColumns}
-              getRowId={(version) => version.id}
-              initialSortColumnId="version"
-              searchValue={(version) => `${version.version} ${version.status} ${version.createdByName} ${version.approvedByName ?? ""}`}
-              searchLabel={t("filterVersions")}
-              pageSizeLabel={tTable("pageSize")}
-              emptyMessage={t("noVersions")}
-              noMatchesMessage={tTable("noMatches")}
-              locale={locale}
-            />
-          </section>
+          <Disclosure title={t("historyTitle")} className="brandKitEditor__disclosure">
+            <section className="brandKitEditor__history" aria-label={t("historyTitle")}>
+              <p className="brandKitEditor__historyDescription">{t("historyDescription")}</p>
+              <DataTable
+                id={`brand-kit-history-${brandId}`}
+                rows={versions}
+                columns={versionColumns}
+                getRowId={(version) => version.id}
+                initialSortColumnId="version"
+                searchValue={(version) => `${version.version} ${version.status} ${version.createdByName} ${version.approvedByName ?? ""}`}
+                searchLabel={t("filterVersions")}
+                pageSizeLabel={tTable("pageSize")}
+                emptyMessage={t("noVersions")}
+                noMatchesMessage={tTable("noMatches")}
+                locale={locale}
+              />
+            </section>
+          </Disclosure>
         </>
       )}
-      <BrandAssetLibrary key={brandId} brandId={brandId} />
+      <Disclosure title={tAssets("assetLibraryDetails")} className="brandKitEditor__disclosure">
+        <BrandAssetLibrary key={brandId} brandId={brandId} />
+      </Disclosure>
     </section>
   );
 }

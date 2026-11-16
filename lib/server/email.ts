@@ -2,7 +2,9 @@ import "server-only";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { AUTH_QUERY_PARAMETERS, BETTER_AUTH_ENV, EMAIL_DELIVERY_LIMITS, EMAIL_ENV, EMAIL_ROUTES, PRODUCT } from "@/lib/constants";
+import englishMessages from "@/messages/en.json";
 import portugueseMessages from "@/messages/pt.json";
+import type { Locale } from "@/lib/constants";
 
 const emailTransportEnvironmentSchema = z.object({
   host: z.string().trim().min(1),
@@ -120,6 +122,35 @@ export async function sendInvitationEmail(data: {
     text: `${greeting}\n\n${body}\n${invitationUrl}\n\n${copy.expiry}\n${copy.ignore}`,
     html: `<p>${interpolateEmail(copy.greeting, { name: safeInviter })}</p><p>${interpolateEmail(copy.body, { organization: safeOrganization })}</p><p><a href="${safeUrl}">${copy.action}</a></p><p>${copy.expiry}</p><p>${copy.ignore}</p>`,
   });
+}
+
+export async function sendPasswordResetEmail(data: { user: { name: string; email: string }; url: string }) {
+  const locale = getPasswordResetLocale(data.url);
+  const copy = locale === "en" ? englishMessages.email.passwordReset : portugueseMessages.email.passwordReset;
+  const safeName = escapeHtml(data.user.name);
+  const safeUrl = escapeHtml(data.url);
+  const greeting = interpolateEmail(copy.greeting, { name: data.user.name });
+
+  await sendTransactionalEmail({
+    recipient: data.user.email,
+    subject: copy.subject,
+    text: `${greeting}\n\n${copy.body}\n${data.url}\n\n${copy.expiry}\n${copy.ignore}`,
+    html: `<p>${interpolateEmail(copy.greeting, { name: safeName })}</p><p>${copy.body}</p><p><a href="${safeUrl}">${copy.action}</a></p><p>${copy.expiry}</p><p>${copy.ignore}</p>`,
+  });
+}
+
+function getPasswordResetLocale(resetUrl: string): Locale {
+  try {
+    let candidate = new URL(resetUrl);
+    for (let depth = 0; depth < 2; depth += 1) {
+      if (candidate.pathname.startsWith("/en/")) return "en";
+      if (candidate.pathname.startsWith("/pt/")) return "pt";
+      const callbackUrl = candidate.searchParams.get("callbackURL");
+      if (!callbackUrl) break;
+      candidate = new URL(callbackUrl, candidate.origin);
+    }
+  } catch { /* Use the product's default locale for malformed callback URLs. */ }
+  return "pt";
 }
 
 function interpolateEmail(template: string, values: Record<string, string>) {

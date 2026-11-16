@@ -5,7 +5,7 @@ import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, defaultStatements, memberAc, ownerAc } from "better-auth/plugins/organization/access";
 import { getDatabase } from "@/lib/db/client";
 import { API_ERROR_CODES, BETTER_AUTH_ENV, EMAIL_DELIVERY_LIMITS, TEAM_AUDIT_ACTIONS, TEAM_INVITATION_LIMIT } from "@/lib/constants";
-import { sendInvitationEmail, sendVerificationEmail } from "@/lib/server/email";
+import { sendInvitationEmail, sendPasswordResetEmail, sendVerificationEmail } from "@/lib/server/email";
 import { recordTeamAuditEvent } from "@/lib/db/repositories/team";
 
 const permissions = {
@@ -13,13 +13,14 @@ const permissions = {
   brands: ["read", "manage"],
   content: ["read", "manage", "approve"],
   analytics: ["read"],
+  competitiveResearch: ["read", "manage"],
 } as const;
 const accessControl = createAccessControl(permissions);
-const owner = accessControl.newRole({ ...ownerAc.statements, brands: ["read", "manage"], content: ["read", "manage", "approve"], analytics: ["read"] });
-const admin = accessControl.newRole({ ...adminAc.statements, brands: ["read", "manage"], content: ["read", "manage", "approve"], analytics: ["read"] });
-const editor = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read", "manage"], analytics: ["read"] });
-const approver = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read", "approve"], analytics: ["read"] });
-const analyst = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read"], analytics: ["read"] });
+const owner = accessControl.newRole({ ...ownerAc.statements, brands: ["read", "manage"], content: ["read", "manage", "approve"], analytics: ["read"], competitiveResearch: ["read", "manage"] });
+const admin = accessControl.newRole({ ...adminAc.statements, brands: ["read", "manage"], content: ["read", "manage", "approve"], analytics: ["read"], competitiveResearch: ["read", "manage"] });
+const editor = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read", "manage"], analytics: ["read"], competitiveResearch: ["read", "manage"] });
+const approver = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read", "approve"], analytics: ["read"], competitiveResearch: ["read"] });
+const analyst = accessControl.newRole({ ...memberAc.statements, brands: ["read"], content: ["read"], analytics: ["read"], competitiveResearch: ["read"] });
 
 function createAuth() {
   const authSecret = process.env[BETTER_AUTH_ENV.secret];
@@ -39,7 +40,13 @@ function createAuth() {
     secret: authSecret,
     trustedOrigins,
     database: drizzleAdapter(getDatabase(), { provider: "pg" }),
-    emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailAndPassword: {
+      enabled: true,
+      requireEmailVerification: true,
+      resetPasswordTokenExpiresIn: EMAIL_DELIVERY_LIMITS.passwordResetExpirySeconds,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async (data) => sendPasswordResetEmail(data),
+    },
     emailVerification: {
       sendOnSignUp: true,
       sendOnSignIn: true,

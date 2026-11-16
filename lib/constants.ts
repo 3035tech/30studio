@@ -3,12 +3,19 @@ export const PRODUCT = {
   groupName: "Grupo 3035",
 } as const;
 
+export const WORKSPACE_UI_EVENTS = { createContent: "30studio:create-content", openCalendarItem: "30studio:open-calendar-item", openCalendarList: "30studio:open-calendar-list" } as const;
+export const WORKSPACE_API_PATHS = { settings: "/api/workspace/settings" } as const;
+export const WORKSPACE_LIMITS = { nameCharacters: 100 } as const;
+
 export const WORKSPACE_SECTION_IDS = {
   overview: "workspace-overview",
   calendar: "workspace-calendar",
+  approvals: "workspace-approvals",
+  analytics: "workspace-analytics",
   brands: "workspace-brands",
   createBrand: "workspace-create-brand",
   team: "workspace-team",
+  profile: "workspace-profile",
 } as const;
 
 export const BRAND_ASSETS = {
@@ -39,8 +46,70 @@ export const SOCIAL_PLATFORMS = [
   "pinterest",
 ] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+export const DASHBOARD_FILTERS = { rangeDays: [30, 90] as const, storageKey: "30studio:dashboard-filters" } as const;
+export const DASHBOARD_ALERTS = { storageKey: "30studio:dashboard-muted", snoozeMilliseconds: 24 * 60 * 60 * 1_000 } as const;
+export const DASHBOARD_GOALS = { minimumMonthlyPublications: 1, maximumMonthlyPublications: 500 } as const;
+export type DashboardRangeDays = typeof DASHBOARD_FILTERS.rangeDays[number];
+export type DashboardFilters = { brandId: string; platform: SocialPlatform | ""; rangeDays: DashboardRangeDays };
 export const SOCIAL_PROFILE_STATUSES = ["not_connected", "pending", "connected", "reauth_required", "disabled"] as const;
 export type SocialProfileStatus = (typeof SOCIAL_PROFILE_STATUSES)[number];
+export const SOCIAL_PROFILE_STATUS = { notConnected: "not_connected", pending: "pending", connected: "connected", reauthRequired: "reauth_required", disabled: "disabled" } as const;
+export const SOCIAL_CONNECTION = {
+  oauthStateLifetimeMilliseconds: 10 * 60 * 1_000,
+  providerRequestTimeoutMilliseconds: 10_000,
+  maximumProviderResponseBytes: 64 * 1024,
+  refreshBeforeExpiryMilliseconds: 5 * 60 * 1_000,
+  encryptionKeyVersion: 1,
+  callbackPath: "/api/social-connections/callback",
+} as const;
+export const SOCIAL_PUBLICATION_LIMITS = {
+  facebook: {
+    publishablePageTasks: ["CREATE_CONTENT", "MANAGE"],
+  },
+  instagram: {
+    captionCharacters: 2_200,
+    supportedSourceImageTypes: ["image/jpeg", "image/png", "image/webp"],
+    maximumSourceImageBytes: 10 * 1024 * 1024,
+    maximumPublishedImageBytes: 8 * 1024 * 1024,
+    minimumAspectRatio: 4 / 5,
+    maximumAspectRatio: 1.91,
+    maximumImageWidth: 1_440,
+    signedImageUrlLifetimeSeconds: 60 * 60,
+    stagingRetentionMilliseconds: 24 * 60 * 60 * 1_000,
+    containerReadinessChecks: 5,
+    containerReadinessIntervalMilliseconds: 5_000,
+  },
+} as const;
+export const SOCIAL_PUBLISHING_CAPABILITIES = ["connection_only", "text", "single_image"] as const;
+export const SOCIAL_CAPABILITY_SNAPSHOT_SCHEMA_VERSION = 1 as const;
+export const SOCIAL_CAPABILITY_CATALOG_VERSION = 1 as const;
+export type SocialCapabilitySnapshot = {
+  schemaVersion: typeof SOCIAL_CAPABILITY_SNAPSHOT_SCHEMA_VERSION;
+  capabilityVersion: typeof SOCIAL_CAPABILITY_CATALOG_VERSION;
+  platform: SocialPlatform;
+  publication: (typeof SOCIAL_PUBLISHING_CAPABILITIES)[number];
+  maximumTextCharacters: number | null;
+  image: {
+    acceptedSourceTypes: readonly string[];
+    maximumSourceBytes: number;
+    maximumPublishedBytes: number;
+    minimumAspectRatio: number;
+    maximumAspectRatio: number;
+    maximumWidth: number;
+  } | null;
+};
+export const SOCIAL_CONNECTION_EVENT_TYPES = ["connected", "refreshed", "disconnected", "reauth_required"] as const;
+export const SOCIAL_CONNECTION_EVENT = {
+  connected: "connected",
+  refreshed: "refreshed",
+  disconnected: "disconnected",
+  reauthRequired: "reauth_required",
+} as const;
+export const SOCIAL_CONNECTION_API_PATHS = {
+  brandConnections: (brandId: string) => `/api/brands/${brandId}/social-connections`,
+  profileConnection: (brandId: string, profileId: string) => `/api/brands/${brandId}/social-connections/${profileId}`,
+  oauthCallback: SOCIAL_CONNECTION.callbackPath,
+} as const;
 
 export const BRAND_COLORS = ["violet", "blue", "green", "orange", "ink"] as const;
 export type BrandColor = (typeof BRAND_COLORS)[number];
@@ -85,6 +154,7 @@ export const CONTENT_MEDIA_STATUS = {
   rejected: "rejected",
   failed: "failed",
 } as const;
+export const CONTENT_APPROVAL_BLOCKING_MEDIA_STATUSES = [CONTENT_MEDIA_STATUS.queued, CONTENT_MEDIA_STATUS.processing, CONTENT_MEDIA_STATUS.pendingReview] as const;
 export const CONTENT_MEDIA_REVIEW_DECISIONS = [CONTENT_MEDIA_STATUS.approved, CONTENT_MEDIA_STATUS.rejected] as const;
 export const CONTENT_MEDIA_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const;
 export const CONTENT_MEDIA_WORKER = {
@@ -96,7 +166,132 @@ export const CONTENT_MEDIA_WORKER = {
   outputFormat: "webp",
   outputQuality: 82,
 } as const;
+export const CONTENT_MEDIA_GENERATION_MODES = ["ai_image", "text_card", "carousel"] as const;
+export const CONTENT_MEDIA_GENERATION_MODE = { aiImage: "ai_image", textCard: "text_card", carousel: "carousel" } as const;
+export const CONTENT_MEDIA_CAROUSEL = { pageCount: 3 } as const;
+export const CONTENT_MEDIA_EXPORTS = {
+  linkedin: { width: 1080, height: 1080 },
+  instagram: { width: 1080, height: 1350 },
+  facebook: { width: 1080, height: 1080 },
+  tiktok: { width: 1080, height: 1080 },
+  x: { width: 1600, height: 900 },
+  youtube: { width: 1280, height: 720 },
+  threads: { width: 1080, height: 1350 },
+  pinterest: { width: 1000, height: 1500 },
+} as const satisfies Record<SocialPlatform, { width: number; height: number }>;
+export const CONTENT_MEDIA_TEMPLATE = {
+  textCardModelId: "native:text-card:v1",
+  width: 1080,
+  height: 1080,
+  maximumCarouselPageCharacters: 2_000,
+  maximumTitleCharacters: 180,
+  maximumCopyExcerptCharacters: 220,
+  maximumTitleLines: 3,
+  maximumCopyLines: 4,
+  neutralBackground: "#F8FAFC",
+  neutralForeground: "#0B1B3B",
+  neutralAccent: "#64748B",
+  fontFamilyPattern: /^[\p{L}\p{N}][\p{L}\p{N} ,.-]{0,79}$/u,
+} as const;
 export const CONTENT_EDITABLE_STATUSES = [CONTENT_STATUS.idea, CONTENT_STATUS.draft] as const;
+export const CONTENT_REVIEWABLE_STATUSES = [...CONTENT_EDITABLE_STATUSES, CONTENT_STATUS.inReview, CONTENT_STATUS.approved] as const;
+export const CONTENT_APPROVAL_STATUSES = ["pending", "approved", "rejected", "changes_requested", "stale"] as const;
+export type ContentApprovalStatus = (typeof CONTENT_APPROVAL_STATUSES)[number];
+export const CONTENT_APPROVAL_STATUS = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+  changesRequested: "changes_requested",
+  stale: "stale",
+} as const;
+export const CONTENT_APPROVAL_DECISIONS = [CONTENT_APPROVAL_STATUS.approved, CONTENT_APPROVAL_STATUS.rejected, CONTENT_APPROVAL_STATUS.changesRequested] as const;
+export const CONTENT_APPROVAL_ACTION = {
+  submit: "submit",
+  approve: CONTENT_APPROVAL_STATUS.approved,
+  reject: CONTENT_APPROVAL_STATUS.rejected,
+  requestChanges: CONTENT_APPROVAL_STATUS.changesRequested,
+} as const;
+export const CONTENT_APPROVAL_ACTIONS = [CONTENT_APPROVAL_ACTION.submit, CONTENT_APPROVAL_ACTION.approve, CONTENT_APPROVAL_ACTION.reject, CONTENT_APPROVAL_ACTION.requestChanges] as const;
+export const CONTENT_APPROVAL_LIMITS = { maximumNoteCharacters: 2_000, maximumHistoryEntries: 10 } as const;
+export const CONTENT_APPROVAL_POLICY = {
+  defaultScopeKey: "organization",
+  brandScopePrefix: "brand:",
+  defaultRequiredApprovals: 1,
+  maximumRequiredApprovals: 5,
+} as const;
+export const CONTENT_APPROVAL_POLICY_API_PATHS = { collection: "/api/approval-policies" } as const;
+export const SOCIAL_PUBLICATION_JOB_STATUSES = ["queued", "processing", "published", "failed", "indeterminate"] as const;
+export const SOCIAL_PUBLICATION_JOB_STATUS = { queued: "queued", processing: "processing", published: "published", failed: "failed", indeterminate: "indeterminate" } as const;
+export const SOCIAL_PUBLICATION_RECONCILIATION_OUTCOMES = ["published", "not_published", "retry"] as const;
+export const SOCIAL_PUBLICATION_RECONCILIATION_SOURCES = ["manual", "automatic"] as const;
+export const SOCIAL_ANALYTICS_COLLECTION_STATUSES = ["success", "permission_denied", "authentication_required", "unavailable"] as const;
+export const COMPETITOR_SOURCE_STATUSES = ["active", "paused", "archived"] as const;
+export const COMPETITOR_SOURCE_STATUS = { active: "active", paused: "paused", archived: "archived" } as const;
+export const COMPETITOR_FETCH_RUN_STATUSES = ["running", "succeeded", "failed", "interrupted"] as const;
+export const COMPETITOR_FETCH_RUN_STATUS = { running: "running", succeeded: "succeeded", failed: "failed", interrupted: "interrupted" } as const;
+export const COMPETITOR_ALERT_TYPES = ["failures", "stale"] as const;
+export const COMPETITOR_WORKER_HEALTH_STATUSES = ["healthy", "stale", "unknown"] as const;
+export const COMPETITOR_WORKER_HEALTH_STATUS = { healthy: "healthy", stale: "stale", unknown: "unknown" } as const;
+export const COMPETITOR_OBSERVATION_DATA_QUALITIES = ["metadata_only"] as const;
+export const COMPETITOR_RETRIEVAL_METHODS = ["rss_atom"] as const;
+export const COMPETITOR_OBSERVATION_ANALYSIS_STATUSES = ["pending", "processing", "ready", "unavailable"] as const;
+export const COMPETITOR_OBSERVATION_ANALYSIS_STATUS = { pending: "pending", processing: "processing", ready: "ready", unavailable: "unavailable" } as const;
+export const COMPETITOR_TOPIC_KEYS = ["product_news", "education", "customer_story", "promotion", "event", "industry_news", "opinion", "other"] as const;
+export const COMPETITOR_SOURCE_ERROR_CODES = {
+  invalidUrl: "invalid_source_url",
+  blockedAddress: "blocked_source_address",
+  requestFailed: "source_request_failed",
+  responseTooLarge: "source_response_too_large",
+  unsupportedContentType: "source_content_type_unsupported",
+  invalidFeed: "source_feed_invalid",
+  httpFailure: "source_http_failure",
+  analysisUnavailable: "analysis_unavailable",
+  analysisProviderFailed: "analysis_provider_failed",
+  analysisOutputInvalid: "analysis_output_invalid",
+  workerInterrupted: "worker_interrupted",
+} as const;
+export const COMPETITOR_WORKER = {
+  pollIntervalMilliseconds: 10_000,
+  leaseMilliseconds: 120_000,
+  pollIntervalMinutes: 60,
+  maximumFeedBytes: 1_000_000,
+  maximumEntriesPerFetch: 50,
+  maximumTitleCharacters: 300,
+  maximumSummaryCharacters: 1_500,
+  requestTimeoutMilliseconds: 10_000,
+  retryDelayMinutes: [5, 30, 120, 360] as const,
+  maximumSourcesPerBrand: 25,
+  analysisBatchSize: 10,
+  analysisMaximumAttempts: 3,
+  analysisLeaseMilliseconds: 120_000,
+  analysisWindowDays: 30,
+  analysisMaximumInputCharacters: 1_000,
+  analysisMaximumOutputCharacters: 320,
+  analysisMaximumOutputTokens: 1_800,
+  analysisTimeoutMilliseconds: 25_000,
+  analysisRetryDelayMinutes: [5, 30] as const,
+  heartbeatIntervalMilliseconds: 15_000,
+  heartbeatStaleMilliseconds: 90_000,
+  fetchHistoryLimitPerSource: 8,
+  fetchHistoryRetentionPerSource: 50,
+  fetchHistoryPruneBatch: 1_000,
+  heartbeatKey: "competitor-research",
+  defaultAlertFailureThreshold: 3,
+  minimumAlertFailureThreshold: 1,
+  maximumAlertFailureThreshold: 10,
+  defaultAlertStaleAfterHours: 36,
+  minimumAlertStaleAfterHours: 6,
+  maximumAlertStaleAfterHours: 336,
+} as const;
+export const SOCIAL_ANALYTICS_LIMITS = { refreshCandidateCount: 10, refreshConcurrency: 3, refreshCooldownMilliseconds: 60 * 60 * 1_000 } as const;
+export const SOCIAL_ANALYTICS_FRESHNESS_MILLISECONDS = 24 * 60 * 60 * 1_000;
+export const SOCIAL_ANALYTICS_DEFINITION_VERSION = "meta_post_counts_lifetime_v1" as const;
+export const SOCIAL_PUBLICATION_RECONCILIATION_LIMITS = { minimumEvidenceCharacters: 10, maximumEvidenceCharacters: 1_000, maximumExternalPostIdCharacters: 256, maximumManualRetriesPerJob: 1, automaticCheckIntervalMilliseconds: 60_000, maximumAutomaticChecksPerJob: 5 } as const;
+export const SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS = 15_000;
+export const SOCIAL_PUBLISHING_WORKER = { heartbeatKey: "social-publishing", heartbeatIntervalMilliseconds: 30_000, heartbeatStaleMilliseconds: 90_000 } as const;
+export const SOCIAL_PUBLISHING_WORKER_STATUSES = ["disabled", "healthy", "stale", "unknown"] as const;
+export const SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS = 180_000;
+export const APPROVAL_POLICY_LIMITS = { minimumApprovals: 1, maximumApprovals: CONTENT_APPROVAL_POLICY.maximumRequiredApprovals } as const;
 export const CALENDAR = {
   daysPerWeek: 7,
   weeksPerView: 6,
@@ -113,12 +308,26 @@ export const CALENDAR_API_PATHS = {
   item: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}`,
   versions: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/versions`,
   generateCopy: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/copy-draft`,
+  reviewCopy: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/review`,
+  approval: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/approval`,
+  reconcilePublication: (itemId: string) => `/api/calendar/${encodeURIComponent(itemId)}/publication-reconciliation`,
 } as const;
 export const COPY_GENERATION = {
   timeoutMilliseconds: 30_000,
-  maximumOutputTokens: 700,
+  maximumOutputTokens: 1_100,
+  variantOptionCount: 3,
+  maximumVariantOptionCharacters: 1_200,
   imageTimeoutMilliseconds: 90_000,
 } as const;
+export const CONTENT_REVIEW = {
+  timeoutMilliseconds: 30_000,
+  maximumFindings: 8,
+  maximumOutputTokens: 900,
+  maximumFindingTextCharacters: 600,
+} as const;
+export const CONTENT_REVIEW_CATEGORIES = ["grammar", "unsupported_claim", "restricted_claim", "brand_voice", "channel_fit", "clarity"] as const;
+export const CONTENT_REVIEW_SEVERITIES = ["high", "medium", "low"] as const;
+export const CONTENT_REVIEW_LOCALES = ["pt", "en"] as const;
 export const AI_PROVIDER_ENV = {
   apiKey: "OPENAI_API_KEY",
   model: "OPENAI_MODEL",
@@ -146,12 +355,15 @@ export const CALENDAR_QUERY_PARAMETERS = {
   brandId: "brandId",
   platform: "platform",
   status: "status",
+  publicationStatus: "publicationStatus",
 } as const;
 export const CALENDAR_UI_IDS = {
   section: WORKSPACE_SECTION_IDS.calendar,
   title: "editorial-calendar-title",
   filters: "editorial-calendar-filters",
   newCampaignForm: "editorial-calendar-new-campaign",
+  createCampaignTitle: "calendar-create-campaign-title",
+  createCampaignDescription: "calendar-create-campaign-description",
   campaignTitle: "calendar-campaign-title",
   campaignBrand: "calendar-campaign-brand",
   campaignBrief: "calendar-campaign-brief",
@@ -225,6 +437,30 @@ export const BRAND_ASSET_ENV = {
   region: "AWS_REGION",
   endpoint: "STUDIO_ASSET_ENDPOINT",
 } as const;
+export const LOCAL_DEVELOPMENT = {
+  seedUserEmail: "demo@30studio.local",
+  seedUserPassword: "30studio-local-only",
+  seedUserName: "30studio Demo",
+  seedOrganizationName: "30studio Local",
+  seedOrganizationSlug: "30studio-local",
+  credentialProviderId: "credential",
+  allowedDatabaseHosts: ["localhost", "127.0.0.1", "::1", "postgres"] as const,
+  allowedDatabaseNames: ["30studio", "30studio_test"] as const,
+  ownerRole: "owner",
+  enabledEnvironmentValue: "true",
+  enabledEnvironmentName: "STUDIO_LOCAL_DEVELOPMENT",
+  objectStorageBucket: "30studio-media",
+  objectStorageEndpoint: "http://localstack:4566",
+  objectStorageHostname: "localstack",
+  objectStoragePort: "4566",
+  region: "us-east-1",
+  runtimeEnvironment: "development",
+} as const;
+export const BRAND_ASSET_ENDPOINT_SECURITY = {
+  allowedProtocols: ["http:", "https:"] as const,
+  loopbackHostnames: ["localhost", "127.0.0.1", "::1", "[::1]"] as const,
+  rootPath: "/",
+} as const;
 export function getBrandAssetsApiPath(brandId: string) {
   return `${BRAND_ASSET_API_PATHS.brands}/${encodeURIComponent(brandId)}/${BRAND_ASSET_API_PATHS.segment}`;
 }
@@ -247,7 +483,7 @@ export const BRAND_KIT_LIMITS = {
   itemsPerField: 30,
   colors: 12,
   facts: 30,
-  sources: 256,
+  sourceUrlCharacters: 2_048,
   historyVersions: 100,
   initialVersion: 0,
   versionIncrement: 1,
@@ -284,10 +520,18 @@ export const API_ERROR_CODES = {
   unauthenticated: "UNAUTHENTICATED",
   forbidden: "FORBIDDEN",
   organizationRequired: "ORGANIZATION_REQUIRED",
+  organizationNotFound: "ORGANIZATION_NOT_FOUND",
   invalidRequest: "INVALID_REQUEST",
   brandExists: "BRAND_EXISTS",
   brandNotFound: "BRAND_NOT_FOUND",
   profileExists: "PROFILE_EXISTS",
+  socialConnectorUnavailable: "SOCIAL_CONNECTOR_UNAVAILABLE",
+  socialConnectionConflict: "SOCIAL_CONNECTION_CONFLICT",
+  socialConnectionNotFound: "SOCIAL_CONNECTION_NOT_FOUND",
+  competitorSourceNotFound: "COMPETITOR_SOURCE_NOT_FOUND",
+  competitorSourceExists: "COMPETITOR_SOURCE_EXISTS",
+  competitorSourceLimitReached: "COMPETITOR_SOURCE_LIMIT_REACHED",
+  socialOAuthInvalid: "SOCIAL_OAUTH_INVALID",
   brandAssetNotFound: "BRAND_ASSET_NOT_FOUND",
   brandAssetInvalid: "BRAND_ASSET_INVALID",
   brandAssetStateConflict: "BRAND_ASSET_STATE_CONFLICT",
@@ -296,6 +540,16 @@ export const API_ERROR_CODES = {
   contentMediaConflict: "CONTENT_MEDIA_CONFLICT",
   campaignIdempotencyConflict: "CAMPAIGN_IDEMPOTENCY_CONFLICT",
   contentVersionConflict: "CONTENT_VERSION_CONFLICT",
+  contentApprovalConflict: "CONTENT_APPROVAL_CONFLICT",
+  contentApprovalContentRequired: "CONTENT_APPROVAL_CONTENT_REQUIRED",
+  contentApprovalMediaPending: "CONTENT_APPROVAL_MEDIA_PENDING",
+  contentApprovalSelfReview: "CONTENT_APPROVAL_SELF_REVIEW",
+  contentApprovalStale: "CONTENT_APPROVAL_STALE",
+  contentApprovalPublisherConnectionRequired: "CONTENT_APPROVAL_PUBLISHER_CONNECTION_REQUIRED",
+  contentApprovalPublisherMediaUnsupported: "CONTENT_APPROVAL_PUBLISHER_MEDIA_UNSUPPORTED",
+  contentApprovalPublisherTextLimit: "CONTENT_APPROVAL_PUBLISHER_TEXT_LIMIT",
+  socialPublicationReconciliationConflict: "SOCIAL_PUBLICATION_RECONCILIATION_CONFLICT",
+  socialPublicationRetryLimitReached: "SOCIAL_PUBLICATION_RETRY_LIMIT_REACHED",
   contentMediaLimitReached: "CONTENT_MEDIA_LIMIT_REACHED",
   contentMediaGenerationFailed: "CONTENT_MEDIA_GENERATION_FAILED",
   contentMediaGenerationUnavailable: "CONTENT_MEDIA_GENERATION_UNAVAILABLE",
@@ -388,12 +642,14 @@ export const EMAIL_DELIVERY_LIMITS = {
   socketTimeoutMilliseconds: 20_000,
   verificationExpirySeconds: 3_600,
   invitationExpirySeconds: 604_800,
+  passwordResetExpirySeconds: 3_600,
 } as const;
 export const AUTH_QUERY_PARAMETERS = {
   invitationId: "invitationId",
 } as const;
 export const EMAIL_ROUTES = {
   invitationAccept: `/${DEFAULT_LOCALE}/accept-invitation`,
+  passwordReset: (locale: Locale) => `/${locale}/reset-password`,
 } as const;
 export const INVITATION_PAGE_ROUTE = "/accept-invitation";
 export const INVITATION_ID_MAX_CHARACTERS = 256;
@@ -416,14 +672,17 @@ export const TENANT_PERMISSIONS = {
   contentRead: "content:read",
   contentManage: "content:manage",
   contentApprove: "content:approve",
+  contentApprovalPoliciesManage: "content:approval-policies:manage",
   analyticsRead: "analytics:read",
+  competitorResearchRead: "competitor-research:read",
+  competitorResearchManage: "competitor-research:manage",
 } as const;
 export type TenantPermission = (typeof TENANT_PERMISSIONS)[keyof typeof TENANT_PERMISSIONS];
 
 export const TENANT_ROLE_PERMISSIONS = {
-  [TENANT_ROLE.owner]: [TENANT_PERMISSIONS.organizationManage, TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
-  [TENANT_ROLE.admin]: [TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
-  [TENANT_ROLE.editor]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.analyticsRead],
-  [TENANT_ROLE.approver]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead],
-  [TENANT_ROLE.analyst]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.analyticsRead],
+  [TENANT_ROLE.owner]: [TENANT_PERMISSIONS.organizationManage, TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.contentApprovalPoliciesManage, TENANT_PERMISSIONS.analyticsRead, TENANT_PERMISSIONS.competitorResearchRead, TENANT_PERMISSIONS.competitorResearchManage],
+  [TENANT_ROLE.admin]: [TENANT_PERMISSIONS.membersManage, TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.brandsManage, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.contentApprovalPoliciesManage, TENANT_PERMISSIONS.analyticsRead, TENANT_PERMISSIONS.competitorResearchRead, TENANT_PERMISSIONS.competitorResearchManage],
+  [TENANT_ROLE.editor]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentManage, TENANT_PERMISSIONS.analyticsRead, TENANT_PERMISSIONS.competitorResearchRead, TENANT_PERMISSIONS.competitorResearchManage],
+  [TENANT_ROLE.approver]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.contentApprove, TENANT_PERMISSIONS.analyticsRead, TENANT_PERMISSIONS.competitorResearchRead],
+  [TENANT_ROLE.analyst]: [TENANT_PERMISSIONS.brandsRead, TENANT_PERMISSIONS.contentRead, TENANT_PERMISSIONS.analyticsRead, TENANT_PERMISSIONS.competitorResearchRead],
 } as const;

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { AI_PROVIDER_ENV, API_ERROR_CODES, BRAND_ASSET_ENV, HTTP_STATUS, TENANT_PERMISSIONS } from "@/lib/constants";
-import { enqueueContentMediaGeneration, listContentMediaForVersion } from "@/lib/db/repositories/calendar";
+import { AI_PROVIDER_ENV, API_ERROR_CODES, BRAND_ASSET_ENV, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_TEMPLATE, HTTP_STATUS, TENANT_PERMISSIONS } from "@/lib/constants";
+import { enqueueContentCarouselGeneration, enqueueContentMediaGeneration, listContentMediaForVersion } from "@/lib/db/repositories/calendar";
 import { getCalendarContentVersions } from "@/lib/db/repositories/calendar";
 import { ApiError } from "@/lib/server/api-error";
 import { assertBrandAssetStorageConfigured, createBrandAssetDownload } from "@/lib/server/brand-asset-storage";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
-import { createContentImagePrompt } from "@/lib/server/content-media-prompt";
+import { createContentCarouselPrompts, createContentImagePrompt, createContentTextCardPrompt } from "@/lib/server/content-media-prompt";
 import { hasTenantPermission } from "@/lib/server/permissions";
 import { contentMediaGenerationRequestSchema, contentMediaGenerationResponseSchema, contentMediaResponseSchema } from "@/lib/validation/calendar";
 
@@ -28,6 +28,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const assets = await listContentMediaForVersion(tenant.organizationId, itemId, versionId);
     const data = await Promise.all(assets.map(async (asset) => ({
       id: asset.id,
+      carouselId: asset.carouselId,
+      pageNumber: asset.pageNumber,
+      pageCount: asset.pageCount,
       status: asset.status,
       fileName: asset.fileName,
       contentType: asset.contentType,
@@ -62,11 +65,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const parsed = contentMediaGenerationRequestSchema.safeParse(body);
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
 
-    const modelId = process.env[AI_PROVIDER_ENV.imageModel];
+    const isCarousel = parsed.data.mode === CONTENT_MEDIA_GENERATION_MODE.carousel;
+    const isTextCard = parsed.data.mode === CONTENT_MEDIA_GENERATION_MODE.textCard || isCarousel;
+    const modelId = isTextCard ? CONTENT_MEDIA_TEMPLATE.textCardModelId : process.env[AI_PROVIDER_ENV.imageModel];
     const apiKey = process.env[AI_PROVIDER_ENV.apiKey];
     const bucket = process.env[BRAND_ASSET_ENV.bucket];
     const region = process.env[BRAND_ASSET_ENV.region];
-    if (!modelId || !apiKey || !bucket || !region) {
+    if (!modelId || (!isTextCard && !apiKey) || !bucket || !region) {
       throw new ApiError(API_ERROR_CODES.contentMediaGenerationUnavailable, HTTP_STATUS.unavailable);
     }
     assertBrandAssetStorageConfigured();
@@ -75,17 +80,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!current || current.id !== parsed.data.contentVersionId) {
       throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     }
-    const prompt = await createContentImagePrompt(tenant.organizationId, itemId, current.id);
+    const prompt = isCarousel
+      ? await createContentCarouselPrompts(tenant.organizationId, itemId, current.id, parsed.data.pageCopies)
+      : isTextCard
+      ? await createContentTextCardPrompt(tenant.organizationId, itemId, current.id)
+      : await createContentImagePrompt(tenant.organizationId, itemId, current.id);
     if (!prompt) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
-    const result = await enqueueContentMediaGeneration({
+    const commonInput = {
       organizationId: tenant.organizationId,
       itemId,
       contentVersionId: current.id,
       idempotencyKey: parsed.data.idempotencyKey,
       userId: tenant.userId,
       modelId,
-      prompt,
-    });
+    };
+    const result = isCarousel
+      ? await enqueueContentCarouselGeneration({ ...commonInput, prompts: prompt as string[] })
+      : await enqueueContentMediaGeneration({ ...commonInput, prompt: prompt as string });
     if (result.kind === "not_found") throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     if (result.kind === "conflict") throw new ApiError(API_ERROR_CODES.contentMediaConflict, HTTP_STATUS.conflict);
     if (result.kind === "limit") throw new ApiError(API_ERROR_CODES.contentMediaLimitReached, HTTP_STATUS.conflict);

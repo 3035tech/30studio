@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowDownUp, ArrowUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { SelectField, TextField } from "@/components/ui/field";
 import { DATA_TABLE_DEFAULT_PAGE_SIZE, DATA_TABLE_FIELD_PREFIXES, DATA_TABLE_PAGE_SIZES } from "@/lib/constants";
 
@@ -15,6 +16,11 @@ export type DataTableColumn<Row> = {
 };
 
 type SortState = { columnId: string; direction: "ascending" | "descending" };
+type CompactTableOptions = {
+  summaryColumnId: string;
+  detailColumnIds: readonly string[];
+  actionsColumnId: string;
+};
 
 type DataTableProps<Row> = {
   id: string;
@@ -28,6 +34,7 @@ type DataTableProps<Row> = {
   searchValue: (row: Row) => string;
   locale: string;
   initialSortColumnId: string;
+  compact?: CompactTableOptions;
 };
 
 export function DataTable<Row>({
@@ -42,6 +49,7 @@ export function DataTable<Row>({
   searchValue,
   locale,
   initialSortColumnId,
+  compact,
 }: DataTableProps<Row>) {
   const t = useTranslations("dataTable");
   const [filter, setFilter] = useState("");
@@ -84,8 +92,12 @@ export function DataTable<Row>({
     }));
   }
 
+  function changeSortDirection() {
+    setSort((current) => ({ ...current, direction: current.direction === "ascending" ? "descending" : "ascending" }));
+  }
+
   return (
-    <div className="dataTable">
+    <div className={compact ? "dataTable dataTable--compact" : "dataTable"}>
       <div className="dataTable__toolbar">
         <TextField
           id={`${DATA_TABLE_FIELD_PREFIXES.filter}${id}`}
@@ -104,6 +116,35 @@ export function DataTable<Row>({
         </SelectField>
       </div>
       <p className="dataTable__resultCount" aria-live="polite">{t("resultCount", { count: filteredRows.length })}</p>
+      {compact ? <>
+        <div className="dataTable__compactSort">
+          <SelectField id={`${id}-compact-sort`} label={t("sortColumn")} value={sort.columnId} onChange={(event) => { setSort((current) => ({ ...current, columnId: event.target.value })); setPage(1); }}>
+            {columns.map((column) => <option key={column.id} value={column.id}>{column.label}</option>)}
+          </SelectField>
+          <Button appearance="quiet" type="button" aria-label={t(sort.direction === "ascending" ? "sortAscending" : "sortDescending", { column: columns.find((column) => column.id === sort.columnId)?.label ?? "" })} onClick={changeSortDirection}>
+            {sort.direction === "ascending" ? <ArrowUp aria-hidden="true" size={16} /> : <ArrowDown aria-hidden="true" size={16} />}
+          </Button>
+        </div>
+        <ul className="dataTable__compactList">
+          {pageRows.map((row) => {
+            const summaryColumn = columns.find((column) => column.id === compact.summaryColumnId);
+            const actionsColumn = columns.find((column) => column.id === compact.actionsColumnId);
+            const detailColumns = compact.detailColumnIds.flatMap((columnId) => {
+              const column = columns.find((candidate) => candidate.id === columnId);
+              return column ? [{ column, value: column.render(row) }] : [];
+            });
+            return <li key={getRowId(row)}>
+              <article className="dataTable__compactCard">
+                <header className="dataTable__compactHeader"><div>{summaryColumn?.render(row)}</div>{actionsColumn ? <div className="dataTable__compactActions">{actionsColumn.render(row)}</div> : null}</header>
+                <Disclosure title={t("compactDetails")} className="dataTable__compactDetails">
+                  <dl>{detailColumns.map(({ column, value }) => <div key={column.id}><dt>{column.label}</dt><dd>{value}</dd></div>)}</dl>
+                </Disclosure>
+              </article>
+            </li>;
+          })}
+          {pageRows.length === 0 ? <li className="dataTable__compactEmpty">{rows.length === 0 ? emptyMessage : noMatchesMessage}</li> : null}
+        </ul>
+      </> : null}
       <div className="dataTable__scroll">
         <table>
           <thead>

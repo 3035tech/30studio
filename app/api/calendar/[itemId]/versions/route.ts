@@ -5,6 +5,7 @@ import { createCalendarContentVersion, getCalendarContentVersions } from "@/lib/
 import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
+import { hasTenantPermission } from "@/lib/server/permissions";
 import { calendarContentVersionSaveSchema, calendarContentVersionResponseSchema } from "@/lib/validation/calendar";
 
 export const runtime = "nodejs";
@@ -22,7 +23,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     const versions = await getCalendarContentVersions(tenant.organizationId, itemId);
     if (!versions) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
-    const parsed = calendarContentVersionResponseSchema.safeParse({ data: versions });
+    const parsed = calendarContentVersionResponseSchema.safeParse({
+      data: versions,
+      canManage: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentManage),
+      canReview: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentApprove)
+        && !versions.approval?.history.some((entry) => entry.matchesCurrent && entry.submittedBy === tenant.userId),
+    });
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);
     return NextResponse.json(parsed.data, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

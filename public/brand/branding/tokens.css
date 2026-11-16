@@ -1,10 +1,19 @@
 :root {
   --brand-primary: #6A00FF;
   --brand-accent: #FF8A00;
-  --brand-dark: #0B1B3B;
+  --brand-dark: #334155;
   --brand-secondary: #8B5CF6;
-  --brand-surface: #F8FAFC;
-  --brand-text: #0B1B3B;
+  --brand-surface: #FFFFFF;
+  --brand-text: #334155;
+  --brand-muted: #64748B;
+  --brand-page: #F7F8FC;
+  --brand-line: #E2E8F0;
+  --brand-line-strong: #CBD5E1;
+  --brand-primary-soft: #F3ECFF;
+  --brand-accent-soft: #FFF4E5;
+  --brand-rail-surface: #F2F3F8;
+  --brand-control-hover: #A8B3C5;
+  --brand-placeholder: #8490A3;
   --brand-display-font: 'Sora', Inter, sans-serif;
   --brand-ui-font: Inter, sans-serif;
 }

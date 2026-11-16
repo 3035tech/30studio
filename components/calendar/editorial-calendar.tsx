@@ -1,28 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { z } from "zod";
 import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DateField } from "@/components/ui/date-field";
+import { TimeField } from "@/components/ui/time-field";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
-import { CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUSES, SOCIAL_PLATFORMS, type CalendarViewMode, type ContentStatus, type Locale, type SocialPlatform } from "@/lib/constants";
+import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarCampaignCreateResponseSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { contentReviewResponseSchema } from "@/lib/validation/content-review";
+import { socialPublicationReconciliationResponseSchema, socialPublicationReconciliationRequestSchema } from "@/lib/validation/social-publication";
 
 type CalendarState = {
   requestKey: string;
   items: CalendarItem[];
   truncated: boolean;
   canManage: boolean;
+  canReview: boolean;
   error: boolean;
 };
 
-const INITIAL_STATE: CalendarState = { requestKey: "", items: [], truncated: false, canManage: false, error: false };
+const INITIAL_STATE: CalendarState = { requestKey: "", items: [], truncated: false, canManage: false, canReview: false, error: false };
 const EMPTY_BRANDS: readonly BrandListItem[] = [];
 const EMPTY_ITEMS: CalendarItem[] = [];
+type GeneratedCopy = z.infer<typeof calendarCopyDraftResponseSchema>["data"] & {
+  itemId: string;
+  selectedVariantIndex: number | null;
+};
+type CampaignSchedule = { date: string; time: string };
+type CampaignNextStep = { itemId: string; brandId: string; platform: SocialPlatform; plannedAt: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function getMonthKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}`;
@@ -32,36 +48,63 @@ function isContentEditable(status: ContentStatus) {
   return CONTENT_EDITABLE_STATUSES.some((editableStatus) => editableStatus === status);
 }
 
-export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly BrandListItem[] }) {
+export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashboardFilters, onDashboardFiltersChange, onCanManageChange }: { organizationId: string; brands: readonly BrandListItem[]; dashboardFilters: DashboardFilters; onDashboardFiltersChange: (next: (current: DashboardFilters) => DashboardFilters) => void; onCanManageChange: (canManage: boolean) => void }) {
   const t = useTranslations("calendar");
   const locale = useLocale() as Locale;
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [brandFilter, setBrandFilter] = useState("");
-  const [platformFilter, setPlatformFilter] = useState("");
+  const brandFilter = dashboardFilters.brandId;
+  const platformFilter = dashboardFilters.platform;
   const [statusFilter, setStatusFilter] = useState("");
+  const [publicationFilter, setPublicationFilter] = useState("");
   const [viewMode, setViewMode] = useState<CalendarViewMode>(CALENDAR_VIEW_MODE.month);
   const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
   const [contentVersionState, setContentVersionState] = useState<{
     itemId: string;
-    data: ReturnType<typeof calendarContentVersionResponseSchema.parse>["data"] | null;
+    data: ReturnType<typeof calendarContentVersionResponseSchema.parse>["data"] & { canManage: boolean; canReview: boolean } | null;
     error: boolean;
   } | null>(null);
   const [contentRefreshIndex, setContentRefreshIndex] = useState(0);
-  const [generatedCopy, setGeneratedCopy] = useState<{ itemId: string; canonicalCopy: string; variantCopy: string } | null>(null);
+  const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
+  const [approvalNote, setApprovalNote] = useState("");
+  const [selectedSocialProfileId, setSelectedSocialProfileId] = useState("");
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [discardChangesPrompt, setDiscardChangesPrompt] = useState(false);
+  const [approvalMessage, setApprovalMessage] = useState("");
+  const [publicationReconciliationMessage, setPublicationReconciliationMessage] = useState("");
+  const [reconciliationOutcome, setReconciliationOutcome] = useState<z.infer<typeof socialPublicationReconciliationRequestSchema>["outcome"]>("published");
+  const [reconciliationEvidence, setReconciliationEvidence] = useState("");
+  const [externalPostId, setExternalPostId] = useState("");
+  const [confirmedNoPost, setConfirmedNoPost] = useState(false);
+  const [contentReview, setContentReview] = useState<ReturnType<typeof contentReviewResponseSchema.parse>["data"] | null>(null);
+  const [reviewingContent, setReviewingContent] = useState(false);
   const [state, setState] = useState(INITIAL_STATE);
   const [formOpen, setFormOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"details" | "schedule">("details");
+  const [campaignFormError, setCampaignFormError] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
+  const [campaignTitle, setCampaignTitle] = useState("");
+  const [campaignBrandId, setCampaignBrandId] = useState("");
+  const [campaignBrief, setCampaignBrief] = useState("");
+  const [campaignSchedules, setCampaignSchedules] = useState<Partial<Record<SocialPlatform, CampaignSchedule>>>({});
   const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>([SOCIAL_PLATFORMS[0]]);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState("");
   const [previewPlatform, setPreviewPlatform] = useState<SocialPlatform | null>(null);
   const [busy, setBusy] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [campaignNextStep, setCampaignNextStep] = useState<CampaignNextStep | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
+  const [dashboardOpenItemId, setDashboardOpenItemId] = useState<string | null>(null);
+  const dashboardNavigationRef = useRef(false);
+
+  function setStatusNotice(message: string) {
+    setCampaignNextStep(null);
+    setNotice(message);
+  }
 
   const monthDays = getCalendarMonthDays(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
   const bounds = getCalendarMonthBounds(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
-  const requestKey = [getMonthKey(month), brandFilter, platformFilter, statusFilter, refreshIndex].join(":");
+  const requestKey = [organizationId, getMonthKey(month), brandFilter, platformFilter, statusFilter, publicationFilter, refreshIndex].join(":");
   const start = bounds.start.toISOString();
   const end = bounds.end.toISOString();
 
@@ -74,6 +117,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     if (brandFilter) query.set(CALENDAR_QUERY_PARAMETERS.brandId, brandFilter);
     if (platformFilter) query.set(CALENDAR_QUERY_PARAMETERS.platform, platformFilter);
     if (statusFilter) query.set(CALENDAR_QUERY_PARAMETERS.status, statusFilter);
+    if (publicationFilter) query.set(CALENDAR_QUERY_PARAMETERS.publicationStatus, publicationFilter);
 
     const load = async () => {
       try {
@@ -86,15 +130,15 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         if (!response.ok) throw new Error("Calendar request failed.");
         const parsed = calendarResponseSchema.safeParse(payload);
         if (!parsed.success) throw new Error("Calendar response was invalid.");
-        setState({ requestKey, items: parsed.data.data, truncated: parsed.data.truncated, canManage: parsed.data.canManage, error: false });
+        setState({ requestKey, items: parsed.data.data, truncated: parsed.data.truncated, canManage: parsed.data.canManage, canReview: parsed.data.canReview, error: false });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setState({ requestKey, items: [], truncated: false, canManage: false, error: true });
+        setState({ requestKey, items: [], truncated: false, canManage: false, canReview: false, error: true });
       }
     };
     void load();
     return () => controller.abort();
-  }, [brandFilter, end, platformFilter, requestKey, start, statusFilter]);
+  }, [brandFilter, end, organizationId, platformFilter, publicationFilter, requestKey, start, statusFilter]);
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -110,7 +154,10 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         if (!response.ok) throw new Error("Content history request failed.");
         const parsed = calendarContentVersionResponseSchema.safeParse(payload);
         if (!parsed.success) throw new Error("Content history response was invalid.");
-        setContentVersionState({ itemId: selectedItem.id, data: parsed.data.data, error: false });
+        const approval = parsed.data.data.approval;
+        const currentRequest = approval.history.find((entry) => entry.matchesCurrent);
+        setSelectedSocialProfileId(currentRequest?.targetProfile?.id ?? (approval.targetProfiles.length === 1 ? approval.targetProfiles[0].id : ""));
+        setContentVersionState({ itemId: selectedItem.id, data: { ...parsed.data.data, canManage: parsed.data.canManage, canReview: parsed.data.canReview }, error: false });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setContentVersionState({ itemId: selectedItem.id, data: null, error: true });
@@ -130,8 +177,47 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         itemId: selectedItem.id,
         canonicalCopy: contentVersionState.data.current?.canonicalCopy ?? "",
         variantCopy: contentVersionState.data.current?.variantCopy ?? "",
+        variantOptions: [],
+        selectedVariantIndex: null,
       }
     : null;
+  const selectedCanEdit = Boolean(selectedItem && state.canManage && isContentEditable(selectedItem.status));
+  const selectedCanReview = Boolean(selectedItem && state.canReview && selectedItem.status === CONTENT_STATUS.inReview && (contentVersionState?.data?.canReview ?? true));
+  useEffect(() => {
+    if (pending) return;
+    onCanManageChange(!hasError && state.canManage);
+  }, [hasError, onCanManageChange, pending, state.canManage]);
+  const currentApprovalRequest = contentVersionState && selectedItem && contentVersionState.itemId === selectedItem.id
+    ? contentVersionState.data?.approval.history.find((request) => request.matchesCurrent) ?? null
+    : null;
+  const approvalNextSteps = selectedCanEdit && selectedItem && contentVersionState?.itemId === selectedItem.id && contentVersionState.data
+    ? [
+      !contentVersionState.data.current
+        ? t("approvalSaveDraftFirst")
+        : editorDirty || generatedCopy?.itemId === selectedItem.id
+          ? t("approvalSaveChangesFirst")
+          : null,
+      contentVersionState.data.approval.mediaPending ? t("approvalMediaPending") : null,
+      contentVersionState.data.approval.publisherProfileRequired && contentVersionState.data.approval.targetProfiles.length === 0
+        ? t("noEligiblePublicationTargets")
+        : contentVersionState.data.approval.publisherProfileRequired && !selectedSocialProfileId
+          ? t("approvalChooseTarget")
+          : null,
+      currentApprovalRequest?.status === CONTENT_APPROVAL_STATUS.pending
+        ? t("approvalVersionAlreadyInReview")
+        : currentApprovalRequest
+          ? t("approvalCreateNewVersion")
+          : null,
+    ].filter((step): step is string => Boolean(step))
+    : [];
+  const canOpenCalendarItem = useCallback((item: CalendarItem) => {
+    return (state.canManage && (isContentEditable(item.status) || item.publicationStatus === "indeterminate" || item.publicationStatus === "failed"))
+      || (state.canReview && item.status === CONTENT_STATUS.inReview);
+  }, [state.canManage, state.canReview]);
+
+  function calendarItemActionLabel(item: CalendarItem) {
+    return item.publicationStatus === "indeterminate" ? t("reconcilePublication") : t(item.status === CONTENT_STATUS.inReview ? "reviewContent" : "editContent", { title: item.title });
+  }
   const eventsByDate = useMemo(() => {
     const events = new Map<string, CalendarItem[]>();
     for (const item of visibleItems) {
@@ -143,26 +229,151 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     return events;
   }, [visibleItems]);
 
+  useEffect(() => {
+    const now = Date.now();
+    const activePublication = visibleItems.some((item) => item.publicationStatus === "processing" || (item.publicationStatus === "queued" && Date.parse(item.plannedAt) <= now));
+    if (activePublication) {
+      const interval = window.setInterval(() => setRefreshIndex((current) => current + 1), SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS);
+      return () => window.clearInterval(interval);
+    }
+    const nextQueuedPublicationAt = visibleItems.reduce<number | null>((nextAt, item) => {
+      const plannedAt = Date.parse(item.plannedAt);
+      return item.publicationStatus === "queued" && plannedAt > now && (nextAt === null || plannedAt < nextAt) ? plannedAt : nextAt;
+    }, null);
+    if (nextQueuedPublicationAt !== null) {
+      const timeout = window.setTimeout(() => setRefreshIndex((current) => current + 1), Math.max(1_000, nextQueuedPublicationAt - now));
+      return () => window.clearTimeout(timeout);
+    }
+  }, [visibleItems]);
+
   function changeMonth(monthDelta: number) {
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + monthDelta, 1));
     setFormOpen(false);
-    setNotice("");
+    setStatusNotice("");
   }
 
   function selectCalendarItem(item: CalendarItem) {
     setSelectedItem(item);
     setContentVersionState(null);
     setGeneratedCopy(null);
+    setApprovalNote("");
+    setSelectedSocialProfileId("");
+    setEditorDirty(false);
+    setDiscardChangesPrompt(false);
+    setApprovalMessage("");
+    setPublicationReconciliationMessage("");
+    setReconciliationOutcome(item.publicationStatus === "failed" ? "not_published" : "published");
+    setReconciliationEvidence("");
+    setExternalPostId("");
+    setConfirmedNoPost(false);
+    setContentReview(null);
     setPreviewPlatform(null);
   }
 
-  function openCampaignForm(date: Date) {
-    setSelectedDate(toLocalDateInputValue(date));
-    setSelectedPlatforms([SOCIAL_PLATFORMS[0]]);
+  useEffect(() => {
+    function handleOpenCalendarItem(event: Event) {
+      if (!(event instanceof CustomEvent) || !isRecord(event.detail)) return;
+      const { itemId, brandId, platform, plannedAt, section } = event.detail;
+      const publicationStatus = typeof event.detail.publicationStatus === "string" ? SOCIAL_PUBLICATION_JOB_STATUSES.find((item) => item === event.detail.publicationStatus) ?? "" : "";
+      const selectedPlatform = typeof platform === "string" ? SOCIAL_PLATFORMS.find((item) => item === platform) : undefined;
+      const timestamp = typeof plannedAt === "string" ? Date.parse(plannedAt) : Number.NaN;
+      if (typeof itemId !== "string" || typeof brandId !== "string" || !selectedPlatform || !Number.isFinite(timestamp)) return;
+      dashboardNavigationRef.current = true;
+      onDashboardFiltersChange((current) => ({ ...current, brandId, platform: selectedPlatform }));
+      setMonth(new Date(new Date(timestamp).getFullYear(), new Date(timestamp).getMonth(), 1));
+      setStatusFilter(section === "approvals" ? CONTENT_STATUS.inReview : "");
+      setPublicationFilter(publicationStatus);
+      setViewMode(CALENDAR_VIEW_MODE.list);
+      setDashboardOpenItemId(itemId);
+    }
+    window.addEventListener(WORKSPACE_UI_EVENTS.openCalendarItem, handleOpenCalendarItem);
+    return () => window.removeEventListener(WORKSPACE_UI_EVENTS.openCalendarItem, handleOpenCalendarItem);
+  }, [onDashboardFiltersChange]);
+
+  useEffect(() => {
+    function handleOpenCalendarList(event: Event) {
+      if (!(event instanceof CustomEvent) || !isRecord(event.detail)) return;
+      dashboardNavigationRef.current = true;
+      const requestedStatus = event.detail.status;
+      const status = typeof requestedStatus === "string" ? CONTENT_STATUSES.find((item) => item === requestedStatus) ?? "" : "";
+      const requestedPublicationStatus = event.detail.publicationStatus;
+      const publicationStatus = typeof requestedPublicationStatus === "string" ? SOCIAL_PUBLICATION_JOB_STATUSES.find((item) => item === requestedPublicationStatus) ?? "" : "";
+      const requestedDate = typeof event.detail.plannedAt === "string" ? Date.parse(event.detail.plannedAt) : Number.NaN;
+      const targetDate = Number.isFinite(requestedDate) ? new Date(requestedDate) : new Date();
+      setMonth(new Date(targetDate.getFullYear(), targetDate.getMonth(), 1));
+      setStatusFilter(status);
+      setPublicationFilter(publicationStatus);
+      setViewMode(CALENDAR_VIEW_MODE.list);
+      setDashboardOpenItemId(null);
+    }
+    window.addEventListener(WORKSPACE_UI_EVENTS.openCalendarList, handleOpenCalendarList);
+    return () => window.removeEventListener(WORKSPACE_UI_EVENTS.openCalendarList, handleOpenCalendarList);
+  }, []);
+
+  useEffect(() => {
+    if (!dashboardOpenItemId || pending) return;
+    const timer = window.setTimeout(() => {
+      const item = visibleItems.find((candidate) => candidate.id === dashboardOpenItemId);
+      if (item && canOpenCalendarItem(item)) selectCalendarItem(item);
+      else if (hasError) setStatusNotice(t("loadError"));
+      setDashboardOpenItemId(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [canOpenCalendarItem, dashboardOpenItemId, hasError, pending, state.canManage, state.canReview, t, visibleItems]);
+
+  const openCampaignForm = useCallback((date: Date) => {
+    const dateValue = toLocalDateInputValue(date);
+    setSelectedDate(dateValue);
+    setSelectedPlatforms(platformFilter ? [platformFilter] : [SOCIAL_PLATFORMS[0]]);
+    setCampaignTitle("");
+    setCampaignBrandId(brands.find((brand) => brand.isActive)?.id ?? "");
+    setCampaignBrief("");
+    setCampaignSchedules({});
+    setCreateStep("details");
     setCampaignIdempotencyKey(crypto.randomUUID());
     setFormOpen(true);
-    setNotice("");
-  }
+    setCampaignFormError("");
+    setStatusNotice("");
+  }, [brands, platformFilter]);
+
+
+  useEffect(() => {
+    function syncCalendarSection() {
+      const sectionId = window.location.hash.slice(1);
+      if (sectionId === WORKSPACE_SECTION_IDS.approvals) {
+        dashboardNavigationRef.current = false;
+        setStatusFilter(CONTENT_STATUS.inReview);
+        setPublicationFilter("");
+        setViewMode(CALENDAR_VIEW_MODE.list);
+      } else if (sectionId === WORKSPACE_SECTION_IDS.calendar) {
+        if (dashboardNavigationRef.current) {
+          dashboardNavigationRef.current = false;
+          setViewMode(CALENDAR_VIEW_MODE.list);
+          return;
+        }
+        setStatusFilter("");
+        setPublicationFilter("");
+        setViewMode(CALENDAR_VIEW_MODE.month);
+      }
+    }
+
+    window.addEventListener("hashchange", syncCalendarSection);
+    const initialSync = window.setTimeout(syncCalendarSection, 0);
+    return () => {
+      window.removeEventListener("hashchange", syncCalendarSection);
+      window.clearTimeout(initialSync);
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleCreateContentRequest() {
+      if (!state.canManage || brands.length === 0) return;
+      openCampaignForm(new Date());
+    }
+
+    window.addEventListener(WORKSPACE_UI_EVENTS.createContent, handleCreateContentRequest);
+    return () => window.removeEventListener(WORKSPACE_UI_EVENTS.createContent, handleCreateContentRequest);
+  }, [brands.length, openCampaignForm, state.canManage]);
 
   function togglePlatform(platform: SocialPlatform) {
     setSelectedPlatforms((current) => current.includes(platform)
@@ -170,49 +381,86 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
       : SOCIAL_PLATFORMS.filter((availablePlatform) => current.includes(availablePlatform) || availablePlatform === platform));
   }
 
+  function updateCampaignSchedule(platform: SocialPlatform, update: Partial<CampaignSchedule>) {
+    setCampaignSchedules((current) => ({
+      ...current,
+      [platform]: {
+        date: current[platform]?.date ?? selectedDate,
+        time: current[platform]?.time ?? CALENDAR.defaultPlannedTime,
+        ...update,
+      },
+    }));
+  }
+
+  function continueCampaignSetup() {
+    const form = document.getElementById(CALENDAR_UI_IDS.newCampaignForm);
+    if (form instanceof HTMLFormElement && !form.reportValidity()) return;
+    if (selectedPlatforms.length === 0) {
+      setCampaignFormError(t("selectAtLeastOneChannel"));
+      return;
+    }
+    setCampaignFormError("");
+    setCreateStep("schedule");
+  }
+
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const platforms = form.getAll(CAMPAIGN_FORM_FIELDS.platforms).filter((value): value is SocialPlatform => SOCIAL_PLATFORMS.some((platform) => platform === value));
-    const publications = platforms.map((platform) => ({
-      platform,
-      localDateTime: new Date(`${String(form.get(CAMPAIGN_FORM_FIELDS.publicationDate(platform)) ?? "")}T${String(form.get(CAMPAIGN_FORM_FIELDS.publicationTime(platform)) ?? "")}`),
-    }));
+    const publications = selectedPlatforms.map((platform) => {
+      const schedule = campaignSchedules[platform] ?? { date: selectedDate, time: CALENDAR.defaultPlannedTime };
+      return { platform, schedule, localDateTime: new Date(`${schedule.date}T${schedule.time}`) };
+    });
     if (publications.length === 0 || publications.some((publication) => Number.isNaN(publication.localDateTime.getTime())) || !timeZone) {
-      setNotice(t("createError"));
+      setCampaignFormError(t("createError"));
+      return;
+    }
+    const request = calendarCampaignCreateSchema.safeParse({
+      brandId: campaignBrandId,
+      idempotencyKey: campaignIdempotencyKey,
+      title: campaignTitle,
+      brief: campaignBrief,
+      publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
+    });
+    if (!request.success) {
+      setCampaignFormError(t("createError"));
       return;
     }
 
     setBusy(true);
-    setNotice("");
+    setStatusNotice("");
     try {
       const response = await fetch(CAMPAIGN_API_PATHS.collection, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brandId: String(form.get(CALENDAR_FORM_FIELDS.brandId) ?? ""),
-          idempotencyKey: campaignIdempotencyKey,
-          title: String(form.get("title") ?? ""),
-          brief: String(form.get("brief") ?? ""),
-          publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
-        }),
+        body: JSON.stringify(request.data),
       });
       const payload: unknown = await response.json().catch(() => null);
       const parsed = calendarCampaignCreateResponseSchema.safeParse(payload);
       if (response.status === 409) {
         setCampaignIdempotencyKey(crypto.randomUUID());
-        setNotice(t("campaignConflict"));
+        setCampaignFormError(t("campaignConflict"));
         return;
       }
       if (!response.ok || !parsed.success) throw new Error("Calendar campaign could not be created.");
       setFormOpen(false);
+      setCampaignFormError("");
       setCampaignIdempotencyKey("");
       setNotice(t("campaignCreated", { count: publications.length }));
+      const firstPublication = parsed.data.data.publications[0];
+      const firstSchedule = publications[0];
+      if (firstPublication && firstSchedule) {
+        setCampaignNextStep({
+          itemId: firstPublication.id,
+          brandId: campaignBrandId,
+          platform: firstPublication.platform,
+          plannedAt: firstSchedule.localDateTime.toISOString(),
+        });
+      }
+      setCreateStep("details");
       setRefreshIndex((current) => current + 1);
     } catch {
-      setNotice(t("createError"));
+      setCampaignFormError(t("createError"));
     } finally {
       setBusy(false);
     }
@@ -225,11 +473,11 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     const localDateTime = new Date(`${String(form.get("date") ?? "")}T${String(form.get("time") ?? "")}`);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (Number.isNaN(localDateTime.getTime()) || !timeZone) {
-      setNotice(t("contentSaveError"));
+      setStatusNotice(t("contentSaveError"));
       return;
     }
     setBusy(true);
-    setNotice("");
+    setStatusNotice("");
     try {
       const response = await fetch(CALENDAR_API_PATHS.versions(selectedItem.id), {
         method: "POST",
@@ -247,16 +495,132 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         }),
       });
       if (response.status === 409) {
-        setNotice(t("versionConflict"));
+        setStatusNotice(t("versionConflict"));
         setContentRefreshIndex((current) => current + 1);
         return;
       }
       if (!response.ok) throw new Error("Calendar content could not be saved.");
       setSelectedItem(null);
-      setNotice(t("contentSaved"));
+      setEditorDirty(false);
+      setDiscardChangesPrompt(false);
+      setContentReview(null);
+      setStatusNotice(t("contentSaved"));
       setRefreshIndex((current) => current + 1);
     } catch {
-      setNotice(t("contentSaveError"));
+      setStatusNotice(t("contentSaveError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reviewSavedContent() {
+    if (!selectedItem) return;
+    setReviewingContent(true);
+    setContentReview(null);
+    setStatusNotice("");
+    try {
+      const response = await fetch(CALENDAR_API_PATHS.reviewCopy(selectedItem.id), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      if (response.status === 503) {
+        setStatusNotice(t("reviewUnavailable"));
+        return;
+      }
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = contentReviewResponseSchema.safeParse(payload);
+      if (!response.ok || !parsed.success) throw new Error("Content review failed.");
+      setContentReview(parsed.data.data);
+    } catch {
+      setStatusNotice(t("reviewError"));
+    } finally {
+      setReviewingContent(false);
+    }
+  }
+
+  async function applyApprovalAction(action: typeof CONTENT_APPROVAL_ACTION[keyof typeof CONTENT_APPROVAL_ACTION]) {
+    if (!selectedItem) return;
+    setBusy(true);
+    setApprovalMessage("");
+    try {
+      const response = await fetch(CALENDAR_API_PATHS.approval(selectedItem.id), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...(action === CONTENT_APPROVAL_ACTION.submit ? { socialProfileId: selectedSocialProfileId || undefined } : { note: approvalNote.trim() || null }) }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = contentApprovalActionResponseSchema.safeParse(payload);
+      const errorCode = z.object({ code: z.string() }).safeParse(payload);
+      if (response.status === 409 || (response.status === 422 && errorCode.success && errorCode.data.code === "CONTENT_APPROVAL_PUBLISHER_TEXT_LIMIT")) {
+        const platform = t(`platforms.${selectedItem.platform}`);
+        const knownMessage = errorCode.success && errorCode.data.code === "CONTENT_APPROVAL_PUBLISHER_CONNECTION_REQUIRED"
+          ? t("approvalPublisherConnectionRequired", { platform })
+          : errorCode.success && errorCode.data.code === "CONTENT_APPROVAL_PUBLISHER_MEDIA_UNSUPPORTED"
+            ? t("approvalPublisherMediaUnsupported", { platform })
+            : errorCode.success && errorCode.data.code === "CONTENT_APPROVAL_PUBLISHER_TEXT_LIMIT"
+              ? t("approvalPublisherTextLimit", { platform })
+              : t("approvalConflict");
+        setApprovalMessage(knownMessage);
+        setContentRefreshIndex((current) => current + 1);
+        setRefreshIndex((current) => current + 1);
+        return;
+      }
+      if (!response.ok || !parsed.success) throw new Error("Content approval action failed.");
+      setSelectedItem({ ...selectedItem, status: parsed.data.data.itemStatus, publicationStatus: parsed.data.data.itemStatus === CONTENT_STATUS.scheduled ? "queued" : selectedItem.publicationStatus });
+      setApprovalNote("");
+      setApprovalMessage(action === CONTENT_APPROVAL_ACTION.submit ? t("approvalSubmitted") : parsed.data.data.kind === "partial" ? t("approvalProgress", { approved: parsed.data.data.approvedCount ?? 0, required: parsed.data.data.requiredApprovals ?? 0 }) : t("approvalDecisionSaved"));
+      setContentRefreshIndex((current) => current + 1);
+      setRefreshIndex((current) => current + 1);
+    } catch {
+      setApprovalMessage(t("approvalActionError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyPublicationReconciliation() {
+    if (!selectedItem || selectedItem.publicationStatus !== "indeterminate") return;
+    const request = socialPublicationReconciliationRequestSchema.safeParse({
+      outcome: reconciliationOutcome,
+      evidence: reconciliationEvidence,
+      ...(reconciliationOutcome === "published" ? { externalPostId } : {}),
+      ...(reconciliationOutcome === "retry" ? { confirmedNoPost } : {}),
+    });
+    if (!request.success) return;
+    setBusy(true);
+    setPublicationReconciliationMessage("");
+    try {
+      const response = await fetch(CALENDAR_API_PATHS.reconcilePublication(selectedItem.id), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request.data),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = socialPublicationReconciliationResponseSchema.safeParse(payload);
+      const errorPayload = z.object({ code: z.string() }).safeParse(payload);
+      if (response.status === 409) {
+        if (errorPayload.success && errorPayload.data.code === API_ERROR_CODES.socialPublicationRetryLimitReached) {
+          setPublicationReconciliationMessage(t("publicationRetryLimitReached"));
+          return;
+        }
+        setStatusNotice(t("publicationReconciliationConflict"));
+        setSelectedItem(null);
+        setContentVersionState(null);
+        setRefreshIndex((current) => current + 1);
+        return;
+      }
+      if (!response.ok || !parsed.success) throw new Error("Publication reconciliation failed.");
+      const noticeKey = parsed.data.data.outcome === "published" ? "publicationMarkedPublished" : parsed.data.data.outcome === "retry" ? "publicationRetryQueued" : "publicationMarkedNotPublished";
+      setStatusNotice(t(noticeKey));
+      setSelectedItem(null);
+      setContentVersionState(null);
+      setRefreshIndex((current) => current + 1);
+    } catch {
+      setPublicationReconciliationMessage(t("publicationReconciliationError"));
     } finally {
       setBusy(false);
     }
@@ -270,7 +634,7 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
     const selectedPlatform = platform instanceof HTMLSelectElement ? platform.value : selectedItem.platform;
     const selectedBrandId = brandField instanceof HTMLSelectElement ? brandField.value : selectedItem.brandId;
     setGeneratingCopy(true);
-    setNotice("");
+    setStatusNotice("");
     try {
       const response = await fetch(CALENDAR_API_PATHS.generateCopy(selectedItem.id), {
         method: "POST",
@@ -279,16 +643,16 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
         body: JSON.stringify({ brandId: selectedBrandId, locale, platform: selectedPlatform }),
       });
       if (response.status === 503) {
-        setNotice(t("generationUnavailable"));
+        setStatusNotice(t("generationUnavailable"));
         return;
       }
       const payload: unknown = await response.json().catch(() => null);
       const parsed = calendarCopyDraftResponseSchema.safeParse(payload);
       if (!response.ok || !parsed.success) throw new Error("Copy generation failed.");
-      setGeneratedCopy({ itemId: selectedItem.id, ...parsed.data.data });
-      setNotice(t("copyGenerated"));
+      setGeneratedCopy({ itemId: selectedItem.id, ...parsed.data.data, selectedVariantIndex: 0 });
+      setStatusNotice(t("copyGenerated"));
     } catch {
-      setNotice(t("generationError"));
+      setStatusNotice(t("generationError"));
     } finally {
       setGeneratingCopy(false);
     }
@@ -311,38 +675,69 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           <p className="entryDescription">{t("description")}</p>
         </div>
         {state.canManage && brands.length > 0 ? (
-          <Button type="button" onClick={() => openCampaignForm(new Date(month.getFullYear(), month.getMonth(), 1))}>
+          <Button type="button" onClick={() => { const now = new Date(); const isCurrentMonth = month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth(); openCampaignForm(isCurrentMonth ? now : new Date(month.getFullYear(), month.getMonth(), 1)); }}>
             <CalendarPlus aria-hidden="true" size={17} />{t("newCampaign")}
           </Button>
         ) : null}
       </header>
 
-      {formOpen && state.canManage ? (
-        <form className="editorialCalendar__form editorialCalendar__campaignForm" id={CALENDAR_UI_IDS.newCampaignForm} onSubmit={(event) => void createCampaign(event)}>
-          <TextField id={CALENDAR_UI_IDS.campaignTitle} name="title" label={t("campaignTitle")} maxLength={CONTENT_LIMITS.titleCharacters} required />
-          <SelectField id={CALENDAR_UI_IDS.campaignBrand} name="brandId" label={t("brand")} defaultValue={brands[0]?.id ?? ""} required>
-            {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-          </SelectField>
-          <TextAreaField id="calendar-campaign-brief" name="brief" label={t("campaignBrief")} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
-          <fieldset className="editorialCalendar__platformPicker">
-            <legend>{t("selectChannels")}</legend>
-            <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
-          </fieldset>
-          <div className="editorialCalendar__publicationSchedules">
-            {selectedPlatforms.map((platform) => <fieldset className="editorialCalendar__publicationSchedule" key={platform}>
-              <legend>{t("channelSchedule", { platform: t(`platforms.${platform}`) })}</legend>
-              <TextField id={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} name={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} label={t("date")} type="date" defaultValue={selectedDate} required />
-              <TextField id={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} name={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} label={t("time")} type="time" defaultValue={CALENDAR.defaultPlannedTime} required />
-            </fieldset>)}
-          </div>
-          <div className="editorialCalendar__formActions">
-            <Button type="submit" disabled={busy}>{busy ? t("saving") : t("createCampaign")}</Button>
-            <Button appearance="quiet" type="button" disabled={busy} onClick={() => setFormOpen(false)}>{t("cancel")}</Button>
-          </div>
-        </form>
-      ) : null}
+      <Dialog open={formOpen} onOpenChange={(open) => { if (!open && !busy) { setFormOpen(false); setCampaignFormError(""); } }}>
+        {formOpen && state.canManage ? (
+          <DialogContent className="editorialCalendar__campaignDialog" aria-labelledby={CALENDAR_UI_IDS.createCampaignTitle} aria-describedby={CALENDAR_UI_IDS.createCampaignDescription}>
+            <DialogHeader>
+              <DialogTitle id={CALENDAR_UI_IDS.createCampaignTitle}>{t("createCampaignDialogTitle")}</DialogTitle>
+              <DialogDescription id={CALENDAR_UI_IDS.createCampaignDescription}>{t("createCampaignDialogDescription")}</DialogDescription>
+            </DialogHeader>
+            <form className="editorialCalendar__form editorialCalendar__campaignForm" id={CALENDAR_UI_IDS.newCampaignForm} onSubmit={(event) => void createCampaign(event)}>
+              <p className="editorialCalendar__wizardProgress" role="status">{t("createStepStatus", { step: createStep === "details" ? 1 : 2, total: 2 })}</p>
+              {campaignFormError ? <p className="editorialCalendar__notice editorialCalendar__error" role="alert">{campaignFormError}</p> : null}
+              {createStep === "details" ? <>
+                <TextField id={CALENDAR_UI_IDS.campaignTitle} name="title" label={t("campaignTitle")} value={campaignTitle} onChange={(event) => setCampaignTitle(event.target.value)} maxLength={CONTENT_LIMITS.titleCharacters} required />
+                <SelectField id={CALENDAR_UI_IDS.campaignBrand} name="brandId" label={t("brand")} value={campaignBrandId} onChange={(event) => setCampaignBrandId(event.target.value)} required>
+                  {brands.filter((brand) => brand.isActive).map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
+                </SelectField>
+                <TextAreaField id={CALENDAR_UI_IDS.campaignBrief} name="brief" label={t("campaignBrief")} value={campaignBrief} onChange={(event) => setCampaignBrief(event.target.value)} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
+                <fieldset className="editorialCalendar__platformPicker">
+                  <legend>{t("selectChannels")}</legend>
+                  <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
+                  <p className="editorialCalendar__channelNote">{t("channelPreparationNote")}</p>
+                </fieldset>
+                <div className="editorialCalendar__formActions">
+                  <Button type="button" disabled={busy} onClick={continueCampaignSetup}>{t("continueToSchedule")}</Button>
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => setFormOpen(false)}>{t("cancel")}</Button>
+                </div>
+              </> : <>
+                <section className="editorialCalendar__wizardStep" aria-labelledby="campaign-schedule-step-title">
+                  <div><h3 id="campaign-schedule-step-title">{t("scheduleStepTitle")}</h3><p>{t("scheduleStepDescription")}</p></div>
+                  <div className="editorialCalendar__publicationSchedules">
+                    {selectedPlatforms.map((platform) => <fieldset className="editorialCalendar__publicationSchedule" key={platform}>
+                      <legend>{t("channelSchedule", { platform: t(`platforms.${platform}`) })}</legend>
+                      <DateField id={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} label={t("date")} value={campaignSchedules[platform]?.date ?? selectedDate} onValueChange={(date) => updateCampaignSchedule(platform, { date })} required />
+                      <TimeField id={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} label={t("time")} value={campaignSchedules[platform]?.time ?? CALENDAR.defaultPlannedTime} onValueChange={(time) => updateCampaignSchedule(platform, { time })} required />
+                    </fieldset>)}
+                  </div>
+                  <section className="editorialCalendar__campaignSummary" aria-label={t("campaignSummary")}>
+                    <h3>{t("campaignSummary")}</h3>
+                    <p><strong>{campaignTitle}</strong><span>{brands.find((brand) => brand.id === campaignBrandId)?.name ?? ""}</span></p>
+                    <ul>{selectedPlatforms.map((platform) => {
+                      const schedule = campaignSchedules[platform] ?? { date: selectedDate, time: CALENDAR.defaultPlannedTime };
+                      const scheduledDate = new Date(`${schedule.date}T${schedule.time}`);
+                      return <li key={platform}><strong>{t(`platforms.${platform}`)}</strong><span>{Number.isNaN(scheduledDate.getTime()) ? t("scheduleIncomplete") : new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(scheduledDate)}</span></li>;
+                    })}</ul>
+                    <small>{t("localTime")}</small>
+                  </section>
+                </section>
+                <div className="editorialCalendar__formActions">
+                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setCampaignFormError(""); setCreateStep("details"); }}>{t("backToDetails")}</Button>
+                  <Button type="submit" disabled={busy}>{busy ? t("saving") : t("createCampaign")}</Button>
+                </div>
+              </>}
+            </form>
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
-      <div className="editorialCalendar__toolbar" id={CALENDAR_UI_IDS.filters}>
+      <div className="editorialCalendar__toolbar" id={WORKSPACE_SECTION_IDS.approvals}>
         <div className="editorialCalendar__monthControls">
           <Button appearance="quiet" type="button" aria-label={t("previousMonth")} onClick={() => changeMonth(CALENDAR.previousMonthStep)}>
             <ArrowLeft aria-hidden="true" size={17} />
@@ -355,18 +750,14 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
             {t("today")}
           </Button>
         </div>
-        <div className="editorialCalendar__filters">
-          <SelectField id="calendar-brand-filter" label={t("filterBrand")} value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
-            <option value="">{t("allBrands")}</option>
-            {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
-          </SelectField>
-          <SelectField id="calendar-platform-filter" label={t("filterChannel")} value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}>
-            <option value="">{t("allChannels")}</option>
-            {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
-          </SelectField>
+        <div className="editorialCalendar__filters" id={CALENDAR_UI_IDS.filters}>
           <SelectField id="calendar-status-filter" label={t("filterStatus")} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="">{t("allStatuses")}</option>
             {CONTENT_STATUSES.map((status) => <option key={status} value={status}>{t(`statuses.${status}`)}</option>)}
+          </SelectField>
+          <SelectField id="calendar-publication-status-filter" label={t("filterPublicationStatus")} value={publicationFilter} onChange={(event) => setPublicationFilter(event.target.value)}>
+            <option value="">{t("allPublicationStatuses")}</option>
+            {SOCIAL_PUBLICATION_JOB_STATUSES.map((status) => <option key={status} value={status}>{t(`publicationStatuses.${status}`)}</option>)}
           </SelectField>
         </div>
       </div>
@@ -381,12 +772,16 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
       </div>
       <p className="editorialCalendar__timezone">{t("localTime")}</p>
 
-      {notice ? <p className="editorialCalendar__notice" role="status">{notice}</p> : null}
+      {notice ? <div className="editorialCalendar__notice" role="status"><p>{notice}</p>{campaignNextStep ? <div className="editorialCalendar__formActions"><span>{t("campaignNextStep")}</span><Button appearance="quiet" type="button" onClick={() => {
+        window.dispatchEvent(new CustomEvent(WORKSPACE_UI_EVENTS.openCalendarItem, { detail: campaignNextStep }));
+        setCampaignNextStep(null);
+      }}>{t("editFirstCampaignPost")}</Button></div> : null}</div> : null}
       {pending ? <p className="workspaceEmpty" role="status">{t("loading")}</p> : null}
       {hasError ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("loadError")}</span><Button appearance="quiet" type="button" onClick={() => setRefreshIndex((current) => current + 1)}>{t("retry")}</Button></div> : null}
-      {!pending && !hasError && visibleItems.length === 0 ? <p className="editorialCalendar__emptyMonth">{t("emptyMonth")}</p> : null}
+      {viewMode === CALENDAR_VIEW_MODE.month && !pending && !hasError && visibleItems.length === 0 ? <p className="editorialCalendar__emptyMonth">{t("emptyMonth")}</p> : null}
       {!pending && state.truncated ? <p className="editorialCalendar__notice" role="status">{t("truncated")}</p> : null}
 
+      {viewMode === CALENDAR_VIEW_MODE.month ? <p className="editorialCalendar__scrollHint">{t("monthScrollHint")}</p> : null}
       {viewMode === CALENDAR_VIEW_MODE.month ? <div className="editorialCalendar__viewport" aria-busy={pending}>
         <div className="editorialCalendar__grid" role="group" aria-label={monthLabel}>
           {weekdayLabels.map((weekday, index) => <div className="editorialCalendar__weekday" key={`${weekday}-${index}`}>{weekday}</div>)}
@@ -404,17 +799,18 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
                 <ol className="editorialCalendar__items">
                   {dayItems.map((item) => (
                     <li className="editorialCalendar__item" key={item.id}>
-                      <button type="button" className="editorialCalendar__itemButton" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => selectCalendarItem(item)} aria-label={t("editContent", { title: item.title })}>
+                      <Button appearance="quiet" type="button" className="editorialCalendar__itemButton" disabled={!canOpenCalendarItem(item)} onClick={() => selectCalendarItem(item)} aria-label={calendarItemActionLabel(item)}>
                       <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
                       <strong>{item.title}</strong>
                       {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
                       <span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
                       <span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
-                      </button>
+                      {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}
+                      </Button>
                     </li>
                   ))}
                 </ol>
-                {remainingCount > 0 ? <button type="button" className="editorialCalendar__more" onClick={() => setViewMode(CALENDAR_VIEW_MODE.list)}>{t("moreItems", { count: remainingCount })}</button> : null}
+                {remainingCount > 0 ? <Button appearance="quiet" type="button" className="editorialCalendar__more" onClick={() => setViewMode(CALENDAR_VIEW_MODE.list)}>{t("moreItems", { count: remainingCount })}</Button> : null}
               </article>
             );
           })}
@@ -425,43 +821,104 @@ export function EditorialCalendar({ brands = EMPTY_BRANDS }: { brands: readonly 
           <h3>{new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(new Date(`${dateKey}T12:00:00`))}</h3>
           <ul>{dayItems.map((item) => <li key={item.id}>
             <span className="editorialCalendar__listTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
-            <button type="button" className="editorialCalendar__listItem" disabled={!state.canManage || !isContentEditable(item.status)} onClick={() => selectCalendarItem(item)} aria-label={t("editContent", { title: item.title })}>
+            <Button appearance="quiet" type="button" className="editorialCalendar__listItem" disabled={!canOpenCalendarItem(item)} onClick={() => selectCalendarItem(item)} aria-label={calendarItemActionLabel(item)}>
               <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
-            </button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
+            </Button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
+            {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}
             {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
           </li>)}</ul>
         </section>)}
       </div>}
 
-      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy && !generatingCopy) { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); } }}>
+      <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy && !generatingCopy) { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } } }}>
         {selectedItem ? <DialogContent aria-labelledby={CALENDAR_UI_IDS.editTitle} aria-describedby={CALENDAR_UI_IDS.editDescription}>
-          <DialogHeader><DialogTitle id={CALENDAR_UI_IDS.editTitle}>{t("editTitle")}</DialogTitle><DialogDescription id={CALENDAR_UI_IDS.editDescription}>{t("editDescription")}</DialogDescription></DialogHeader>
-          {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form className="editorialCalendar__editForm" onSubmit={(event) => void saveContentVersion(event)} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
-            <TextField id="calendar-edit-idea-title" name="title" label={t("ideaTitle")} defaultValue={selectedItem.title} maxLength={CONTENT_LIMITS.titleCharacters} required />
-            <SelectField id="calendar-edit-idea-brand" name={CALENDAR_FORM_FIELDS.brandId} label={t("brand")} defaultValue={selectedItem.brandId} disabled={Boolean(selectedItem.campaignId)} required>
+          <DialogHeader><DialogTitle id={CALENDAR_UI_IDS.editTitle}>{selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed" ? t("reconciliationTitle") : selectedCanReview ? t("reviewTitle") : t("editTitle")}</DialogTitle><DialogDescription id={CALENDAR_UI_IDS.editDescription}>{selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed" ? t("reconciliationDescription") : selectedCanReview ? t("reviewDescription") : t("editDescription")}</DialogDescription></DialogHeader>
+          {editorDirty ? <p className="editorialCalendar__notice" role="status">{t("unsavedChanges")}</p> : null}
+          {discardChangesPrompt ? <section className="editorialCalendar__notice" role="alert"><p>{t("discardChangesPrompt")}</p><div className="editorialCalendar__formActions"><Button appearance="quiet" type="button" onClick={() => setDiscardChangesPrompt(false)}>{t("keepEditing")}</Button><Button appearance="danger" type="button" onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); setEditorDirty(false); setDiscardChangesPrompt(false); }}>{t("discardChanges")}</Button></div></section> : null}
+          {selectedItem.publicationStatus === "indeterminate" ? <p className="editorialCalendar__notice" role="alert">{t("publicationOutcomeUnknown")}</p> : null}
+          {selectedItem.publicationStatus === "failed" ? <p className="editorialCalendar__notice" role="status">{t("publicationKnownFailed")}</p> : null}
+          {selectedItem.publicationStatus === "processing" ? <p className="editorialCalendar__notice" role="status">{t("publicationInProgress")}</p> : null}
+          {(selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed") && state.canManage ? <section className="editorialCalendar__editForm" aria-labelledby="calendar-reconciliation-title">
+            <strong id="calendar-reconciliation-title">{t("reconciliationTitle")}</strong>
+            <p>{t("reconciliationEvidenceHelp")}</p>
+            <SelectField id="calendar-reconciliation-outcome" label={t("reconciliationOutcome")} value={reconciliationOutcome} onChange={(event) => { const value = event.target.value; setReconciliationOutcome(value === "published" || value === "retry" ? value : "not_published"); setConfirmedNoPost(false); }} disabled={busy}>
+              <option value="published">{t("reconciliationOutcomes.published")}</option>
+              <option value="not_published">{t("reconciliationOutcomes.not_published")}</option>
+              <option value="retry">{t("reconciliationOutcomes.retry")}</option>
+            </SelectField>
+            {reconciliationOutcome === "published" ? <TextField id="calendar-reconciliation-post-id" label={t("externalPostId")} value={externalPostId} maxLength={SOCIAL_PUBLICATION_RECONCILIATION_LIMITS.maximumExternalPostIdCharacters} disabled={busy} required onChange={(event) => setExternalPostId(event.target.value)} /> : null}
+            <TextAreaField id="calendar-reconciliation-evidence" label={t("reconciliationEvidence")} value={reconciliationEvidence} maxLength={SOCIAL_PUBLICATION_RECONCILIATION_LIMITS.maximumEvidenceCharacters} disabled={busy} required onChange={(event) => setReconciliationEvidence(event.target.value)} />
+            {reconciliationOutcome === "retry" ? <CheckboxField id="calendar-reconciliation-confirm-no-post" label={t("confirmNoPostRetry")} checked={confirmedNoPost} disabled={busy} onChange={(event) => setConfirmedNoPost(event.target.checked)} /> : null}
+            {publicationReconciliationMessage ? <p className="editorialCalendar__notice" role="status">{publicationReconciliationMessage}</p> : null}
+            <div className="editorialCalendar__formActions"><Button type="button" disabled={busy || reconciliationEvidence.trim().length < SOCIAL_PUBLICATION_RECONCILIATION_LIMITS.minimumEvidenceCharacters || (reconciliationOutcome === "published" && !externalPostId.trim()) || (reconciliationOutcome === "retry" && !confirmedNoPost)} onClick={() => void applyPublicationReconciliation()}>{busy ? t("saving") : t(reconciliationOutcome === "retry" ? "confirmAndRetryPublication" : "resolvePublication")}</Button></div>
+          </section> : null}
+          {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form className="editorialCalendar__editForm" onSubmit={(event) => selectedCanEdit ? void saveContentVersion(event) : event.preventDefault()} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
+            <TextField id="calendar-edit-idea-title" name="title" label={t("ideaTitle")} defaultValue={selectedItem.title} maxLength={CONTENT_LIMITS.titleCharacters} readOnly={!selectedCanEdit} required onChange={() => setEditorDirty(true)} />
+            <SelectField id="calendar-edit-idea-brand" name={CALENDAR_FORM_FIELDS.brandId} label={t("brand")} defaultValue={selectedItem.brandId} disabled={Boolean(selectedItem.campaignId) || !selectedCanEdit} onChange={() => setEditorDirty(true)} required>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </SelectField>
-            <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} onChange={(event) => setPreviewPlatform(SOCIAL_PLATFORMS.find((platform) => platform === event.target.value) ?? selectedItem.platform)} disabled={Boolean(selectedItem.campaignId)} required>
+            <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} onChange={(event) => { setPreviewPlatform(SOCIAL_PLATFORMS.find((platform) => platform === event.target.value) ?? selectedItem.platform); setEditorDirty(true); }} disabled={Boolean(selectedItem.campaignId) || !selectedCanEdit} required>
               {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
             </SelectField>
-            <TextField id="calendar-edit-idea-date" name="date" label={t("date")} type="date" defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} required />
-            <TextField id="calendar-edit-idea-time" name="time" label={t("time")} type="time" defaultValue={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(selectedItem.plannedAt))} required />
+            <DateField id="calendar-edit-idea-date" name="date" label={t("date")} defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} disabled={!selectedCanEdit} required onValueChange={() => setEditorDirty(true)} />
+            <TimeField id="calendar-edit-idea-time" name="time" label={t("time")} defaultValue={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(selectedItem.plannedAt))} disabled={!selectedCanEdit} required onValueChange={() => setEditorDirty(true)} />
             <div className="editorialCalendar__generationAction">
-              <Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={(event) => void generateCopyDraft(event)}>
+              <Button appearance="quiet" type="button" disabled={!selectedCanEdit || busy || generatingCopy} onClick={(event) => void generateCopyDraft(event)}>
                 <WandSparkles aria-hidden="true" size={16} />{generatingCopy ? t("generatingCopy") : t("generateCopy")}
               </Button>
               <p>{t("generatedCopyReview")}</p>
             </div>
-            <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} value={selectedCopy?.canonicalCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: event.target.value, variantCopy: current?.itemId === selectedItem.id ? current.variantCopy : selectedCopy?.variantCopy ?? "" }))} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} required />
-            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value }))} maxLength={CONTENT_LIMITS.variantCopyCharacters} required />
+            <div className="editorialCalendar__generationAction">
+              <Button appearance="quiet" type="button" disabled={!selectedCanEdit || busy || generatingCopy || reviewingContent || editorDirty || Boolean(generatedCopy?.itemId === selectedItem.id) || !contentVersionState.data.current} onClick={() => void reviewSavedContent()}>
+                {reviewingContent ? t("reviewingContent") : t("reviewSavedContent")}
+              </Button>
+              <p>{t("reviewAdvisory")}</p>
+            </div>
+            {contentReview && contentReview.contentVersionId === contentVersionState.data.current?.id && !editorDirty ? <section className="editorialCalendar__versionHistory" aria-labelledby="calendar-content-review-title">
+              <strong id="calendar-content-review-title">{t("reviewFindingsTitle", { version: contentReview.versionNumber, model: contentReview.model })}</strong>
+              {contentReview.findings.length === 0 ? <p>{t("reviewNoFindings")}</p> : <ul>{contentReview.findings.map((finding, index) => <li key={index}>
+                <strong>{t(`reviewSeverities.${finding.severity}`)} · {t(`reviewCategories.${finding.category}`)}</strong>
+                {finding.excerpt ? <p>{finding.excerpt}</p> : null}<p>{finding.explanation}</p>{finding.suggestion ? <p>{t("reviewSuggestion", { suggestion: finding.suggestion })}</p> : null}
+              </li>)}</ul>}
+            </section> : null}
+            <TextAreaField id={CALENDAR_UI_IDS.canonicalCopy} name="canonicalCopy" label={t("canonicalCopy")} value={selectedCopy?.canonicalCopy ?? ""} onChange={(event) => { setEditorDirty(true); setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: event.target.value, variantCopy: current?.itemId === selectedItem.id ? current.variantCopy : selectedCopy?.variantCopy ?? "", variantOptions: current?.itemId === selectedItem.id ? current.variantOptions : [], selectedVariantIndex: current?.itemId === selectedItem.id ? current.selectedVariantIndex : null })); }} maxLength={CONTENT_LIMITS.canonicalCopyCharacters} readOnly={!selectedCanEdit} required />
+            {selectedCopy?.variantOptions.length ? <div className="editorialCalendar__copyOptions" role="group" aria-label={t("generatedOptions")}>
+              {selectedCopy.variantOptions.map((copy, index) => <Button
+                key={`${index}-${copy}`}
+                appearance={selectedCopy.selectedVariantIndex === index ? "primary" : "quiet"}
+                className="editorialCalendar__copyOption"
+                type="button"
+                aria-pressed={selectedCopy.selectedVariantIndex === index}
+                disabled={!selectedCanEdit || busy || generatingCopy}
+                onClick={() => { setEditorDirty(true); setGeneratedCopy((current) => current?.itemId === selectedItem.id ? { ...current, variantCopy: copy, selectedVariantIndex: index } : current); }}
+              ><span>{t("generatedOption", { index: index + 1 })}</span><small>{copy}</small></Button>)}
+            </div> : null}
+            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => { setEditorDirty(true); setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value, variantOptions: current?.itemId === selectedItem.id ? current.variantOptions : [], selectedVariantIndex: null })); }} maxLength={CONTENT_LIMITS.variantCopyCharacters} readOnly={!selectedCanEdit} required />
             <section className="editorialCalendar__channelPreview" aria-label={t("previewTitle")}>
               <div><strong>{t("previewFor", { platform: t(`platforms.${previewPlatform ?? selectedItem.platform}`) })}</strong><span>{selectedItem.title}</span></div>
               <p>{selectedCopy?.variantCopy || t("previewEmpty")}</p>
               <small>{t("previewCharacters", { count: Array.from(selectedCopy?.variantCopy ?? "").length })}</small>
             </section>
             {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
-            <ContentMediaPanel key={`${selectedItem.id}-${contentVersionState.data.current?.id ?? "new"}`} itemId={selectedItem.id} versionId={contentVersionState.data.current?.id ?? null} versionNumber={contentVersionState.data.current?.versionNumber ?? null} />
-            <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button><Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); }}>{t("cancel")}</Button></div>
+            <ContentMediaPanel key={`${selectedItem.id}-${contentVersionState.data.current?.id ?? "new"}`} itemId={selectedItem.id} versionId={contentVersionState.data.current?.id ?? null} versionNumber={contentVersionState.data.current?.versionNumber ?? null} variantCopy={selectedCopy?.variantCopy ?? ""} platform={selectedItem.platform} />
+            {contentVersionState.data.approval.history.length > 0 ? <section className="editorialCalendar__versionHistory" aria-label={t("approvalHistory")}><strong>{t("approvalHistory")}</strong><ol>{contentVersionState.data.approval.history.map((request) => <li key={request.id}>{t(`approvalStatuses.${request.status}`, { version: request.versionNumber, name: request.submittedByName })}{request.targetProfile ? <p>{t("publicationTargetHistory", { name: request.targetProfile.displayName, handle: request.targetProfile.handle ? `@${request.targetProfile.handle}` : "" })}</p> : null}<p>{t("approvalProgress", { approved: request.decisions.filter((decision) => decision.decision === CONTENT_APPROVAL_STATUS.approved).length, required: request.requiredApprovals })}</p>{request.decisions.map((decision, index) => <p key={`${request.id}-${index}`}>{t(`approvalDecisions.${decision.decision}`, { name: decision.reviewerName })}{decision.note ? ` — ${decision.note}` : ""}</p>)}</li>)}</ol></section> : null}
+            {approvalNextSteps.length > 0 ? <section className="editorialCalendar__notice" role="status" aria-labelledby="calendar-approval-next-steps"><strong id="calendar-approval-next-steps">{t("approvalReadinessTitle")}</strong><ul>{approvalNextSteps.map((step) => <li key={step}>{step}</li>)}</ul></section> : null}
+            {approvalMessage ? <p className="editorialCalendar__notice" role="status">{approvalMessage}</p> : null}
+            {selectedCanEdit && contentVersionState.data.approval.publisherProfileRequired ? contentVersionState.data.approval.targetProfiles.length > 0 ? <SelectField id="calendar-publication-target" label={t("publicationTarget")} value={selectedSocialProfileId} onChange={(event) => setSelectedSocialProfileId(event.target.value)} disabled={busy || !contentVersionState.data.approval.canRequest || Boolean(currentApprovalRequest)} required>
+              <option value="">{t("selectPublicationTarget")}</option>
+              {contentVersionState.data.approval.targetProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName}{profile.handle ? ` (@${profile.handle})` : ""}</option>)}
+            </SelectField> : null : null}
+            {selectedCanReview && currentApprovalRequest?.status === CONTENT_APPROVAL_STATUS.pending && currentApprovalRequest.matchesCurrent ? <div className="editorialCalendar__editForm">
+              <TextAreaField id="calendar-approval-note" label={t("approvalNote")} value={approvalNote} maxLength={CONTENT_APPROVAL_LIMITS.maximumNoteCharacters} onChange={(event) => setApprovalNote(event.target.value)} />
+              <div className="editorialCalendar__formActions"><Button type="button" disabled={busy} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.approve)}>{t("approveContent")}</Button><Button appearance="quiet" type="button" disabled={busy || !approvalNote.trim()} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.requestChanges)}>{t("requestChanges")}</Button><Button appearance="danger" type="button" disabled={busy || !approvalNote.trim()} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.reject)}>{t("rejectContent")}</Button></div>
+            </div> : null}
+            <div className="editorialCalendar__formActions">
+              {selectedCanEdit ? <>
+                <Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button>
+                <Button appearance="quiet" type="button" disabled={busy || generatingCopy || editorDirty || Boolean(generatedCopy?.itemId === selectedItem.id) || !contentVersionState.data.current || !contentVersionState.data.approval.canRequest || contentVersionState.data.approval.mediaPending || Boolean(currentApprovalRequest) || (contentVersionState.data.approval.publisherProfileRequired && !selectedSocialProfileId)} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.submit)}>{t("requestApproval")}</Button>
+              </> : null}
+              <Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } }}>{t("cancel")}</Button>
+            </div>
           </form> : null}
         </DialogContent> : null}
       </Dialog>

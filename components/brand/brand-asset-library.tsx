@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { DateField } from "@/components/ui/date-field";
 import { FileField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { BRAND_ASSET_ACTIONS, BRAND_ASSET_FORMATS_BY_MIME, BRAND_ASSET_KINDS, BRAND_ASSET_LIMITS, BRAND_ASSET_REVIEW_DECISION, BRAND_ASSET_STATUS, BRAND_ASSET_UI_IDS, getBrandAssetActionApiPath, getBrandAssetsApiPath, type BrandAssetKind } from "@/lib/constants";
 import { brandAssetDownloadResponseSchema, brandAssetsResponseSchema, brandAssetUploadSessionResponseSchema, type BrandAsset } from "@/lib/validation/brand-assets";
@@ -166,7 +168,7 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
     { id: "kind", label: tTable("kind"), sortValue: (asset) => t(`kind.${asset.kind}`), render: (asset) => t(`kind.${asset.kind}`) },
     { id: "format", label: tTable("fileFormat"), sortValue: (asset) => asset.contentType, render: (asset) => tTable(`formats.${BRAND_ASSET_FORMATS_BY_MIME[asset.contentType]}`) },
     { id: "status", label: tTable("status"), sortValue: (asset) => t(`status.${asset.status}`), render: (asset) => <span className={`brandAssetStatus brandAssetStatus--${asset.status}`}>{t(`status.${asset.status}`)}</span> },
-    { id: "sha256", label: tTable("checksum"), sortValue: (asset) => asset.sha256, render: (asset) => <code title={asset.sha256}>{asset.sha256.slice(0, 12)}</code> },
+    { id: "sha256", label: tTable("checksum"), sortValue: (asset) => asset.sha256, render: (asset) => <code title={asset.sha256}>{asset.sha256}</code> },
     { id: "dimensions", label: tTable("dimensions"), sortValue: (asset) => asset.width ?? 0, render: (asset) => asset.width && asset.height ? `${asset.width} × ${asset.height}` : tTable("notAvailable") },
     { id: "size", label: tTable("size"), sortValue: (asset) => asset.sizeBytes, render: (asset) => new Intl.NumberFormat(locale, { style: "unit", unit: "kilobyte", maximumFractionDigits: 0 }).format(Math.ceil(asset.sizeBytes / 1_024)) },
     { id: "creator", label: tTable("createdBy"), sortValue: (asset) => asset.createdByName, render: (asset) => asset.createdByName },
@@ -189,7 +191,7 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       <header className="brandAssetLibrary__header">
         <div><h4 id={`${libraryId}-title`}>{t("title")}</h4><p>{t("description")}</p></div>
       </header>
-      {canManage ? <form className="brandAssetLibrary__upload" onSubmit={(event) => void submitUpload(event)}>
+      {canManage ? <Disclosure title={t("addAsset")} className="brandAssetLibrary__uploadDisclosure"><form className="brandAssetLibrary__upload" onSubmit={(event) => void submitUpload(event)}>
         <FileField
           id={`${BRAND_ASSET_UI_IDS.filePrefix}${brandId}`}
           label={t("file")}
@@ -206,10 +208,10 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
         </SelectField>
         <TextField id={`${BRAND_ASSET_UI_IDS.sourcePrefix}${brandId}`} label={t("sourceUrl")} type="url" value={sourceUrl} disabled={busy} onChange={(event) => setSourceUrl(event.target.value)} />
         <TextField id={`${BRAND_ASSET_UI_IDS.licensePrefix}${brandId}`} label={t("license")} value={license} maxLength={BRAND_ASSET_LIMITS.maximumLicenseCharacters} disabled={busy} onChange={(event) => setLicense(event.target.value)} />
-        <TextField id={`${BRAND_ASSET_UI_IDS.rightsExpiryPrefix}${brandId}`} label={t("rightsExpiry")} type="date" value={rightsExpiresAt} disabled={busy} onChange={(event) => setRightsExpiresAt(event.target.value)} />
+        <DateField id={`${BRAND_ASSET_UI_IDS.rightsExpiryPrefix}${brandId}`} label={t("rightsExpiry")} value={rightsExpiresAt} disabled={busy} onValueChange={setRightsExpiresAt} />
         <TextField id={`${BRAND_ASSET_UI_IDS.altTextPrefix}${brandId}`} label={t("altText")} value={altText} maxLength={BRAND_ASSET_LIMITS.maximumAltTextCharacters} disabled={busy} onChange={(event) => setAltText(event.target.value)} />
         <Button appearance="primary" type="submit" disabled={busy || !selectedFile}>{busy ? t("working") : t("upload")}</Button>
-      </form> : null}
+      </form></Disclosure> : null}
       {canManage ? <div className="brandAssetLibrary__reviewNote"><TextAreaField id={`${BRAND_ASSET_UI_IDS.reviewNotePrefix}${brandId}`} label={t("reviewNote")} value={reviewNote} maxLength={BRAND_ASSET_LIMITS.maximumAltTextCharacters} disabled={busy} onChange={(event) => setReviewNote(event.target.value)} /></div> : null}
       {pending ? <p className="brandAssetLibrary__state" role="status">{t("loading")}</p> : null}
       {hasError ? <p className="brandAssetLibrary__state brandAssetLibrary__state--error" role="alert">{t("error")}</p> : null}
@@ -226,6 +228,11 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
         searchValue={searchValue}
         locale={locale}
         initialSortColumnId="createdAt"
+        compact={{
+          summaryColumnId: "fileName",
+          detailColumnIds: ["status", "kind", "license", "rightsExpiresAt", "format", "dimensions", "size", "sha256", "creator", "createdAt"],
+          actionsColumnId: "actions",
+        }}
       /> : null}
       {preview ? <section className="brandAssetLibrary__preview" aria-label={t("previewRegion")}>
         <header><h5>{preview.asset.fileName}</h5><Button appearance="quiet" type="button" onClick={() => setPreview(null)}>{t("closePreview")}</Button></header>

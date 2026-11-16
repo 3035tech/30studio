@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CALENDAR, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema, contentMediaGenerationRequestSchema, contentMediaReviewSchema } from "@/lib/validation/calendar";
+import { CALENDAR, CONTENT_STATUS, COPY_GENERATION, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarCopyDraftResponseSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema, contentMediaGenerationRequestSchema, contentMediaReviewSchema } from "@/lib/validation/calendar";
 import { getCampaignRequestFingerprint } from "@/lib/server/campaign-idempotency";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
@@ -60,6 +60,20 @@ test("calendar content versions require bounded canonical and channel copy", () 
   assert.equal(calendarContentVersionSaveSchema.safeParse({ ...validVersion, status: "approved" }).success, false);
 });
 
+test("generated channel copy requires three distinct bounded options", () => {
+  const validResponse = {
+    data: {
+      canonicalCopy: "A concise source draft.",
+      variantCopy: "A selected channel draft.",
+      variantOptions: ["Benefit-focused draft.", "Question-led draft?", "Direct draft."],
+    },
+  };
+  assert.equal(calendarCopyDraftResponseSchema.safeParse(validResponse).success, true);
+  assert.equal(calendarCopyDraftResponseSchema.safeParse({ ...validResponse, data: { ...validResponse.data, variantOptions: ["One.", "Two."] } }).success, false);
+  assert.equal(calendarCopyDraftResponseSchema.safeParse({ ...validResponse, data: { ...validResponse.data, variantOptions: ["Same.", "Same.", "Different."] } }).success, false);
+  assert.equal(calendarCopyDraftResponseSchema.safeParse({ ...validResponse, data: { ...validResponse.data, variantOptions: ["x".repeat(COPY_GENERATION.maximumVariantOptionCharacters + 1), "Two.", "Three."] } }).success, false);
+});
+
 test("campaign planning accepts independent channel schedules and rejects duplicate networks", () => {
   const validCampaign = {
     brandId: "11111111-1111-4111-8111-111111111111",
@@ -99,6 +113,7 @@ test("content image generation requires an exact version and idempotency key", (
   const validRequest = {
     contentVersionId: "11111111-1111-4111-8111-111111111111",
     idempotencyKey: "22222222-2222-4222-8222-222222222222",
+    mode: "ai_image",
   };
   assert.equal(contentMediaGenerationRequestSchema.safeParse(validRequest).success, true);
   assert.equal(contentMediaGenerationRequestSchema.safeParse({ ...validRequest, contentVersionId: "not-a-uuid" }).success, false);

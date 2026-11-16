@@ -1,9 +1,12 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { and, asc, count, desc, eq, gte, inArray, lt, or } from "drizzle-orm";
-import { BRAND_KIT_VERSION_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_RETRY_DELAYS_MS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_WORKER, CONTENT_STATUS } from "@/lib/constants";
+import { BRAND_KIT_VERSION_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_RETRY_DELAYS_MS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_WORKER, CONTENT_REVIEWABLE_STATUSES, CONTENT_STATUS, SOCIAL_PUBLICATION_JOB_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
 import { getCampaignRequestFingerprint } from "@/lib/server/campaign-idempotency";
-import { brandKitVersions, brands, campaigns, contentItems, contentMediaAssets, contentMediaReviews, contentVariants, contentVersions, user } from "@/lib/db/schema";
+import { getContentApprovalState } from "@/lib/db/repositories/content-approvals";
+import { getSocialCapabilitySnapshot } from "@/lib/server/social-publisher/registry";
+import { brandKitVersions, brands, campaigns, contentItems, contentMediaAssets, contentMediaReviews, contentVariants, contentVersions, socialPublicationJobs, user } from "@/lib/db/schema";
 import type { CalendarCampaignCreateInput, CalendarContentVersionSaveInput, CalendarItemCreateInput, CalendarItemUpdateInput } from "@/lib/validation/calendar";
 
 export type CalendarQuery = {
@@ -12,9 +15,11 @@ export type CalendarQuery = {
   brandId?: string;
   platform?: CalendarItemCreateInput["platform"];
   status?: typeof CONTENT_STATUS[keyof typeof CONTENT_STATUS];
+  publicationStatus?: typeof SOCIAL_PUBLICATION_JOB_STATUS[keyof typeof SOCIAL_PUBLICATION_JOB_STATUS];
 };
 
 export async function listCalendarItems(organizationId: string, query: CalendarQuery) {
+  const database = getDatabase();
   const conditions = [
     eq(contentItems.organizationId, organizationId),
     eq(brands.isActive, true),
@@ -24,8 +29,11 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
   if (query.brandId) conditions.push(eq(contentItems.brandId, query.brandId));
   if (query.platform) conditions.push(eq(contentItems.platform, query.platform));
   if (query.status) conditions.push(eq(contentItems.status, query.status));
+  if (query.publicationStatus) conditions.push(inArray(contentItems.id, database.select({ contentItemId: socialPublicationJobs.contentItemId }).from(socialPublicationJobs).where(and(
+    eq(socialPublicationJobs.organizationId, organizationId), eq(socialPublicationJobs.status, query.publicationStatus),
+  ))));
 
-  const rows = await getDatabase().select({
+  const rows = await database.select({
     id: contentItems.id,
     brandId: contentItems.brandId,
     brandName: brands.name,
@@ -47,8 +55,20 @@ export async function listCalendarItems(organizationId: string, query: CalendarQ
   )).where(and(...conditions)).orderBy(asc(contentItems.plannedAt), asc(contentItems.createdAt))
     .limit(CONTENT_LIMITS.maximumCalendarItems + 1);
 
+  const publicationRows = rows.length === 0 ? [] : await database.select({
+    contentItemId: socialPublicationJobs.contentItemId,
+    status: socialPublicationJobs.status,
+  }).from(socialPublicationJobs).where(and(
+    eq(socialPublicationJobs.organizationId, organizationId),
+    inArray(socialPublicationJobs.contentItemId, rows.map((row) => row.id)),
+  )).orderBy(desc(socialPublicationJobs.createdAt));
+  const latestPublicationStatus = new Map<string, typeof publicationRows[number]["status"]>();
+  for (const publication of publicationRows) {
+    if (!latestPublicationStatus.has(publication.contentItemId)) latestPublicationStatus.set(publication.contentItemId, publication.status);
+  }
+
   return {
-    data: rows.slice(0, CONTENT_LIMITS.maximumCalendarItems),
+    data: rows.slice(0, CONTENT_LIMITS.maximumCalendarItems).map((row) => ({ ...row, publicationStatus: latestPublicationStatus.get(row.id) ?? null })),
     truncated: rows.length > CONTENT_LIMITS.maximumCalendarItems,
   };
 }
@@ -180,10 +200,10 @@ export async function updateCalendarIdea(organizationId: string, itemId: string,
 
 export async function getCalendarContentVersions(organizationId: string, itemId: string) {
   const database = getDatabase();
-  const [item] = await database.select({ id: contentItems.id, platform: contentItems.platform }).from(contentItems).where(and(
+  const [item] = await database.select({ id: contentItems.id, platform: contentItems.platform, status: contentItems.status }).from(contentItems).where(and(
     eq(contentItems.id, itemId),
     eq(contentItems.organizationId, organizationId),
-    inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
+    inArray(contentItems.status, CONTENT_REVIEWABLE_STATUSES),
   )).limit(1);
   if (!item) return null;
 
@@ -191,6 +211,7 @@ export async function getCalendarContentVersions(organizationId: string, itemId:
     id: contentVersions.id,
     versionNumber: contentVersions.versionNumber,
     brandKitVersionNumber: contentVersions.brandKitVersionNumber,
+    capabilitySnapshot: contentVersions.capabilitySnapshot,
     canonicalCopy: contentVersions.canonicalCopy,
     createdAt: contentVersions.createdAt,
   }).from(contentVersions).where(and(
@@ -211,10 +232,12 @@ export async function getCalendarContentVersions(organizationId: string, itemId:
   const currentVariant = current ? variantByVersion.get(current.id) : undefined;
 
   return {
+    itemStatus: item.status,
     current: current && currentVariant ? {
       id: current.id,
       versionNumber: current.versionNumber,
       brandKitVersionNumber: current.brandKitVersionNumber,
+      capabilitySnapshot: current.capabilitySnapshot,
       canonicalCopy: current.canonicalCopy,
       variantCopy: currentVariant.copy,
       platform: currentVariant.platform,
@@ -228,6 +251,7 @@ export async function getCalendarContentVersions(organizationId: string, itemId:
         createdAt: version.createdAt.toISOString(),
       } : null;
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
+    approval: await getContentApprovalState(organizationId, itemId),
   };
 }
 
@@ -273,6 +297,50 @@ export async function getCalendarCopyGenerationContext(organizationId: string, i
   )).orderBy(desc(brandKitVersions.version)).limit(1);
 
   return { title: item.title, campaignBrief: item.campaignBrief, brandId: brand.id, brandName: brand.name, brandDescription: brand.description, industry: brand.industry, brandKit };
+}
+
+export async function getCalendarContentReviewContext(organizationId: string, itemId: string) {
+  const database = getDatabase();
+  const [item] = await database.select({
+    id: contentItems.id,
+    brandId: contentItems.brandId,
+    title: contentItems.title,
+    platform: contentItems.platform,
+    status: contentItems.status,
+    brandName: brands.name,
+    brandDescription: brands.description,
+    industry: brands.industry,
+  }).from(contentItems).innerJoin(brands, and(
+    eq(brands.organizationId, contentItems.organizationId),
+    eq(brands.id, contentItems.brandId),
+  )).where(and(
+    eq(contentItems.organizationId, organizationId),
+    eq(contentItems.id, itemId),
+    eq(brands.isActive, true),
+    inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
+  )).limit(1);
+  if (!item) return null;
+  const [version] = await database.select({
+    id: contentVersions.id,
+    versionNumber: contentVersions.versionNumber,
+    brandKitVersionNumber: contentVersions.brandKitVersionNumber,
+    canonicalCopy: contentVersions.canonicalCopy,
+    variantCopy: contentVariants.copy,
+  }).from(contentVersions).innerJoin(contentVariants, and(
+    eq(contentVariants.organizationId, contentVersions.organizationId),
+    eq(contentVariants.contentVersionId, contentVersions.id),
+    eq(contentVariants.platform, item.platform),
+  )).where(and(
+    eq(contentVersions.organizationId, organizationId),
+    eq(contentVersions.contentItemId, itemId),
+  )).orderBy(desc(contentVersions.versionNumber)).limit(1);
+  if (!version) return null;
+  const [brandKit] = version.brandKitVersionNumber === null ? [] : await database.select({ version: brandKitVersions.version, content: brandKitVersions.content }).from(brandKitVersions).where(and(
+    eq(brandKitVersions.organizationId, organizationId),
+    eq(brandKitVersions.brandId, item.brandId),
+    eq(brandKitVersions.version, version.brandKitVersionNumber),
+  )).limit(1);
+  return { item, version, brandKit: brandKit ?? null };
 }
 
 export async function getContentImageGenerationContext(organizationId: string, itemId: string, contentVersionId: string) {
@@ -338,12 +406,12 @@ export async function enqueueContentMediaGeneration(input: {
     )).for("update").limit(1);
     if (!item) return { kind: "not_found" as const };
 
-    const [existingRequest] = await transaction.select({ id: contentMediaAssets.id, status: contentMediaAssets.status, contentVersionId: contentMediaAssets.contentVersionId, contentItemId: contentMediaAssets.contentItemId }).from(contentMediaAssets).where(and(
+    const [existingRequest] = await transaction.select({ id: contentMediaAssets.id, status: contentMediaAssets.status, contentVersionId: contentMediaAssets.contentVersionId, contentItemId: contentMediaAssets.contentItemId, modelId: contentMediaAssets.modelId, prompt: contentMediaAssets.prompt }).from(contentMediaAssets).where(and(
       eq(contentMediaAssets.organizationId, input.organizationId),
       eq(contentMediaAssets.idempotencyKey, input.idempotencyKey),
     )).limit(1);
     if (existingRequest) {
-      if (existingRequest.contentVersionId !== input.contentVersionId || existingRequest.contentItemId !== input.itemId) return { kind: "conflict" as const };
+      if (existingRequest.contentVersionId !== input.contentVersionId || existingRequest.contentItemId !== input.itemId || existingRequest.modelId !== input.modelId || existingRequest.prompt !== input.prompt) return { kind: "conflict" as const };
       return { kind: "existing" as const, assetId: existingRequest.id, status: existingRequest.status };
     }
 
@@ -376,10 +444,79 @@ export async function enqueueContentMediaGeneration(input: {
   });
 }
 
+export async function enqueueContentCarouselGeneration(input: {
+  organizationId: string;
+  itemId: string;
+  contentVersionId: string;
+  idempotencyKey: string;
+  userId: string;
+  modelId: string;
+  prompts: string[];
+}) {
+  const database = getDatabase();
+  return database.transaction(async (transaction) => {
+    if (input.prompts.length !== CONTENT_MEDIA_CAROUSEL.pageCount) return { kind: "conflict" as const };
+    const [item] = await transaction.select({ brandId: contentItems.brandId }).from(contentItems).where(and(
+      eq(contentItems.organizationId, input.organizationId),
+      eq(contentItems.id, input.itemId),
+      inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
+    )).for("update").limit(1);
+    if (!item) return { kind: "not_found" as const };
+
+    const existing = await transaction.select({ id: contentMediaAssets.id, status: contentMediaAssets.status, contentVersionId: contentMediaAssets.contentVersionId, modelId: contentMediaAssets.modelId, prompt: contentMediaAssets.prompt, pageNumber: contentMediaAssets.pageNumber }).from(contentMediaAssets).where(and(
+      eq(contentMediaAssets.organizationId, input.organizationId),
+      eq(contentMediaAssets.carouselId, input.idempotencyKey),
+    )).orderBy(asc(contentMediaAssets.pageNumber));
+    if (existing.length > 0) {
+      const matches = existing.length === input.prompts.length && existing.every((asset, index) => asset.contentVersionId === input.contentVersionId && asset.modelId === input.modelId && asset.prompt === input.prompts[index] && asset.pageNumber === index + 1);
+      if (!matches) return { kind: "conflict" as const };
+      return { kind: "existing" as const, assetId: existing[0]!.id, status: existing[0]!.status };
+    }
+
+    const [latestVersion] = await transaction.select({ id: contentVersions.id }).from(contentVersions).where(and(
+      eq(contentVersions.organizationId, input.organizationId),
+      eq(contentVersions.contentItemId, input.itemId),
+    )).orderBy(desc(contentVersions.versionNumber)).limit(1);
+    if (!latestVersion || latestVersion.id !== input.contentVersionId) return { kind: "conflict" as const };
+    const [generatedCount] = await transaction.select({ value: count() }).from(contentMediaAssets).where(and(
+      eq(contentMediaAssets.organizationId, input.organizationId),
+      eq(contentMediaAssets.contentVersionId, input.contentVersionId),
+    ));
+    if ((generatedCount?.value ?? 0) + input.prompts.length > CONTENT_LIMITS.maximumGeneratedImagesPerVersion) return { kind: "limit" as const };
+
+    const values = input.prompts.map((prompt, index) => {
+      const idempotencyKey = randomUUID();
+      const fileName = `${input.idempotencyKey}-${index + 1}.webp`;
+      return {
+        organizationId: input.organizationId,
+        brandId: item.brandId,
+        contentItemId: input.itemId,
+        contentVersionId: input.contentVersionId,
+        carouselId: input.idempotencyKey,
+        pageNumber: index + 1,
+        pageCount: input.prompts.length,
+        idempotencyKey,
+        objectKey: `tenants/${encodeURIComponent(input.organizationId)}/brands/${item.brandId}/content/${input.itemId}/${input.contentVersionId}/${fileName}`,
+        fileName,
+        prompt,
+        modelId: input.modelId,
+        status: CONTENT_MEDIA_STATUS.queued,
+        createdBy: input.userId,
+      };
+    });
+    const assets = await transaction.insert(contentMediaAssets).values(values).returning({ id: contentMediaAssets.id, status: contentMediaAssets.status });
+    const firstAsset = assets[0];
+    return firstAsset ? { kind: "created" as const, assetId: firstAsset.id, status: firstAsset.status } : { kind: "not_found" as const };
+  });
+}
+
 export async function listContentMediaForVersion(organizationId: string, itemId: string, contentVersionId: string) {
   const creator = user;
   const rows = await getDatabase().select({
     id: contentMediaAssets.id,
+    carouselId: contentMediaAssets.carouselId,
+    pageNumber: contentMediaAssets.pageNumber,
+    pageCount: contentMediaAssets.pageCount,
     status: contentMediaAssets.status,
     fileName: contentMediaAssets.fileName,
     contentType: contentMediaAssets.contentType,
@@ -411,25 +548,34 @@ export async function getContentMediaForTenant(organizationId: string, itemId: s
 export async function reviewContentMedia(organizationId: string, itemId: string, mediaId: string, reviewerId: string, decision: typeof CONTENT_MEDIA_STATUS.approved | typeof CONTENT_MEDIA_STATUS.rejected, note: string | null) {
   const database = getDatabase();
   return database.transaction(async (transaction) => {
-    const [asset] = await transaction.select({ id: contentMediaAssets.id, brandId: contentMediaAssets.brandId }).from(contentMediaAssets).where(and(
+    const [asset] = await transaction.select({ id: contentMediaAssets.id, brandId: contentMediaAssets.brandId, carouselId: contentMediaAssets.carouselId, pageCount: contentMediaAssets.pageCount }).from(contentMediaAssets).where(and(
       eq(contentMediaAssets.organizationId, organizationId),
       eq(contentMediaAssets.contentItemId, itemId),
       eq(contentMediaAssets.id, mediaId),
+    )).limit(1);
+    if (!asset) return null;
+    const group = asset.carouselId ? await transaction.select({ id: contentMediaAssets.id, status: contentMediaAssets.status, brandId: contentMediaAssets.brandId }).from(contentMediaAssets).where(and(
+      eq(contentMediaAssets.organizationId, organizationId),
+      eq(contentMediaAssets.contentItemId, itemId),
+      eq(contentMediaAssets.carouselId, asset.carouselId),
+    )).orderBy(asc(contentMediaAssets.pageNumber)).for("update") : await transaction.select({ id: contentMediaAssets.id, status: contentMediaAssets.status, brandId: contentMediaAssets.brandId }).from(contentMediaAssets).where(and(
+      eq(contentMediaAssets.organizationId, organizationId),
+      eq(contentMediaAssets.id, mediaId),
       eq(contentMediaAssets.status, CONTENT_MEDIA_STATUS.pendingReview),
     )).for("update").limit(1);
-    if (!asset) return null;
-    const [reviewed] = await transaction.update(contentMediaAssets).set({
+    if (group.length !== (asset.pageCount ?? 1) || group.some((page) => page.status !== CONTENT_MEDIA_STATUS.pendingReview)) return null;
+    const reviewed = await transaction.update(contentMediaAssets).set({
       status: decision,
       reviewedBy: reviewerId,
       reviewedAt: new Date(),
     }).where(and(
       eq(contentMediaAssets.organizationId, organizationId),
-      eq(contentMediaAssets.id, mediaId),
+      asset.carouselId ? eq(contentMediaAssets.carouselId, asset.carouselId) : eq(contentMediaAssets.id, mediaId),
       eq(contentMediaAssets.status, CONTENT_MEDIA_STATUS.pendingReview),
     )).returning({ id: contentMediaAssets.id });
     if (!reviewed) return null;
-    await transaction.insert(contentMediaReviews).values({ organizationId, brandId: asset.brandId, mediaAssetId: mediaId, reviewerId, decision, note });
-    return reviewed;
+    await transaction.insert(contentMediaReviews).values(group.map((page) => ({ organizationId, brandId: page.brandId, mediaAssetId: page.id, reviewerId, decision, note })));
+    return reviewed.find((page) => page.id === mediaId) ?? reviewed[0];
   });
 }
 
@@ -543,6 +689,7 @@ export async function createCalendarContentVersion(organizationId: string, userI
       versionNumber,
       canonicalCopy: input.canonicalCopy,
       brandKitVersionNumber: brandKitVersion?.version ?? null,
+      capabilitySnapshot: getSocialCapabilitySnapshot(input.platform),
       createdBy: userId,
     }).returning({ id: contentVersions.id });
     if (!version) return null;

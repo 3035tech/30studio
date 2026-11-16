@@ -4,7 +4,7 @@ import { BRAND_KIT_LIMITS, BRAND_KIT_VERSION_STATUSES } from "@/lib/constants";
 const boundedTextSchema = z.string().trim().max(BRAND_KIT_LIMITS.textCharacters);
 const listItemSchema = z.string().trim().min(1).max(BRAND_KIT_LIMITS.itemCharacters);
 const stringListSchema = z.array(listItemSchema).max(BRAND_KIT_LIMITS.itemsPerField);
-const sourceUrlSchema = z.url({ protocol: /^https$/ }).max(BRAND_KIT_LIMITS.sources).refine((value) => {
+const sourceUrlSchema = z.url({ protocol: /^https$/ }).max(BRAND_KIT_LIMITS.sourceUrlCharacters).refine((value) => {
   const parsed = new URL(value);
   return !parsed.username && !parsed.password;
 });

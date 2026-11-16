@@ -1,0 +1,2 @@
+ALTER TABLE "content_approval_requests" ADD CONSTRAINT "content_approval_requests_org_brand_profile_fk" FOREIGN KEY ("organization_id","brand_id","social_profile_id") REFERENCES "public"."social_profiles"("organization_id","brand_id","id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "social_profiles" ADD CONSTRAINT "social_profiles_org_brand_profile_unique" UNIQUE("organization_id","brand_id","id");
