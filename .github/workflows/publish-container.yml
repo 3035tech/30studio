@@ -71,7 +71,7 @@ jobs:
         run: npm run test:integration
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node --conditions=react-server --import tsx scripts/audit-production-dependencies.ts
 
   build:
     name: Build container
