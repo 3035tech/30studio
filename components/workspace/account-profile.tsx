@@ -15,7 +15,16 @@ export function AccountProfile({ email }: { email: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [activeTab, setActiveTab] = useState<"account" | "workspace">("account");
+
+  function validatePasswordConfirmation(form: HTMLFormElement | null) {
+    if (!form) return;
+    const values = new FormData(form);
+    const newPassword = String(values.get("newPassword") ?? "");
+    const confirmation = String(values.get("confirmPassword") ?? "");
+    setPasswordMismatch(Boolean(newPassword && confirmation && newPassword !== confirmation));
+  }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,11 +36,11 @@ export function AccountProfile({ email }: { email: string }) {
     setBusy(true);
     setMessage("");
     if (newPassword !== confirmation) {
-      setMessage(tAuth("passwordMismatch"));
-      setIsError(true);
+      setPasswordMismatch(true);
       setBusy(false);
       return;
     }
+    setPasswordMismatch(false);
     try {
       const result = await authClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true });
       if (result.error) throw new Error();
@@ -88,8 +97,8 @@ export function AccountProfile({ email }: { email: string }) {
         <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
           <h2>{t("changePassword")}</h2>
           <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
-          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} required />
-          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} required />
+          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} onInput={(event) => { setMessage(""); validatePasswordConfirmation(event.currentTarget.form); }} required />
+          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} error={passwordMismatch ? tAuth("passwordMismatch") : undefined} onInput={(event) => { setMessage(""); validatePasswordConfirmation(event.currentTarget.form); }} required />
           {message ? <p className={isError ? "entryMessage entryMessage--error" : "entryMessage"} role={isError ? "alert" : "status"}>{message}</p> : null}
           <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
           <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>

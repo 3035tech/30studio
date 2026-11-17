@@ -27,6 +27,7 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
   const [refreshKey, setRefreshKey] = useState(0);
   const { brandId, platform, rangeDays } = filters;
   const [data, setData] = useState<Analytics | null>(null);
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<"overview" | "goals" | "engagement">("overview");
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -190,6 +191,19 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
     finally { setGoalSaving(false); }
   }
 
+  function handleAnalyticsTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const tabs = Array.from(event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % tabs.length
+      : event.key === "ArrowLeft" ? (currentIndex - 1 + tabs.length) % tabs.length
+        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    nextTab?.focus();
+    nextTab?.click();
+  }
+
   return <section className="publicationAnalytics" aria-labelledby="publication-analytics-title">
     <header className="workspaceHeading">
       <div><p className="entryKicker">{t("eyebrow")}</p><h2 id="publication-analytics-title">{t("title")}</h2><p className="entryDescription">{t("description")}</p></div>
@@ -198,6 +212,21 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
     {loading ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : null}
     {!loading && !error && data ? <>
       <p className="publicationAnalytics__coverage">{t("coverage", { start: new Intl.DateTimeFormat(locale).format(new Date(data.start)), end: new Intl.DateTimeFormat(locale).format(new Date(data.end)) })}</p>
+      <div className="publicationAnalytics__tabs" role="tablist" aria-label={t("reportTabs.label")}>
+        {(["overview", "goals", "engagement"] as const).map((tab) => <button
+          className={activeAnalyticsTab === tab ? "publicationAnalytics__tab is-selected" : "publicationAnalytics__tab"}
+          id={`publication-analytics-tab-${tab}`}
+          type="button"
+          role="tab"
+          aria-selected={activeAnalyticsTab === tab}
+          aria-controls={`publication-analytics-panel-${tab}`}
+          tabIndex={activeAnalyticsTab === tab ? 0 : -1}
+          key={tab}
+          onClick={() => setActiveAnalyticsTab(tab)}
+          onKeyDown={handleAnalyticsTabKeyDown}
+        >{t(`reportTabs.${tab}`)}</button>)}
+      </div>
+      <div id="publication-analytics-panel-overview" className="publicationAnalytics__tabPanel" role="tabpanel" tabIndex={0} aria-labelledby="publication-analytics-tab-overview" hidden={activeAnalyticsTab !== "overview"}>
       <section className="publicationAnalytics__attention" aria-labelledby="publication-analytics-attention-title">
         <div className="publicationAnalytics__attentionHeader">
           <div><h3 id="publication-analytics-attention-title">{t("attention.title")}</h3><p>{t("attention.description")}</p></div>
@@ -238,6 +267,14 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
         <strong>{data.comparison.publishedChange > 0 ? "+" : ""}{new Intl.NumberFormat(locale).format(data.comparison.publishedChange)}</strong>
         <span>{t("publishedComparison", { count: new Intl.NumberFormat(locale).format(data.comparison.previousPublished) })}</span>
       </p>
+      {reportablePlatforms.length === 0 ? <p className="workspaceEmpty">{t("empty")}</p> : <div className="publicationAnalytics__platforms">
+        {reportablePlatforms.map((item) => <article className="publicationAnalytics__platform" key={item.platform}>
+          <h3>{tPlatforms(item.platform)}</h3>
+          <dl>{statuses.map((status) => <div key={status}><dt>{t(`status.${status}`)}</dt><dd>{item.totals[status]}</dd></div>)}</dl>
+        </article>)}
+      </div>}
+      </div>
+      <div id="publication-analytics-panel-goals" className="publicationAnalytics__tabPanel" role="tabpanel" tabIndex={0} aria-labelledby="publication-analytics-tab-goals" hidden={activeAnalyticsTab !== "goals"}>
       <section className="publicationAnalytics__goalSection" aria-labelledby="publication-goals-title">
         <div><h3 id="publication-goals-title">{t("goals.title")}</h3><p>{t("goals.description", { days: rangeDays })}</p></div>
         {data.goalTargets.filter((goal) => !platform || goal.platform === platform).length ? <div className="publicationAnalytics__goalGrid">
@@ -258,6 +295,8 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
         </form> : <p className="publicationAnalytics__limitation">{t("goals.chooseScope")}</p> : null}
         {goalMessage ? <p className="publicationAnalytics__coverage" role="status">{goalMessage}</p> : null}
       </section>
+      </div>
+      <div id="publication-analytics-panel-engagement" className="publicationAnalytics__tabPanel" role="tabpanel" tabIndex={0} aria-labelledby="publication-analytics-tab-engagement" hidden={activeAnalyticsTab !== "engagement"}>
       <section className="publicationAnalytics__engagement" aria-labelledby="analytics-engagement-title">
         <div className="publicationAnalytics__engagementHeader">
           <div><h3 id="analytics-engagement-title">{t("engagement.title")}</h3><p>{t("engagement.description")}</p></div>
@@ -306,13 +345,8 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
         </div>
         {refreshResult ? <p className="publicationAnalytics__coverage" role="status">{refreshResult.attempted < 0 ? t("engagement.refreshError") : t("engagement.refreshResult", refreshResult)}</p> : null}
       </section>
-      {reportablePlatforms.length === 0 ? <p className="workspaceEmpty">{t("empty")}</p> : <div className="publicationAnalytics__platforms">
-        {reportablePlatforms.map((item) => <article className="publicationAnalytics__platform" key={item.platform}>
-          <h3>{tPlatforms(item.platform)}</h3>
-          <dl>{statuses.map((status) => <div key={status}><dt>{t(`status.${status}`)}</dt><dd>{item.totals[status]}</dd></div>)}</dl>
-        </article>)}
-      </div>}
       <p className="publicationAnalytics__limitation">{t("engagementUnavailable")}</p>
+      </div>
     </> : null}
     <Button appearance="quiet" type="button" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)}>{t("refresh")}</Button>
   </section>;

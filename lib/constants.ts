@@ -11,7 +11,7 @@ export const DATABASE_CONNECTION = {
   sslMode: "verify-full",
 } as const;
 
-export const WORKSPACE_UI_EVENTS = { createContent: "30studio:create-content", openCalendarItem: "30studio:open-calendar-item", openCalendarList: "30studio:open-calendar-list" } as const;
+export const WORKSPACE_UI_EVENTS = { createContent: "30studio:create-content", openCalendarItem: "30studio:open-calendar-item", openCalendarList: "30studio:open-calendar-list", openSocialConnections: "30studio:open-social-connections" } as const;
 export const WORKSPACE_API_PATHS = { settings: "/api/workspace/settings" } as const;
 export const WORKSPACE_LIMITS = { nameCharacters: 100 } as const;
 

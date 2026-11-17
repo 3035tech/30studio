@@ -39,6 +39,8 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
   const [altText, setAltText] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileInputVersion, setFileInputVersion] = useState(0);
+  const [fileError, setFileError] = useState<"fileTooLarge" | "unsupportedType" | null>(null);
   const [pending, setPending] = useState(true);
   const [busy, setBusy] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -67,11 +69,18 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
   async function submitUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedFile) return;
+    if (!BRAND_ASSET_LIMITS.allowedMimeTypes.some((mimeType) => mimeType === selectedFile.type)) {
+      setFileError("unsupportedType");
+      return;
+    }
+    if (selectedFile.size > BRAND_ASSET_LIMITS.maximumBytes) {
+      setFileError("fileTooLarge");
+      return;
+    }
     setBusy(true);
     setHasError(false);
     setNotice("");
     try {
-      if (selectedFile.size > BRAND_ASSET_LIMITS.maximumBytes) throw new Error("file-too-large");
       const bytes = await selectedFile.arrayBuffer();
       const digest = await crypto.subtle.digest("SHA-256", bytes);
       const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -106,6 +115,8 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       });
       await readJson(finalizeResponse);
       setSelectedFile(null);
+      setFileError(null);
+      setFileInputVersion((version) => version + 1);
       setSourceUrl("");
       setLicense("");
       setRightsExpiresAt("");
@@ -193,12 +204,22 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       </header>
       {canManage ? <Disclosure title={t("addAsset")} className="brandAssetLibrary__uploadDisclosure"><form className="brandAssetLibrary__upload" onSubmit={(event) => void submitUpload(event)}>
         <FileField
+          key={`${brandId}-${fileInputVersion}`}
           id={`${BRAND_ASSET_UI_IDS.filePrefix}${brandId}`}
           label={t("file")}
           accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")}
+          error={fileError ? fileError === "fileTooLarge"
+            ? t("fileTooLarge", { maximum: new Intl.NumberFormat(locale).format(BRAND_ASSET_LIMITS.maximumBytes / (1024 * 1024)) })
+            : t("unsupportedType") : undefined}
           required
           disabled={busy}
-          onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            setSelectedFile(file);
+            setFileError(file && !BRAND_ASSET_LIMITS.allowedMimeTypes.some((mimeType) => mimeType === file.type)
+              ? "unsupportedType"
+              : file && file.size > BRAND_ASSET_LIMITS.maximumBytes ? "fileTooLarge" : null);
+          }}
         />
         <SelectField id={`${BRAND_ASSET_UI_IDS.kindPrefix}${brandId}`} label={t("kindLabel")} value={kind} disabled={busy} onChange={(event) => {
           const selectedKind = BRAND_ASSET_KINDS.find((value) => value === event.target.value);
@@ -210,7 +231,7 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
         <TextField id={`${BRAND_ASSET_UI_IDS.licensePrefix}${brandId}`} label={t("license")} value={license} maxLength={BRAND_ASSET_LIMITS.maximumLicenseCharacters} disabled={busy} onChange={(event) => setLicense(event.target.value)} />
         <DateField id={`${BRAND_ASSET_UI_IDS.rightsExpiryPrefix}${brandId}`} label={t("rightsExpiry")} value={rightsExpiresAt} disabled={busy} onValueChange={setRightsExpiresAt} />
         <TextField id={`${BRAND_ASSET_UI_IDS.altTextPrefix}${brandId}`} label={t("altText")} value={altText} maxLength={BRAND_ASSET_LIMITS.maximumAltTextCharacters} disabled={busy} onChange={(event) => setAltText(event.target.value)} />
-        <Button appearance="primary" type="submit" disabled={busy || !selectedFile}>{busy ? t("working") : t("upload")}</Button>
+        <Button appearance="primary" type="submit" disabled={busy || !selectedFile || fileError !== null}>{busy ? t("working") : t("upload")}</Button>
       </form></Disclosure> : null}
       {canManage ? <div className="brandAssetLibrary__reviewNote"><TextAreaField id={`${BRAND_ASSET_UI_IDS.reviewNotePrefix}${brandId}`} label={t("reviewNote")} value={reviewNote} maxLength={BRAND_ASSET_LIMITS.maximumAltTextCharacters} disabled={busy} onChange={(event) => setReviewNote(event.target.value)} /></div> : null}
       {pending ? <p className="brandAssetLibrary__state" role="status">{t("loading")}</p> : null}

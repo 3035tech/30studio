@@ -5,9 +5,21 @@ import { Bell, CheckCircle2, ChevronRight, CircleAlert, RefreshCw } from "lucide
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { analyticsResponseSchema } from "@/lib/validation/analytics";
-import { WORKSPACE_SECTION_IDS } from "@/lib/constants";
+import { WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS } from "@/lib/constants";
 
 type NotificationData = ReturnType<typeof analyticsResponseSchema.parse>["data"];
+type Notification = {
+  id: string;
+  title: string;
+  detail: string;
+  href: string;
+  severity: "error" | "attention";
+} & (
+  | { kind: "publication"; itemId: string; brandId: string; platform: NotificationData["issues"]["publications"][number]["platform"]; plannedAt: string; section: "calendar"; publicationStatus: "failed" | "indeterminate" }
+  | { kind: "approval"; itemId: string; brandId: string; platform: NotificationData["issues"]["approvals"][number]["platform"]; plannedAt: string; section: "approvals" }
+  | { kind: "connection"; brandId: string }
+  | { kind: "worker" }
+);
 
 export function NotificationCenter() {
   const t = useTranslations("notifications");
@@ -61,15 +73,20 @@ export function NotificationCenter() {
   const notifications = useMemo(() => {
     if (!data) return [];
     const items = [
-      ...data.issues.publications.map((issue) => ({ id: issue.id, title: issue.title, detail: issue.status === "failed" ? t("publication.failed") : t("publication.indeterminate"), href: `#${WORKSPACE_SECTION_IDS.calendar}`, severity: "error" as const })),
-      ...data.issues.approvals.map((issue) => ({ id: issue.id, title: issue.title, detail: t("approvalPending", { brand: issue.brandName }), href: `#${WORKSPACE_SECTION_IDS.approvals}`, severity: "attention" as const })),
-      ...data.issues.connections.map((issue) => ({ id: issue.id, title: issue.displayName, detail: t("connectionNeedsAttention", { platform: tPlatforms(issue.platform), brand: issue.brandName }), href: `#${WORKSPACE_SECTION_IDS.connections}`, severity: "error" as const })),
+      ...data.issues.publications.map((issue): Notification => ({ kind: "publication", id: issue.id, title: issue.title, detail: issue.status === "failed" ? t("publication.failed") : t("publication.indeterminate"), href: `#${WORKSPACE_SECTION_IDS.calendar}`, itemId: issue.itemId, brandId: issue.brandId, platform: issue.platform, plannedAt: issue.plannedAt, section: "calendar", publicationStatus: issue.status, severity: "error" })),
+      ...data.issues.approvals.map((issue): Notification => ({ kind: "approval", id: issue.id, title: issue.title, detail: t("approvalPending", { brand: issue.brandName }), href: `#${WORKSPACE_SECTION_IDS.approvals}`, itemId: issue.itemId, brandId: issue.brandId, platform: issue.platform, plannedAt: issue.plannedAt, section: "approvals", severity: "attention" })),
+      ...data.issues.connections.map((issue): Notification => ({ kind: "connection", id: issue.id, title: issue.displayName, detail: t("connectionNeedsAttention", { platform: tPlatforms(issue.platform), brand: issue.brandName }), href: `#${WORKSPACE_SECTION_IDS.connections}`, brandId: issue.brandId, severity: "error" })),
     ];
-    if (data.worker.status === "stale" || data.worker.status === "unknown") items.unshift({ id: `worker-${data.worker.status}`, title: data.worker.status === "stale" ? t("worker.stale") : t("worker.unknown"), detail: t("workerDetail"), href: `#${WORKSPACE_SECTION_IDS.analytics}`, severity: "error" as const });
+    if (data.worker.status === "stale" || data.worker.status === "unknown") items.unshift({ kind: "worker", id: `worker-${data.worker.status}`, title: data.worker.status === "stale" ? t("worker.stale") : t("worker.unknown"), detail: t("workerDetail"), href: `#${WORKSPACE_SECTION_IDS.analytics}`, severity: "error" });
     return items;
   }, [data, t, tPlatforms]);
 
   const count = data ? data.attention.failedPublications + data.attention.indeterminatePublications + data.attention.pendingApprovals + data.attention.connectionsNeedReauth + (data.worker.status === "stale" || data.worker.status === "unknown" ? 1 : 0) : 0;
+  const overflowLinks = data ? [
+    { key: "publications", count: Math.max(0, data.attention.failedPublications + data.attention.indeterminatePublications - notifications.filter((item) => item.kind === "publication").length), href: `#${WORKSPACE_SECTION_IDS.calendar}`, message: "morePublications" as const },
+    { key: "approvals", count: Math.max(0, data.attention.pendingApprovals - notifications.filter((item) => item.kind === "approval").length), href: `#${WORKSPACE_SECTION_IDS.approvals}`, message: "moreApprovals" as const },
+    { key: "connections", count: Math.max(0, data.attention.connectionsNeedReauth - notifications.filter((item) => item.kind === "connection").length), href: `#${WORKSPACE_SECTION_IDS.connections}`, message: "moreConnections" as const },
+  ].filter((item) => item.count > 0) : [];
 
   return <div className="notificationCenter" ref={rootRef}>
     <Button appearance="quiet" className="notificationCenter__trigger" type="button" aria-label={t("open", { count })} aria-expanded={open} aria-controls="workspace-notifications-panel" onClick={() => setOpen((current) => !current)}>
@@ -81,12 +98,33 @@ export function NotificationCenter() {
       {hasError ? <p className="notificationCenter__empty" role="status">{t("loadError")} <Button appearance="quiet" type="button" onClick={() => setRefreshCount((current) => current + 1)}>{t("retry")}</Button></p> : null}
       {!hasError && data && notifications.length === 0 ? <p className="notificationCenter__empty"><CheckCircle2 aria-hidden="true" size={17} />{t("empty")}</p> : null}
       {!hasError && notifications.length > 0 ? <ul className="notificationCenter__list">{notifications.map((notification) => <li key={notification.id}>
-        <a href={notification.href} onClick={() => setOpen(false)}>
+        <a href={notification.href} onClick={(event) => {
+          if (notification.kind === "publication" || notification.kind === "approval") {
+            event.preventDefault();
+            window.dispatchEvent(new CustomEvent(WORKSPACE_UI_EVENTS.openCalendarItem, { detail: {
+              itemId: notification.itemId,
+              brandId: notification.brandId,
+              platform: notification.platform,
+              plannedAt: notification.plannedAt,
+              section: notification.section,
+              ...(notification.kind === "publication" ? { publicationStatus: notification.publicationStatus } : {}),
+            } }));
+            window.location.hash = notification.href.slice(1);
+          } else if (notification.kind === "connection") {
+            event.preventDefault();
+            window.dispatchEvent(new CustomEvent(WORKSPACE_UI_EVENTS.openSocialConnections, { detail: { brandId: notification.brandId } }));
+          }
+          setOpen(false);
+        }}>
           <span className={`notificationCenter__icon is-${notification.severity}`}>{notification.severity === "error" ? <CircleAlert aria-hidden="true" size={17} /> : <Bell aria-hidden="true" size={17} />}</span>
           <span className="notificationCenter__copy"><strong>{notification.title}</strong><small>{notification.detail}</small></span>
           <ChevronRight aria-hidden="true" size={16} />
         </a>
       </li>)}</ul> : null}
+      {!hasError && overflowLinks.length > 0 ? <div className="notificationCenter__overflow">
+        <p>{t("additionalAlerts")}</p>
+        <ul>{overflowLinks.map((item) => <li key={item.key}><a href={item.href} onClick={() => setOpen(false)}>{t(item.message, { count: item.count })}</a></li>)}</ul>
+      </div> : null}
     </div>
   </div>;
 }

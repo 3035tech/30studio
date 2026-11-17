@@ -107,6 +107,19 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
   }, [activeBrands, socialConnectionBrandId]);
 
   useEffect(() => {
+    function handleOpenConnections(event: Event) {
+      if (!(event instanceof CustomEvent) || !isRecord(event.detail) || typeof event.detail.brandId !== "string") return;
+      if (!activeBrands.some((brand) => brand.id === event.detail.brandId)) return;
+      setConnectionBrandId(event.detail.brandId);
+      setActiveBrandKitId(null);
+      setBrandView("connections");
+      window.location.hash = WORKSPACE_SECTION_IDS.connections;
+    }
+    window.addEventListener(WORKSPACE_UI_EVENTS.openSocialConnections, handleOpenConnections);
+    return () => window.removeEventListener(WORKSPACE_UI_EVENTS.openSocialConnections, handleOpenConnections);
+  }, [activeBrands]);
+
+  useEffect(() => {
     function syncBrandView() {
       if (window.location.hash === `#${WORKSPACE_SECTION_IDS.connections}`) setBrandView("connections");
       if (window.location.hash === `#${WORKSPACE_SECTION_IDS.brands}`) setBrandView("brands");

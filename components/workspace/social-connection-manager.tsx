@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { SOCIAL_PLATFORMS, type Locale, type SocialPlatform, type SocialProfileStatus } from "@/lib/constants";
 import { socialConnectionConfigurationResponseSchema, socialConnectionListResponseSchema } from "@/lib/validation/social-connections";
@@ -21,6 +22,8 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
   const [configured, setConfigured] = useState<SocialPlatform[]>([]);
   const [publicationCapabilities, setPublicationCapabilities] = useState<Map<SocialPlatform, { publication: "connection_only" | "text" | "single_image"; maximumTextCharacters: number | null }>>(() => new Map());
   const [configurationReady, setConfigurationReady] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
+  const [pendingDisconnect, setPendingDisconnect] = useState<Connection | null>(null);
 
   async function load() {
     try {
@@ -63,7 +66,13 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
         }
       });
     return () => controller.abort();
-  }, [brandId]);
+  }, [brandId, reloadCount]);
+
+  function retryLoading() {
+    setError(false);
+    setConfigurationReady(false);
+    setReloadCount((count) => count + 1);
+  }
 
   async function connect(platform: SocialPlatform) {
     setBusyPlatform(platform); setError(false);
@@ -86,13 +95,14 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
       });
       if (!response.ok) throw new Error();
       await load();
+      setPendingDisconnect(null);
     } catch { setError(true); }
     finally { setBusyPlatform(null); }
   }
 
   return <section className="socialConnectionManager" aria-labelledby={`social-connections-${brandId}`}>
     <h3 id={`social-connections-${brandId}`}>{t("title")}</h3>
-    {error ? <p role="alert">{t("error")}</p> : null}
+    {error ? <div className="entryMessage entryMessage--error" role="alert"><span>{t("error")}</span><Button appearance="quiet" type="button" disabled={!configurationReady || busyPlatform !== null} onClick={retryLoading}>{t("retry")}</Button></div> : null}
     <ul className="brandCollection__social">
       {SOCIAL_PLATFORMS.map((platform) => {
         const platformConnections = connections.filter((connection) => connection.platform === platform);
@@ -125,7 +135,7 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
               {connection.grantedScopes.length ? <small>{t("health.grantedScopes", { scopes: connection.grantedScopes.join(", ") })}</small> : null}
               <small>{t("health.remoteCheckUnavailable")}</small>
             </div>
-            {canManage && connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => void disconnect(connection)}>
+            {canManage && connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => setPendingDisconnect(connection)}>
               {busyPlatform === platform ? t("working") : t("disconnect")}
             </Button> : null}
           </div>;
@@ -133,5 +143,17 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
         </li>;
       })}
     </ul>
+    <Dialog open={pendingDisconnect !== null} onOpenChange={(open) => { if (!open && busyPlatform === null) setPendingDisconnect(null); }}>
+      {pendingDisconnect ? <DialogContent aria-labelledby="social-disconnect-title" aria-describedby="social-disconnect-description">
+        <DialogHeader>
+          <DialogTitle id="social-disconnect-title">{t("disconnectTitle")}</DialogTitle>
+          <DialogDescription id="social-disconnect-description">{t("disconnectConfirmation", { account: pendingDisconnect.displayName })}</DialogDescription>
+        </DialogHeader>
+        <div className="brandCollection__editorActions">
+          <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => setPendingDisconnect(null)}>{t("cancel")}</Button>
+          <Button appearance="danger" type="button" disabled={busyPlatform !== null} onClick={() => void disconnect(pendingDisconnect)}>{busyPlatform === pendingDisconnect.platform ? t("working") : t("disconnect")}</Button>
+        </div>
+      </DialogContent> : null}
+    </Dialog>
   </section>;
 }

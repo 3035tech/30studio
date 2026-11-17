@@ -152,3 +152,49 @@ The live browser became unavailable during the latest audit pass, so these are d
 - Added explicit approval-queue title and guidance, and aligned email input length with the 254-character server schema.
 - Audited input metadata and schemas for the reviewed forms: invitation email and organization display name are bounded, social and role values use shared domain types, and server requests continue to be validated by Zod. Existing multi-tenant authorization paths were not changed.
 - Verification: production build, full ESLint, and 46 unit tests pass; Portuguese and English catalogs have matching keys. Browser-level visual testing remains unverified because the local Python Playwright package is unavailable. The notification list is an active-issues summary, not a persistent inbox with read/unread messages or historical event storage.
+
+## Analytics information architecture — 2026-11-17
+
+- Split publication analytics into Overview, Goals, and Engagement tabs to reduce the long scroll and keep related information together. The Overview retains operational issues, publishing worker health, publication totals, and per-network status; the dashboard continues to render that compact summary without the tab controls.
+- Added localized tab names and labels in English and Brazilian Portuguese, arrow/Home/End keyboard navigation, and focusable tab panels.
+- TypeScript, focused ESLint, locale-key alignment, and `git diff --check` passed. Chrome's browser access host is unavailable, so visual and click-through review remains pending.
+
+## Social connections recovery — 2026-11-17
+
+- The connection manager showed an error with “try again” wording but provided no retry action. Added a localized reload button that refetches both the brand's connection list and provider configuration, and disables itself while configuration is loading or a connection action is running.
+- TypeScript, focused ESLint, locale-key alignment, and `git diff --check` passed. Live OAuth and disconnect flows were not exercised; Chrome's browser access host remains unavailable.
+
+## Workspace profile scope — 2026-11-17
+
+- Profile settings now follow the active workspace ID. A workspace switch hides stale settings while the scoped request loads, and a cancelled request cannot clear the next request's loading state. Saving is blocked unless the displayed settings still match the active workspace.
+- TypeScript, focused ESLint, and `git diff --check` passed. This fixes a client-side stale-workspace race; it does not establish the cause of the previously observed settings API error, which still needs browser Network evidence.
+
+## Brand media upload feedback — 2026-11-17
+
+- The media form now validates supported image types and the 10 MB limit when a file is selected, showing a localized field error and disabling upload until the selection is valid. After a successful upload, the native file input is remounted so it no longer displays the previous file.
+- TypeScript, focused ESLint, locale-key alignment, and `git diff --check` passed. Storage upload and image preview still need browser-level verification against the configured bucket.
+
+## Social account disconnect safeguard — 2026-11-17
+
+- Disconnecting a social account now asks for confirmation and names the account, with a reminder that scheduled posts may need attention. The dialog uses the shared accessible Radix dialog and is localized in English and Brazilian Portuguese.
+- TypeScript, focused ESLint, locale-key alignment, and `git diff --check` passed. The live disconnect flow still needs browser verification.
+
+## Notification destinations — 2026-11-17
+
+- Connection alerts now select the affected brand before opening its social connections. Publication and approval alerts now open the corresponding calendar item with the relevant brand, network, date, and status context instead of opening only a generic list.
+- The connection target is checked against brands in the active workspace before navigation. TypeScript, focused ESLint, and `git diff --check` passed. Browser click-through remains unverified.
+
+## Transactional email layout — 2026-11-17
+
+- Replaced plain paragraph-only HTML for verification, invitation, and password recovery messages with one shared branded layout: official 30studio wordmark, responsive white content panel, high-contrast action button, and compact sender footer. Styles are inline and use presentation tables for email-client compatibility; escaped copy remains readable when remote images are blocked.
+- Existing plain-text fallbacks and message catalogs remain the source of copy. TypeScript, focused ESLint, and `git diff --check` passed. Inbox rendering still needs verification with the configured SMTP provider and representative clients.
+
+## Notification overflow clarity — 2026-11-17
+
+- The notification badge uses organization-scoped totals, while each issue list is capped at ten items per category. The popover now reports how many additional publication, approval, and connection alerts are omitted and links to the corresponding workspace section.
+- This keeps the badge count understandable without loading an unbounded alert list. The popover remains a current-issues summary, not a historical notification inbox. TypeScript, focused ESLint, and `git diff --check` passed; browser behavior remains unverified.
+
+## Profile password validation — 2026-11-17
+
+- The profile's confirm-password field now shows the existing localized mismatch message directly below the field as the user types or submits, and clears it as soon as both values match. This keeps correction guidance next to the input while retaining server-side password verification.
+- TypeScript, focused ESLint, and `git diff --check` passed; browser interaction remains unverified.
