@@ -93,7 +93,7 @@ async function publishInstagramImage(accessToken: string, accountId: string, cap
 
 export const instagramPublisher: SocialPublisherAdapter = {
   platform: "instagram",
-  requiredScopes: ["instagram_business_basic", "instagram_business_content_publish"],
+  requiredScopes: ["instagram_business_basic", "instagram_business_content_publishing"],
   mediaSupport: "single_image",
   maximumTextCharacters: instagramLimits.captionCharacters,
   assertConfigured: () => { assertInstagramConfigured(); },

@@ -8,7 +8,7 @@ export const instagram: ProviderConfig = {
   authorizationEndpoint: "https://www.instagram.com/oauth/authorize",
   tokenEndpoint: "https://api.instagram.com/oauth/access_token",
   tokenAuth: "post",
-  scopes: ["instagram_business_basic", "instagram_business_content_publish"],
+  scopes: ["instagram_business_basic", "instagram_business_content_publishing"],
   supportsPkce: false,
   accountEndpoint: "https://graph.instagram.com/me",
   accountFields: "id,username,name",

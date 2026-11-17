@@ -13,7 +13,7 @@ Set each provider's client ID and secret in the deployment environment. Meta use
 | Provider | Environment variables | Initial identity scopes |
 | --- | --- | --- |
 | LinkedIn | `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_API_VERSION` | `openid profile w_member_social` for publishing |
-| Instagram, Facebook, Threads | `META_CLIENT_ID`, `META_CLIENT_SECRET`, `META_GRAPH_API_VERSION` | Instagram Login: `instagram_business_basic`, `instagram_business_content_publish`; Facebook Pages: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`; Threads: `threads_basic`, `threads_content_publish` |
+| Instagram, Facebook, Threads | `META_CLIENT_ID`, `META_CLIENT_SECRET`, `META_GRAPH_API_VERSION` | Instagram Login: `instagram_business_basic`, `instagram_business_content_publishing`; Facebook Pages: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`; Threads: `threads_basic`, `threads_content_publish` |
 | TikTok | `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET` | `user.info.basic` |
 | X | `X_CLIENT_ID`, `X_CLIENT_SECRET` | `users.read offline.access` |
 | YouTube | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | `youtube.readonly` |

@@ -38,7 +38,7 @@ type RawTokenSet = {
 };
 
 export class SocialProviderError extends Error {
-  constructor(readonly requiresReauthentication: boolean, readonly retryable: boolean) {
+  constructor(readonly requiresReauthentication: boolean, readonly retryable: boolean, readonly providerCode: string | null = null) {
     super("Social provider request failed.");
     this.name = "SocialProviderError";
   }
@@ -118,8 +118,11 @@ async function parseProviderJson(response: Response) {
   try { value = JSON.parse(body); } catch { throw new Error("Social provider returned an invalid response."); }
   if (!response.ok) {
     const providerError = asObject(value);
-    const code = providerError?.error;
-    throw new SocialProviderError(code === "invalid_grant" || response.status === 401, response.status === 429 || response.status >= 500);
+    const providerDetails = asObject(providerError?.error);
+    const codeValue = typeof providerError?.error === "string" ? providerError.error
+      : typeof providerDetails?.code === "string" ? providerDetails.code
+        : typeof providerError?.error_code === "string" ? providerError.error_code : null;
+    throw new SocialProviderError(codeValue === "invalid_grant" || response.status === 401, response.status === 429 || response.status >= 500, codeValue);
   }
   const parsed = asObject(value);
   if (!parsed) throw new Error("Social provider returned an invalid response.");
@@ -146,7 +149,7 @@ function getRawTokenSet(value: unknown): RawTokenSet {
   const outer = asObject(value);
   const nestedData = asObject(outer?.data);
   const token = nestedData ?? outer;
-  if (token && typeof token.error === "string") throw new SocialProviderError(token.error === "invalid_grant", false);
+  if (token && typeof token.error === "string") throw new SocialProviderError(token.error === "invalid_grant", false, token.error);
   if (!token || typeof token.access_token !== "string" || token.access_token.length === 0) throw new Error("Social provider did not return an access token.");
   return token as RawTokenSet;
 }

@@ -73,7 +73,7 @@ export const SOCIAL_CONNECTION = {
 } as const;
 export const SOCIAL_PUBLICATION_LIMITS = {
   facebook: {
-    publishablePageTasks: ["CREATE_CONTENT", "MANAGE"],
+    publishablePageTasks: ["CREATE_CONTENT", "MANAGE", "PROFILE_PLUS_CREATE_CONTENT", "PROFILE_PLUS_MANAGE", "PROFILE_PLUS_FULL_CONTROL"],
   },
   instagram: {
     captionCharacters: 2_200,
