@@ -7,6 +7,7 @@ import { API_ERROR_CODES, BRAND_ASSET_ENV, BRAND_ASSET_LIMITS, HTTP_STATUS, SOCI
 import type { BrandAssetUpload } from "@/lib/validation/brand-assets";
 import { ApiError } from "@/lib/server/api-error";
 import { isAllowedBrandAssetEndpoint } from "@/lib/server/brand-asset-endpoint";
+import { logOperationalError } from "@/lib/server/operational-logger";
 
 const MIME_BY_FORMAT = { jpeg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 
@@ -63,7 +64,8 @@ export async function verifyBrandAssetUpload(input: Pick<BrandAssetUpload, "cont
   let head: HeadObjectCommandOutput;
   try {
     head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: uploadKey }));
-  } catch {
+  } catch (error) {
+    logOperationalError("storage.brand_asset.upload.head_failed", error);
     throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
   }
   if (head.ContentLength !== input.sizeBytes || head.ContentType !== input.contentType || head.Metadata?.sha256 !== input.sha256 || head.ContentLength > BRAND_ASSET_LIMITS.maximumBytes) {
@@ -77,6 +79,7 @@ export async function verifyBrandAssetUpload(input: Pick<BrandAssetUpload, "cont
     bytes = Buffer.from(await response.Body.transformToByteArray());
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    logOperationalError("storage.brand_asset.upload.download_failed", error);
     throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
   }
   if (bytes.byteLength !== input.sizeBytes || createHash("sha256").update(bytes).digest("hex") !== input.sha256) {
@@ -109,7 +112,8 @@ export async function storeVerifiedBrandAsset(input: Pick<BrandAssetUpload, "con
       Metadata: { sha256: input.sha256 },
       ChecksumSHA256: Buffer.from(input.sha256, "hex").toString("base64"),
     }));
-  } catch {
+  } catch (error) {
+    logOperationalError("storage.brand_asset.upload.store_failed", error);
     throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
   }
 }

@@ -19,5 +19,5 @@ export async function GET(request: NextRequest) {
       maximumTextCharacters: capabilities.get(provider.platform)?.maximumTextCharacters ?? null,
     }));
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

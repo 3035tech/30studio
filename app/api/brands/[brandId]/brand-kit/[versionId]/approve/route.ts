@@ -26,6 +26,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: version }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

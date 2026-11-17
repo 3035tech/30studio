@@ -34,6 +34,6 @@ export async function POST(request: NextRequest) {
     if (!response.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);
     return NextResponse.json(response.data, { status: campaign.replayed ? HTTP_STATUS.ok : HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

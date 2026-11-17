@@ -30,6 +30,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!review) throw new ApiError(API_ERROR_CODES.contentMediaNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: { id: review.id, status: parsed.data.decision === CONTENT_MEDIA_STATUS.approved ? CONTENT_MEDIA_STATUS.approved : CONTENT_MEDIA_STATUS.rejected } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

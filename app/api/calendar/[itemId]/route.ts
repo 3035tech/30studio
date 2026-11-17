@@ -35,6 +35,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (!item) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: item }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

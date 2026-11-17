@@ -13,6 +13,6 @@ export async function GET(request: NextRequest) {
     const events = await listTeamAuditEvents(tenant.organizationId);
     return NextResponse.json({ data: events }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

@@ -8,6 +8,7 @@ import { claimNextContentMediaJob, completeContentMediaJob, expireExhaustedConte
 import { storeVerifiedBrandAsset } from "@/lib/server/brand-asset-storage";
 import { renderTextCard } from "@/lib/server/content-media-template";
 import { textCardPayloadSchema } from "@/lib/validation/content-media-template";
+import { logOperationalError } from "@/lib/server/operational-logger";
 
 export type ContentMediaJob = Awaited<ReturnType<typeof claimNextContentMediaJob>>;
 
@@ -58,7 +59,13 @@ export async function processNextContentMediaJob(now = new Date()) {
   try {
     const image = await renderAndStoreImage(job);
     await completeContentMediaJob({ organizationId: job.organizationId, id: job.id, claimedAt: job.claimedAt, ...image });
-  } catch {
+  } catch (error) {
+    logOperationalError("worker.content_media.job_failed", error, {
+      organizationId: job.organizationId,
+      brandId: job.brandId,
+      jobId: job.id,
+      attempts: job.attempts,
+    });
     await failContentMediaJob({ organizationId: job.organizationId, id: job.id, claimedAt: job.claimedAt, attempts: job.attempts }, new Date());
   }
   return true;

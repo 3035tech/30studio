@@ -37,8 +37,17 @@ export async function uploadBrandAssetFile(brandId: string, file: File, options:
   const form = new FormData();
   Object.entries(session.data.upload.fields).forEach(([field, value]) => form.append(field, value));
   form.append("file", file, file.name);
-  const storageResponse = await fetch(session.data.upload.url, { method: "POST", body: form, credentials: "omit" });
-  if (!storageResponse.ok) throw new Error("upload-failed");
+  let storageResponse: Response;
+  try {
+    storageResponse = await fetch(session.data.upload.url, { method: "POST", body: form, credentials: "omit" });
+  } catch {
+    await reportUploadFailure(brandId, session.data.id, "network", null);
+    throw new Error("upload-failed");
+  }
+  if (!storageResponse.ok) {
+    await reportUploadFailure(brandId, session.data.id, "storage_rejected", storageResponse.status);
+    throw new Error("upload-failed");
+  }
 
   const finalizeResponse = await fetch(getBrandAssetActionApiPath(brandId, session.data.id, BRAND_ASSET_ACTIONS.finalize), {
     method: "POST",
@@ -47,4 +56,13 @@ export async function uploadBrandAssetFile(brandId: string, file: File, options:
     body: "{}",
   });
   await readJson(finalizeResponse);
+}
+
+async function reportUploadFailure(brandId: string, assetId: string, failure: "network" | "storage_rejected", status: number | null) {
+  await fetch(`${getBrandAssetsApiPath(brandId)}/${encodeURIComponent(assetId)}/upload-failure`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ failure, status }),
+  }).catch(() => undefined);
 }

@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       canReview: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentApprove),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -60,6 +60,6 @@ export async function POST(request: NextRequest) {
     if (!item) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: item }, { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

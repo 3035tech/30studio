@@ -84,5 +84,5 @@ export async function GET(request: NextRequest) {
     destination.searchParams.set("social_connection", "connected");
     destination.searchParams.set("platform", oauthState.platform);
     return redirectToWorkspace(destination);
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

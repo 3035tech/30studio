@@ -36,6 +36,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       itemStatus: result.itemStatus,
     } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

@@ -29,6 +29,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!asset) throw new ApiError(API_ERROR_CODES.brandAssetStateConflict, HTTP_STATUS.conflict);
     return NextResponse.json({ data: asset }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

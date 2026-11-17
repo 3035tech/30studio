@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!approval) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: approval }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -64,6 +64,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const itemStatus = result.kind === "partial" ? "in_review" : result.kind === "decided" ? result.itemStatus : decision === CONTENT_APPROVAL_STATUS.approved ? "approved" : "draft";
     return NextResponse.json({ data: { kind: result.kind, decision, itemStatus, ...(result.kind === "partial" ? { approvedCount: result.approvedCount, requiredApprovals: result.requiredApprovals } : {}) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

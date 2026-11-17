@@ -24,5 +24,5 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const updated = await updateCompetitorSourceStatus(tenant.organizationId, brandId, sourceId, parsed.data.status);
     if (!updated) throw new ApiError(API_ERROR_CODES.competitorSourceNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: { updated: true } }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

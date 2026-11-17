@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({ data: brand }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -56,6 +56,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     return new NextResponse(null, { status: HTTP_STATUS.ok, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

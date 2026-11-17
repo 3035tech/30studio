@@ -29,6 +29,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const url = await createBrandAssetDownload(asset.objectKey, asset.fileName, asset.contentType);
     return NextResponse.redirect(url, { status: 302, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

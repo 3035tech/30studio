@@ -21,5 +21,5 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (result === "not_found" || result === "inactive") throw new ApiError(API_ERROR_CODES.competitorSourceNotFound, HTTP_STATUS.notFound);
     if (result === "running") throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.conflict);
     return NextResponse.json({ data: { queued: true } }, { status: HTTP_STATUS.accepted, headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

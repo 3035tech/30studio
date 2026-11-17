@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: resent }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -68,6 +68,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     return new NextResponse(null, { status: HTTP_STATUS.ok, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

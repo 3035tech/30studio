@@ -23,5 +23,5 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const updated = await updateCompetitorAlertSettings(tenant.organizationId, brandId, tenant.userId, parsed.data);
     if (!updated) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: parsed.data }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

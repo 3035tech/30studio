@@ -9,6 +9,7 @@ import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
 import { hasTenantPermission } from "@/lib/server/permissions";
 import { brandAssetUploadSchema } from "@/lib/validation/brand-assets";
+import { logOperationalError } from "@/lib/server/operational-logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     if (!assets) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: assets, canManage }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -53,11 +54,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         status: HTTP_STATUS.created,
         headers: { "Cache-Control": "no-store" },
       });
-    } catch {
+    } catch (error) {
+      logOperationalError("storage.brand_asset.upload.presign_failed", error, { organizationId: tenant.organizationId, brandId });
       await removePendingBrandAsset(tenant.organizationId, brandId, assetId).catch(() => undefined);
       throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
     }
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

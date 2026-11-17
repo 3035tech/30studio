@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const tenant = await requireTenant(request, TENANT_PERMISSIONS.contentRead);
     const data = await listContentApprovalPolicies(tenant.organizationId);
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }
 
 export async function PUT(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest) {
     const saved = await saveContentApprovalPolicy(tenant.organizationId, tenant.userId, parsed.data.brandId, parsed.data.requiredApprovals);
     if (!saved) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: await listContentApprovalPolicies(tenant.organizationId) }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }
 
 export async function DELETE(request: NextRequest) {
@@ -39,5 +39,5 @@ export async function DELETE(request: NextRequest) {
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
     await deleteBrandApprovalPolicy(tenant.organizationId, parsed.data.brandId);
     return NextResponse.json({ data: await listContentApprovalPolicies(tenant.organizationId) }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

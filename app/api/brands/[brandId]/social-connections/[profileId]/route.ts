@@ -18,5 +18,5 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const disconnected = await disconnectSocialProfile(tenant.organizationId, brandId, profileId, tenant.userId);
     if (!disconnected) throw new ApiError(API_ERROR_CODES.socialConnectionNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: { disconnected: true } }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

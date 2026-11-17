@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     });
     if (!response.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);
     return NextResponse.json(response.data, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
@@ -41,5 +41,5 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (result.kind === "duplicate") throw new ApiError(API_ERROR_CODES.competitorSourceExists, HTTP_STATUS.conflict);
     if (result.kind === "limit_reached") throw new ApiError(API_ERROR_CODES.competitorSourceLimitReached, HTTP_STATUS.conflict);
     return NextResponse.json({ data: { id: result.id } }, { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

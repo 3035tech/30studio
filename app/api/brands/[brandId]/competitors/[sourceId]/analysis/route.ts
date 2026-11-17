@@ -19,5 +19,5 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
     const retried = await retryUnavailableCompetitorAnalysis(tenant.organizationId, brandId, sourceId);
     return NextResponse.json({ data: { retried } }, { status: HTTP_STATUS.accepted, headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

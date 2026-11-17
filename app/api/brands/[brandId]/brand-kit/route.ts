@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -50,6 +50,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ data: version }, { status: HTTP_STATUS.created, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

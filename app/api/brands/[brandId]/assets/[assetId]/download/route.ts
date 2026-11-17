@@ -34,6 +34,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     }
     return NextResponse.json({ data: { url, expiresInSeconds: BRAND_ASSET_LIMITS.downloadExpirySeconds } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

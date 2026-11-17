@@ -1,5 +1,6 @@
 import { CONTENT_MEDIA_WORKER } from "@/lib/constants";
 import { runContentMediaWorker } from "@/lib/server/content-media-worker";
+import { logOperationalError } from "@/lib/server/operational-logger";
 
 let stopping = false;
 process.once("SIGINT", () => { stopping = true; });
@@ -9,7 +10,7 @@ async function waitForNextJob() {
   await new Promise((resolve) => setTimeout(resolve, CONTENT_MEDIA_WORKER.pollIntervalMilliseconds));
 }
 
-runContentMediaWorker(() => stopping, waitForNextJob).catch(() => {
-  console.error("Content media worker stopped after an unrecoverable database error.");
+runContentMediaWorker(() => stopping, waitForNextJob).catch((error) => {
+  logOperationalError("worker.content_media.stopped", error);
   process.exitCode = 1;
 });

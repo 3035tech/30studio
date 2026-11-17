@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const data = canManage ? await listTeamInvitations(tenant.organizationId) : [];
     return NextResponse.json({ data, canManage, actorRole: tenant.role }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -64,6 +64,6 @@ export async function POST(request: NextRequest) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

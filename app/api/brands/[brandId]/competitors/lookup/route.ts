@@ -167,5 +167,5 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       feedUrl: `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}`,
     } });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

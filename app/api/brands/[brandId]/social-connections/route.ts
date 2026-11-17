@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!z.string().uuid().safeParse(brandId).success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
     const connections = await listSocialConnections(tenant.organizationId, brandId);
     return NextResponse.json({ data: connections }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -53,5 +53,5 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!saved) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     const authorizationUrl = await createSocialAuthorizationUrl(connector, state, codeVerifier, nonce, callback.toString());
     return NextResponse.json({ data: { authorizationUrl: authorizationUrl.toString() } }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }

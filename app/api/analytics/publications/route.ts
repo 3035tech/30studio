@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       canManageGoals: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentManage),
     } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -57,6 +57,6 @@ export async function POST(request: NextRequest) {
     if (!result.success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.internalError);
     return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

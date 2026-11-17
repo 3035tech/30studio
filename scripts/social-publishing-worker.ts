@@ -8,6 +8,7 @@ import { getSocialPublisher } from "../lib/server/social-publisher/registry";
 import { cleanupExpiredSocialPublicationImages, createInstagramPublicationImage, deleteSocialPublicationImage } from "../lib/server/brand-asset-storage";
 import { isPublishableInstagramImage } from "../lib/server/social-publisher/instagram-media";
 import { recordSocialPublishingWorkerHeartbeat } from "../lib/db/repositories/social-publication-health";
+import { logOperationalError } from "../lib/server/operational-logger";
 
 const pollMilliseconds = 5_000;
 const leaseBatchSize = 1;
@@ -235,14 +236,16 @@ async function processJob(job: NonNullable<Awaited<ReturnType<typeof claimDueJob
     return;
   }
   try { publisher.assertConfigured(); }
-  catch {
+  catch (error) {
+    logOperationalError("worker.social_publication.publisher_not_configured", error, { organizationId: job.organizationId, brandId: data.item.brandId, jobId: job.id });
     await finish(job, SOCIAL_PUBLICATION_JOB_STATUS.failed, "publisher_not_configured", null);
     return;
   }
   let accessToken: string | null;
   try {
     accessToken = await getValidSocialAccessToken(job.organizationId, job.socialProfileId);
-  } catch {
+  } catch (error) {
+    logOperationalError("worker.social_publication.token_unavailable", error, { organizationId: job.organizationId, brandId: data.item.brandId, jobId: job.id });
     await finish(job, SOCIAL_PUBLICATION_JOB_STATUS.failed, "social_token_unavailable", null);
     return;
   }
@@ -264,7 +267,8 @@ async function processJob(job: NonNullable<Awaited<ReturnType<typeof claimDueJob
       const staged = await createInstagramPublicationImage(asset.objectKey, { sha256: asset.sha256, sizeBytes: asset.sizeBytes, contentType: asset.contentType }, job.organizationId, job.id);
       stagingKey = staged.stagingKey;
       imageUrl = staged.url;
-    } catch {
+    } catch (error) {
+      logOperationalError("worker.social_publication.media_staging_failed", error, { organizationId: job.organizationId, brandId: data.item.brandId, jobId: job.id });
       await finish(job, SOCIAL_PUBLICATION_JOB_STATUS.failed, "publication_media_staging_failed", null);
       return;
     }
@@ -283,7 +287,7 @@ async function processJob(job: NonNullable<Awaited<ReturnType<typeof claimDueJob
     },
   });
   if (stagingKey && result.kind !== "indeterminate") {
-    try { await deleteSocialPublicationImage(stagingKey, job.organizationId, job.id); } catch { /* Retention cleanup removes stale publication images. */ }
+    try { await deleteSocialPublicationImage(stagingKey, job.organizationId, job.id); } catch (error) { logOperationalError("worker.social_publication.staging_cleanup_failed", error, { organizationId: job.organizationId, jobId: job.id }); }
   }
   if (result.kind === "indeterminate") {
     await finish(job, SOCIAL_PUBLICATION_JOB_STATUS.indeterminate, "provider_result_indeterminate", null);
@@ -313,14 +317,15 @@ async function main() {
       if (!job) {
         const indeterminateJob = await claimIndeterminateJob();
         if (indeterminateJob) {
-          try { await processIndeterminateJob(indeterminateJob); } catch { /* The bounded next check or manual review will resolve this job. */ }
+          try { await processIndeterminateJob(indeterminateJob); } catch (error) { logOperationalError("worker.social_publication.reconciliation_failed", error, { organizationId: indeterminateJob.organizationId, jobId: indeterminateJob.id }); }
           continue;
         }
         await new Promise((resolve) => setTimeout(resolve, pollMilliseconds));
         continue;
       }
       try { await processJob(job); }
-      catch {
+      catch (error) {
+        logOperationalError("worker.social_publication.job_failed_unexpectedly", error, { organizationId: job.organizationId, jobId: job.id });
         await finish(job, SOCIAL_PUBLICATION_JOB_STATUS.indeterminate, "worker_outcome_unknown", null);
       }
     }
@@ -330,4 +335,4 @@ async function main() {
   }
 }
 
-main().catch(async () => { await closeDatabase(); process.exitCode = 1; });
+main().catch(async (error) => { logOperationalError("worker.social_publication.stopped", error); await closeDatabase(); process.exitCode = 1; });

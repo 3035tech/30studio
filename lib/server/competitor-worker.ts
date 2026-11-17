@@ -8,6 +8,7 @@ import { collectCompetitorWebsite } from "@/lib/server/competitor-website";
 import { collectXCompetitorPosts, XCompetitorError } from "@/lib/server/competitor-x";
 import { getValidSocialAccessToken } from "@/lib/server/social-access-token";
 import type { CompetitorFeedItem } from "@/lib/db/repositories/competitors";
+import { logOperationalError } from "@/lib/server/operational-logger";
 
 async function processDueSource() {
   const source = await claimDueCompetitorSource();
@@ -51,6 +52,12 @@ async function processDueSource() {
             : error instanceof XCompetitorError && error.code === "connection_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired
               : error instanceof XCompetitorError && error.code === "permission_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialPermissionRequired
               : COMPETITOR_SOURCE_ERROR_CODES.requestFailed;
+    logOperationalError("worker.competitor.fetch_failed", error, {
+      organizationId: source.organizationId,
+      brandId: source.brandId,
+      sourceId: source.id,
+      failureCode: errorCode,
+    });
     await failCompetitorFetch(source, errorCode);
   }
   return true;
@@ -73,6 +80,12 @@ async function processDueAnalysis() {
     await completeCompetitorAnalysis(jobs, result.model, result.analyses);
   } catch (error) {
     const errorCode = error instanceof CompetitorAnalysisError ? error.code : COMPETITOR_SOURCE_ERROR_CODES.analysisProviderFailed;
+    logOperationalError("worker.competitor.analysis_failed", error, {
+      organizationId: first.organizationId,
+      brandId: first.brandId,
+      jobCount: jobs.length,
+      failureCode: errorCode,
+    });
     await failCompetitorAnalysis(jobs, errorCode);
   }
   return true;

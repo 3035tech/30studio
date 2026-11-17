@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.internalError, HTTP_STATUS.internalError);
     return NextResponse.json(parsed.data, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }
 
@@ -108,6 +108,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, request);
   }
 }

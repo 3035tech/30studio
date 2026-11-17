@@ -21,5 +21,5 @@ export async function PUT(request: NextRequest) {
     const updated = await saveDashboardPublicationGoal(tenant.organizationId, parsed.data.brandId, parsed.data.platform, parsed.data.monthlyTarget, tenant.userId);
     if (!updated) throw new ApiError(API_ERROR_CODES.brandNotFound, HTTP_STATUS.notFound);
     return NextResponse.json({ data: { saved: true } }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) { return apiErrorResponse(error); }
+  } catch (error) { return apiErrorResponse(error, request); }
 }
