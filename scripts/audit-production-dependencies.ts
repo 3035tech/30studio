@@ -30,14 +30,18 @@ export function isOnlyTemporaryPicomatchFinding(
     picomatch.via?.length === 1 &&
     typeof picomatch.via[0] === 'object' &&
     picomatch.via[0].url === temporaryPicomatchAdvisory &&
-    Boolean(micromatch) &&
-    micromatch?.severity === 'high' &&
-    micromatch.via?.length === 1 &&
-    micromatch.via[0] === 'picomatch' &&
     Boolean(parcelWatcher) &&
     parcelWatcher?.severity === 'high' &&
     parcelWatcher.via?.length === 1 &&
-    parcelWatcher.via[0] === 'micromatch'
+    (parcelWatcher.via[0] === 'picomatch' ||
+      (parcelWatcher.via[0] === 'micromatch' &&
+        micromatch?.severity === 'high' &&
+        micromatch.via?.length === 1 &&
+        micromatch.via[0] === 'picomatch')) &&
+    (!micromatch ||
+      (micromatch.severity === 'high' &&
+        micromatch.via?.length === 1 &&
+        micromatch.via[0] === 'picomatch'))
   );
 }
 
@@ -98,7 +102,7 @@ function main(): void {
 
   const counts = report.metadata?.vulnerabilities;
   console.warn(
-    `Temporary exception: ${temporaryPicomatchAdvisory} is the only high-severity production advisory, reported through picomatch → micromatch → @parcel/watcher.`,
+    `Temporary exception: ${temporaryPicomatchAdvisory} is the only high-severity production advisory, reported through picomatch and its @parcel/watcher dependency chain.`,
   );
   console.warn(
     `Audit totals: ${counts?.high ?? 0} high, ${counts?.critical ?? 0} critical. Remove this exception after the advisory is remediated upstream.`,

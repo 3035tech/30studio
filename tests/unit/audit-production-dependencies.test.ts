@@ -18,6 +18,14 @@ test('allows only the approved picomatch advisory dependency chain', () => {
   assert.equal(isOnlyTemporaryPicomatchFinding(allowedFinding), true);
 });
 
+test('allows watcher reports that link directly to the same picomatch advisory', () => {
+  const vulnerabilities = structuredClone(allowedFinding);
+  vulnerabilities['@parcel/watcher'].via = ['picomatch'];
+  delete vulnerabilities.micromatch;
+
+  assert.equal(isOnlyTemporaryPicomatchFinding(vulnerabilities), true);
+});
+
 test('rejects a different high-severity advisory on picomatch', () => {
   const vulnerabilities = structuredClone(allowedFinding);
   vulnerabilities.picomatch.via = [
