@@ -998,6 +998,8 @@
     "retry": "Recarregar conexões",
     "connected": "Conta social conectada.",
     "failed": "Não foi possível conectar a conta social. Tente novamente.",
+    "cancelled": "A conexão foi cancelada antes de ser concluída. Você pode tentar novamente quando quiser.",
+    "permissions_required": "A Meta não concedeu uma permissão necessária. Confira as permissões aprovadas no app Meta, autorize o acesso à Página do Facebook e, para Instagram, use uma conta profissional. Depois, tente conectar novamente.",
     "already_connected": "Esta conta já está conectada a esta marca.",
     "no_publishable_pages": "Nenhuma Página do Facebook com permissão de publicação foi encontrada. Conceda as permissões necessárias e tente novamente.",
     "selectProfilePerPost": "Escolha a conta de destino ao solicitar a aprovação de cada publicação.",

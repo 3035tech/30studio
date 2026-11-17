@@ -998,6 +998,8 @@
     "retry": "Reload connections",
     "connected": "Social account connected.",
     "failed": "Social account could not be connected. Try again.",
+    "cancelled": "The connection was cancelled before it finished. You can try again whenever you are ready.",
+    "permissions_required": "Meta did not grant a required permission. Check the permissions approved for your Meta app, allow access to the Facebook Page, and use a professional account for Instagram. Then try connecting again.",
     "already_connected": "This account is already connected to this brand.",
     "no_publishable_pages": "No Facebook Page with publishing access was found. Grant the required Page permissions and try again.",
     "selectProfilePerPost": "Choose the destination account when you submit each post for approval.",

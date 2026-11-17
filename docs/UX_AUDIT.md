@@ -164,6 +164,12 @@ The live browser became unavailable during the latest audit pass, so these are d
 - The connection manager showed an error with “try again” wording but provided no retry action. Added a localized reload button that refetches both the brand's connection list and provider configuration, and disables itself while configuration is loading or a connection action is running.
 - TypeScript, focused ESLint, locale-key alignment, and `git diff --check` passed. Live OAuth and disconnect flows were not exercised; Chrome's browser access host remains unavailable.
 
+## Social connection failure guidance — 2026-11-17
+
+- OAuth cancellations now return a clear informational message. Explicit permission-denial codes from the token exchange lead to a localized Meta permissions checklist; other failures retain the generic safe message and structured server log.
+- Failure messages use alert semantics and the existing error treatment. Provider error descriptions and internal details are never exposed in the URL or UI.
+- Live Meta OAuth still requires a configured, approved Meta app and browser verification; the app cannot confirm those external settings by itself.
+
 ## Workspace profile scope — 2026-11-17
 
 - Profile settings now follow the active workspace ID. A workspace switch hides stale settings while the scoped request loads, and a cancelled request cannot clear the next request's loading state. Saving is blocked unless the displayed settings still match the active workspace.

@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         platform: oauthState.platform,
         ...(providerError && /^[A-Za-z0-9_.-]{1,64}$/u.test(providerError) ? { providerCode: providerError } : {}),
       });
+      if (providerError === "access_denied") destination.searchParams.set("social_connection", "cancelled");
       return redirectToWorkspace(destination);
     }
     if (!isSupportedSocialPlatform(oauthState.platform)) throw new ApiError(API_ERROR_CODES.socialOAuthInvalid, HTTP_STATUS.badRequest);
@@ -99,6 +100,9 @@ export async function GET(request: NextRequest) {
           requiresReauthentication: error.requiresReauthentication,
         } : {}),
       });
+      if (error instanceof SocialProviderError && ["invalid_scope", "10", "200"].includes(error.providerCode ?? "")) {
+        destination.searchParams.set("social_connection", "permissions_required");
+      }
       return redirectToWorkspace(destination);
     }
     destination.searchParams.set("social_connection", "connected");

@@ -505,7 +505,14 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       onSignOut={() => void handleSignOut()}
     >
       {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
-      {socialConnectionResult === "connected" || socialConnectionResult === "failed" || socialConnectionResult === "already_connected" || socialConnectionResult === "no_publishable_pages" ? <p className="entryMessage" role="status">{tSocialConnections(socialConnectionResult)}</p> : null}
+      {socialConnectionResult === "connected" || socialConnectionResult === "failed" || socialConnectionResult === "cancelled" || socialConnectionResult === "permissions_required" || socialConnectionResult === "already_connected" || socialConnectionResult === "no_publishable_pages" ? (
+        <p
+          className={socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" ? "entryMessage entryMessage--error" : "entryMessage"}
+          role={socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" ? "alert" : "status"}
+        >
+          {tSocialConnections(socialConnectionResult)}
+        </p>
+      ) : null}
       <section className="workspaceOverview" id={WORKSPACE_SECTION_IDS.overview} aria-labelledby="workspace-overview-title">
         <div className="workspaceOverview__intro">
           <p className="entryKicker">{activeOrganization?.name ?? tWorkspace("title")}</p>
