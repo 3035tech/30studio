@@ -198,3 +198,8 @@ The live browser became unavailable during the latest audit pass, so these are d
 
 - The profile's confirm-password field now shows the existing localized mismatch message directly below the field as the user types or submits, and clears it as soon as both values match. This keeps correction guidance next to the input while retaining server-side password verification.
 - TypeScript, focused ESLint, and `git diff --check` passed; browser interaction remains unverified.
+
+## Verification email localization — 2026-11-17
+
+- Sign-up now includes the active locale in its callback URL, and verification subject, copy, and email language use that locale. Password reset continues to use its localized callback URL through the shared resolver.
+- Invitation records do not currently retain a locale, so invitation email copy still uses the product's Portuguese default rather than guessing the recipient's preference. TypeScript, focused ESLint, and `git diff --check` passed; email-client rendering remains pending.

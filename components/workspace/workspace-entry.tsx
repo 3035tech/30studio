@@ -219,7 +219,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
         setResetLinkSent(true);
       } else if (authMode === "sign_up") {
         const name = String(form.get("name") ?? "").trim();
-        const result = await authClient.signUp.email({ name, email, password });
+        const result = await authClient.signUp.email({ name, email, password, callbackURL: `/${locale}` });
         if (result.error) throw new Error(result.error.message);
         await refreshSession();
         setMessage(tWorkspace("emailVerificationRequired"));

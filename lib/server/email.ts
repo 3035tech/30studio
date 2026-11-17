@@ -94,14 +94,15 @@ export async function sendTransactionalEmail(email: TransactionalEmail) {
 }
 
 export async function sendVerificationEmail(data: { user: { name: string; email: string }; url: string }) {
-  const copy = portugueseMessages.email.verification;
+  const locale = getEmailUrlLocale(data.url);
+  const copy = locale === "en" ? englishMessages.email.verification : portugueseMessages.email.verification;
   const greeting = interpolateEmail(copy.greeting, { name: data.user.name });
 
   await sendTransactionalEmail({
     recipient: data.user.email,
     subject: copy.subject,
     text: `${greeting}\n\n${copy.body}\n${data.url}\n\n${copy.ignore}`,
-    html: renderBrandedEmail({ locale: "pt", greeting, body: copy.body, action: copy.action, href: data.url, footer: copy.ignore }),
+    html: renderBrandedEmail({ locale, greeting, body: copy.body, action: copy.action, href: data.url, footer: copy.ignore }),
   });
 }
 
@@ -130,7 +131,7 @@ export async function sendInvitationEmail(data: {
 }
 
 export async function sendPasswordResetEmail(data: { user: { name: string; email: string }; url: string }) {
-  const locale = getPasswordResetLocale(data.url);
+  const locale = getEmailUrlLocale(data.url);
   const copy = locale === "en" ? englishMessages.email.passwordReset : portugueseMessages.email.passwordReset;
   const greeting = interpolateEmail(copy.greeting, { name: data.user.name });
 
@@ -159,9 +160,9 @@ function renderBrandedEmail(template: BrandedEmailTemplate) {
   return `<!doctype html><html lang="${template.locale === "pt" ? "pt-BR" : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background-color:#F7F8FC;color:#334155;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${safeBody}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#F7F8FC"><tr><td align="center" style="padding:32px 16px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px"><tr><td style="padding:8px 24px 22px">${logoMarkup}</td></tr><tr><td style="padding:32px 30px;background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px"><h1 style="margin:0 0 18px;color:#334155;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:700;line-height:1.35">${safeGreeting}</h1><p style="margin:0 0 22px;color:#334155;font-size:16px;line-height:1.65">${safeBody}</p><table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 22px"><tr><td align="center" bgcolor="#6A00FF" style="border-radius:7px"><a href="${safeHref}" style="display:inline-block;padding:13px 20px;border:1px solid #6A00FF;border-radius:7px;color:#FFFFFF;font-size:15px;font-weight:700;line-height:1.3;text-decoration:none">${safeAction}</a></td></tr></table>${safeExpiry ? `<p style="margin:0 0 16px;color:#64748B;font-size:14px;line-height:1.55">${safeExpiry}</p>` : ""}<p style="margin:0;color:#64748B;font-size:14px;line-height:1.55">${safeFooter}</p></td></tr><tr><td style="padding:20px 24px 0;color:#64748B;font-size:12px;line-height:1.5;text-align:center">${escapeHtml(PRODUCT.name)} · ${escapeHtml(PRODUCT.groupName)}</td></tr></table></td></tr></table></body></html>`;
 }
 
-function getPasswordResetLocale(resetUrl: string): Locale {
+function getEmailUrlLocale(emailUrl: string): Locale {
   try {
-    let candidate = new URL(resetUrl);
+    let candidate = new URL(emailUrl);
     for (let depth = 0; depth < 2; depth += 1) {
       if (candidate.pathname.startsWith("/en/")) return "en";
       if (candidate.pathname.startsWith("/pt/")) return "pt";
