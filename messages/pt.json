@@ -87,6 +87,10 @@
       "social_connected": { "title": "Conta social conectada", "detail": "{platform} foi conectada a {brand}." },
       "social_connection_failed": { "title": "Falha ao conectar conta social", "detail": "Não foi possível conectar {platform} a {brand}. Confira as permissões da conta e tente novamente." },
       "approval_requested": { "title": "Aprovação solicitada", "detail": "{content} de {brand} aguarda revisão." },
+      "approval_approved": { "title": "Aprovação registrada", "detail": "Uma pessoa aprovou {content} de {brand}." },
+      "approval_rejected": { "title": "Decisão de revisão registrada", "detail": "Uma pessoa rejeitou {content} de {brand}." },
+      "approval_changes_requested": { "title": "Alterações solicitadas", "detail": "Foram solicitadas alterações em {content} de {brand}." },
+      "publication_succeeded": { "title": "Conteúdo publicado", "detail": "{content} de {brand} foi publicado com sucesso." },
       "publication_failed": { "title": "Falha na publicação", "detail": "Não foi possível publicar {content} de {brand}." },
       "publication_indeterminate": { "title": "Confirme o estado da publicação", "detail": "Confirme se {content} de {brand} foi publicado." }
     }

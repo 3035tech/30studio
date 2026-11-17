@@ -398,14 +398,14 @@ export async function decideContentApproval(organizationId: string, reviewerId: 
       return { kind: "stale" as const };
     }
 
-    await transaction.insert(contentApprovalDecisions).values({ organizationId, approvalRequestId: request.id, reviewerId, decision, note, fingerprint });
+    const [decisionRecord] = await transaction.insert(contentApprovalDecisions).values({ organizationId, approvalRequestId: request.id, reviewerId, decision, note, fingerprint }).returning({ id: contentApprovalDecisions.id });
     if (decision === CONTENT_APPROVAL_STATUS.approved) {
       const [approvedCount] = await transaction.select({ value: count() }).from(contentApprovalDecisions).where(and(
         eq(contentApprovalDecisions.organizationId, organizationId),
         eq(contentApprovalDecisions.approvalRequestId, request.id),
         eq(contentApprovalDecisions.decision, CONTENT_APPROVAL_STATUS.approved),
       ));
-      if (approvedCount.value < request.requiredApprovals) return { kind: "partial" as const, approvedCount: approvedCount.value, requiredApprovals: request.requiredApprovals };
+      if (approvedCount.value < request.requiredApprovals) return { kind: "partial" as const, approvedCount: approvedCount.value, requiredApprovals: request.requiredApprovals, brandId: item.brandId, platform: item.platform, decisionId: decisionRecord.id };
       if (publisher && publicationProfileId) {
         await transaction.insert(socialPublicationJobs).values({
           organizationId, brandId: item.brandId, contentItemId: item.id, approvalRequestId: request.id,
@@ -426,6 +426,6 @@ export async function decideContentApproval(organizationId: string, reviewerId: 
       eq(contentItems.id, itemId),
       eq(contentItems.status, CONTENT_STATUS.inReview),
     ));
-    return { kind: "decided" as const, decision, itemStatus: decision === CONTENT_APPROVAL_STATUS.approved && publicationEnabled ? CONTENT_STATUS.scheduled : decision === CONTENT_APPROVAL_STATUS.approved ? CONTENT_STATUS.approved : CONTENT_STATUS.draft };
+    return { kind: "decided" as const, decision, itemStatus: decision === CONTENT_APPROVAL_STATUS.approved && publicationEnabled ? CONTENT_STATUS.scheduled : decision === CONTENT_APPROVAL_STATUS.approved ? CONTENT_STATUS.approved : CONTENT_STATUS.draft, brandId: item.brandId, platform: item.platform, decisionId: decisionRecord.id };
   });
 }

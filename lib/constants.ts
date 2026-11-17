@@ -18,10 +18,14 @@ export const WORKSPACE_NOTIFICATION_TYPES = {
   socialConnected: "social_connected",
   socialConnectionFailed: "social_connection_failed",
   approvalRequested: "approval_requested",
+  approvalApproved: "approval_approved",
+  approvalRejected: "approval_rejected",
+  approvalChangesRequested: "approval_changes_requested",
+  publicationSucceeded: "publication_succeeded",
   publicationFailed: "publication_failed",
   publicationIndeterminate: "publication_indeterminate",
 } as const;
-export const WORKSPACE_NOTIFICATION_TYPE_VALUES = ["social_connected", "social_connection_failed", "approval_requested", "publication_failed", "publication_indeterminate"] as const;
+export const WORKSPACE_NOTIFICATION_TYPE_VALUES = ["social_connected", "social_connection_failed", "approval_requested", "approval_approved", "approval_rejected", "approval_changes_requested", "publication_succeeded", "publication_failed", "publication_indeterminate"] as const;
 export const WORKSPACE_NOTIFICATION_LIMITS = { historyItems: 50 } as const;
 
 export const WORKSPACE_SECTION_IDS = {

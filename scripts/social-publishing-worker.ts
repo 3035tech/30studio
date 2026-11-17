@@ -116,11 +116,15 @@ async function finish(job: NonNullable<Awaited<ReturnType<typeof claimDueJob>>>,
         .where(and(eq(contentItems.organizationId, job.organizationId), eq(contentItems.id, job.contentItemId), eq(contentItems.status, CONTENT_STATUS.scheduled)));
     }
   });
-  if (state === SOCIAL_PUBLICATION_JOB_STATUS.failed || state === SOCIAL_PUBLICATION_JOB_STATUS.indeterminate) {
+  if (state === SOCIAL_PUBLICATION_JOB_STATUS.published || state === SOCIAL_PUBLICATION_JOB_STATUS.failed || state === SOCIAL_PUBLICATION_JOB_STATUS.indeterminate) {
     await recordWorkspaceNotification({
       organizationId: job.organizationId,
-      eventType: state === SOCIAL_PUBLICATION_JOB_STATUS.failed ? WORKSPACE_NOTIFICATION_TYPES.publicationFailed : WORKSPACE_NOTIFICATION_TYPES.publicationIndeterminate,
-      dedupeKey: `publication:${job.id}:${job.attemptCount}:${state}`,
+      eventType: state === SOCIAL_PUBLICATION_JOB_STATUS.published
+        ? WORKSPACE_NOTIFICATION_TYPES.publicationSucceeded
+        : state === SOCIAL_PUBLICATION_JOB_STATUS.failed
+          ? WORKSPACE_NOTIFICATION_TYPES.publicationFailed
+          : WORKSPACE_NOTIFICATION_TYPES.publicationIndeterminate,
+      dedupeKey: state === SOCIAL_PUBLICATION_JOB_STATUS.published ? `publication:${job.id}:published` : `publication:${job.id}:${job.attemptCount}:${state}`,
       contentItemId: job.contentItemId,
       brandId: job.brandId,
     });

@@ -40,6 +40,25 @@ test("notification history rejects unknown event types and malformed timestamps"
   assert.equal(parsed.success, false);
 });
 
+test("notification history accepts approval decisions and successful publication events", () => {
+  const base = {
+    id: "13db49b4-2ccd-4743-94ef-8ae5f99bb74a",
+    brandId: "e2f240af-219e-4c9b-9b3b-e56868a79a40",
+    brandName: "3035TECH",
+    contentItemId: "7dd9101d-c755-4f11-ae20-4a9bd75306f1",
+    contentTitle: "Launch post",
+    plannedAt: null,
+    platform: "instagram",
+    occurredAt: "2026-11-17T18:00:00.000Z",
+    readAt: null,
+  };
+  const parsed = workspaceNotificationResponseSchema.safeParse({
+    data: ["approval_approved", "approval_rejected", "approval_changes_requested", "publication_succeeded"].map((eventType) => ({ ...base, eventType })),
+  });
+
+  assert.equal(parsed.success, true);
+});
+
 test("read state accepts only a boolean", () => {
   assert.equal(workspaceNotificationReadRequestSchema.safeParse({ read: true }).success, true);
   assert.equal(workspaceNotificationReadRequestSchema.safeParse({ read: "true" }).success, false);

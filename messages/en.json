@@ -87,6 +87,10 @@
       "social_connected": { "title": "Social account connected", "detail": "{platform} connected to {brand}." },
       "social_connection_failed": { "title": "Social connection failed", "detail": "Could not connect {platform} to {brand}. Review the account permissions and try again." },
       "approval_requested": { "title": "Approval requested", "detail": "{content} from {brand} is waiting for review." },
+      "approval_approved": { "title": "Approval recorded", "detail": "A reviewer approved {content} from {brand}." },
+      "approval_rejected": { "title": "Review decision recorded", "detail": "A reviewer rejected {content} from {brand}." },
+      "approval_changes_requested": { "title": "Changes requested", "detail": "Changes were requested for {content} from {brand}." },
+      "publication_succeeded": { "title": "Content published", "detail": "{content} from {brand} was published successfully." },
       "publication_failed": { "title": "Publication failed", "detail": "{content} from {brand} could not be published." },
       "publication_indeterminate": { "title": "Publication status needs confirmation", "detail": "Confirm whether {content} from {brand} was published." }
     }

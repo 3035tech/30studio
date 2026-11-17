@@ -295,6 +295,13 @@
       "when": 1794958092923,
       "tag": "0041_silent_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794959058761,
+      "tag": "0042_eager_moon_knight",
+      "breakpoints": true
     }
   ]
 }

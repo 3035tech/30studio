@@ -63,6 +63,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (result.kind === "stale") throw new ApiError(API_ERROR_CODES.contentApprovalStale, HTTP_STATUS.conflict);
     if (result.kind === "conflict") throw new ApiError(API_ERROR_CODES.contentApprovalConflict, HTTP_STATUS.conflict);
     if (result.kind === "already_decided") throw new ApiError(API_ERROR_CODES.contentApprovalConflict, HTTP_STATUS.conflict);
+    if (result.kind === "partial" || result.kind === "decided") {
+      const eventType = decision === CONTENT_APPROVAL_STATUS.approved
+        ? WORKSPACE_NOTIFICATION_TYPES.approvalApproved
+        : decision === CONTENT_APPROVAL_STATUS.rejected
+          ? WORKSPACE_NOTIFICATION_TYPES.approvalRejected
+          : WORKSPACE_NOTIFICATION_TYPES.approvalChangesRequested;
+      await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType, dedupeKey: `approval-decision:${result.decisionId}`, contentItemId: itemId, brandId: result.brandId, platform: result.platform });
+    }
     const itemStatus = result.kind === "partial" ? "in_review" : result.kind === "decided" ? result.itemStatus : decision === CONTENT_APPROVAL_STATUS.approved ? "approved" : "draft";
     return NextResponse.json({ data: { kind: result.kind, decision, itemStatus, ...(result.kind === "partial" ? { approvedCount: result.approvedCount, requiredApprovals: result.requiredApprovals } : {}) } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

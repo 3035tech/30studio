@@ -154,14 +154,13 @@ export function NotificationCenter() {
           const brand = item.brandName ?? t("unknownBrand");
           const platform = item.platform ? tPlatforms(item.platform) : "";
           const title = t(`event.${item.eventType}.title`);
-          const detail = item.eventType === "approval_requested"
-            ? t("event.approval_requested.detail", { content: item.contentTitle ?? t("unknownContent"), brand })
-            : item.eventType.startsWith("publication_")
+          const detail = item.eventType.startsWith("approval_") || item.eventType.startsWith("publication_")
               ? t(`event.${item.eventType}.detail`, { content: item.contentTitle ?? t("unknownContent"), brand })
               : t(`event.${item.eventType}.detail`, { platform, brand });
-          const href = item.eventType.startsWith("social_") ? `#${WORKSPACE_SECTION_IDS.connections}` : item.eventType === "approval_requested" ? `#${WORKSPACE_SECTION_IDS.approvals}` : `#${WORKSPACE_SECTION_IDS.calendar}`;
+          const href = item.eventType.startsWith("social_") ? `#${WORKSPACE_SECTION_IDS.connections}` : item.eventType.startsWith("approval_") ? `#${WORKSPACE_SECTION_IDS.approvals}` : `#${WORKSPACE_SECTION_IDS.calendar}`;
+          const isError = item.eventType.endsWith("failed") || item.eventType === "publication_indeterminate" || item.eventType === "approval_rejected";
           return <li key={item.id} className={item.readAt ? "is-read" : "is-unread"}>
-            <a href={href} onClick={() => setOpen(false)}><span className={`notificationCenter__icon ${item.eventType.endsWith("failed") || item.eventType === "publication_indeterminate" ? "is-error" : ""}`}><Bell aria-hidden="true" size={16} /></span><span className="notificationCenter__copy"><strong>{title}</strong><small>{detail}</small><time dateTime={item.occurredAt}>{formatter.dateTime(new Date(item.occurredAt), { dateStyle: "medium", timeStyle: "short" })}</time></span></a>
+            <a href={href} onClick={() => setOpen(false)}><span className={`notificationCenter__icon ${isError ? "is-error" : ""}`}><Bell aria-hidden="true" size={16} /></span><span className="notificationCenter__copy"><strong>{title}</strong><small>{detail}</small><time dateTime={item.occurredAt}>{formatter.dateTime(new Date(item.occurredAt), { dateStyle: "medium", timeStyle: "short" })}</time></span></a>
             <Button appearance="quiet" className="notificationCenter__read" type="button" aria-label={t(item.readAt ? "markUnread" : "markRead")} onClick={async () => {
               const read = !item.readAt;
               const previous = history;
