@@ -1,15 +1,30 @@
 import "server-only";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { DATABASE_LIMITS } from "@/lib/constants";
+import { API_ERROR_CODES, DATABASE_CONNECTION, DATABASE_LIMITS, HTTP_STATUS } from "@/lib/constants";
 import * as schema from "@/lib/db/schema";
 import { ApiError } from "@/lib/server/api-error";
-import { API_ERROR_CODES, HTTP_STATUS } from "@/lib/constants";
 
 function createDatabase() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
+  const configuredUrl = process.env[DATABASE_CONNECTION.urlEnvironmentName];
+  if (!configuredUrl) {
     throw new ApiError(API_ERROR_CODES.serviceUnavailable, HTTP_STATUS.unavailable);
+  }
+
+  const directHost = process.env[DATABASE_CONNECTION.directHostEnvironmentName];
+  const sslRootCertificate = process.env[DATABASE_CONNECTION.sslRootCertificateEnvironmentName];
+  if (Boolean(directHost) !== Boolean(sslRootCertificate)) {
+    throw new Error("Direct PostgreSQL connections require both a host and a trusted CA certificate.");
+  }
+
+  let connectionString = configuredUrl;
+  if (directHost && sslRootCertificate) {
+    const directUrl = new URL(configuredUrl);
+    directUrl.hostname = directHost;
+    directUrl.port = DATABASE_CONNECTION.postgresPort;
+    directUrl.searchParams.set("sslmode", DATABASE_CONNECTION.sslMode);
+    directUrl.searchParams.set("sslrootcert", sslRootCertificate);
+    connectionString = directUrl.toString();
   }
 
   const pool = new Pool({

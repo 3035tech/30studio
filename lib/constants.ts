@@ -3,6 +3,14 @@ export const PRODUCT = {
   groupName: "Grupo 3035",
 } as const;
 
+export const DATABASE_CONNECTION = {
+  urlEnvironmentName: "DATABASE_URL",
+  directHostEnvironmentName: "DATABASE_DIRECT_HOST",
+  sslRootCertificateEnvironmentName: "DATABASE_SSL_ROOT_CERT",
+  postgresPort: "5432",
+  sslMode: "verify-full",
+} as const;
+
 export const WORKSPACE_UI_EVENTS = { createContent: "30studio:create-content", openCalendarItem: "30studio:open-calendar-item", openCalendarList: "30studio:open-calendar-list" } as const;
 export const WORKSPACE_API_PATHS = { settings: "/api/workspace/settings" } as const;
 export const WORKSPACE_LIMITS = { nameCharacters: 100 } as const;
