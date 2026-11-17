@@ -15,6 +15,33 @@ jobs:
   quality:
     name: Quality checks
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: 30studio
+          POSTGRES_PASSWORD: 30studio-test-password
+          POSTGRES_DB: 30studio
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U 30studio -d 30studio"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      mailpit:
+        image: ghcr.io/axllent/mailpit:v1.33.1
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      DATABASE_URL: postgres://30studio:30studio-test-password@localhost:5432/30studio
+      MAILPIT_API_URL: http://localhost:8025
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_REQUIRE_TLS: "false"
+      MAIL_FROM_EMAIL: 30studio@example.invalid
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -31,8 +58,17 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check types
+        run: npx tsc --noEmit
+
       - name: Run unit tests
         run: npm test
+
+      - name: Apply migrations to the disposable database
+        run: npm run db:migrate
+
+      - name: Run PostgreSQL integration tests
+        run: npm run test:integration
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
