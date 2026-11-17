@@ -19,7 +19,7 @@
     "worker:competitors": "node --conditions=react-server --import tsx scripts/competitor-worker.ts",
     "storage:dev:init": "node --conditions=react-server --import tsx scripts/initialize-local-storage.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --conditions=react-server --import tsx scripts/migrate-database.ts",
     "db:seed:local": "node --conditions=react-server --import tsx scripts/seed-local-user.ts",
     "db:seed:system-owner": "node --conditions=react-server --import tsx scripts/seed-system-owner.ts",
     "db:seed:demo": "node --conditions=react-server --import tsx scripts/seed-local-demo-data.ts",
