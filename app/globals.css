@@ -174,6 +174,10 @@
 .workspaceContent:not([data-active-section="competitors"]) > .competitorIntelligence { display: none; }
 .workspaceContent[data-active-section="competitors"] > :not(.competitorIntelligence) { display: none !important; }
 .workspaceContent[data-active-section="competitors"] > .competitorIntelligence { display: grid; }
+.workspaceContent[data-active-section="connections"] > :not(.workspaceBrands) { display: none !important; }
+.workspaceContent[data-active-section="connections"] > .workspaceBrands > :not(.brandConnectionsPanel) { display: none !important; }
+.brandConnectionsPanel[hidden] { display: none !important; }
+.workspaceContent[data-active-section="connections"] .brandConnectionsPanel:not([hidden]) { display: grid; }
 .workspaceContent[data-active-section="overview"] > .editorialCalendar,
 .workspaceContent[data-active-section="overview"] > .workspaceBrands,
 .workspaceContent[data-active-section="overview"] > .teamSection { display: none; }
@@ -207,6 +211,55 @@
 .workspaceContent[data-active-section="profile"] > .workspaceBrands,
 .workspaceContent[data-active-section="profile"] > .teamSection { display: none; }
 .workspaceContent:not([data-active-section="profile"]) > .accountProfile { display: none; }
+.fieldControl__select { position: relative; display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; border: 1px solid var(--studio-border-subtle); border-radius: 9px; background: var(--brand-surface); color: var(--brand-dark); text-align: left; }
+.fieldControl__select:focus-visible { outline: 2px solid var(--studio-primary); outline-offset: 2px; }
+.fieldControl__select[aria-invalid="true"] { border-color: var(--studio-danger); }
+.fieldControl__select[data-disabled] { cursor: not-allowed; opacity: .6; }
+.fieldControl__selectContent { z-index: 1000; width: var(--radix-select-trigger-width); max-height: min(18rem, calc(100vh - 1rem)); overflow: auto; border: 1px solid var(--studio-border-subtle); border-radius: 10px; background: var(--brand-surface); color: var(--brand-dark); box-shadow: var(--studio-shadow-soft); }
+.fieldControl__selectViewport { padding: 4px; }
+.fieldControl__selectItem { position: relative; display: flex; min-height: 38px; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; border-radius: 6px; outline: none; cursor: pointer; }
+.fieldControl__selectItem[data-highlighted] { background: var(--studio-surface-soft); }
+.fieldControl__selectItem[data-disabled] { cursor: not-allowed; opacity: .5; }
+.fieldControl__selectItem [data-radix-select-item-indicator] { display: inline-flex; color: var(--studio-primary); }
+.fieldControl__formSelect { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fieldControl .fieldControl__select { padding-inline: 12px 10px; }
+.fieldControl .fieldControl__selectIcon { position: static; flex: 0 0 auto; transform: none; color: var(--studio-muted); }
+.fieldControl__select[data-disabled] { background: var(--studio-surface-soft); color: var(--studio-muted); }
+.fieldControl__select[aria-invalid="true"] { border-color: var(--studio-danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--studio-danger) 12%, transparent); }
+.notificationCenter { position: relative; display: flex; align-items: center; }
+.notificationCenter__trigger { position: relative; width: 42px; min-height: 42px; padding: 0; }
+.notificationCenter__badge { position: absolute; top: 0; inset-inline-end: 0; min-width: 17px; height: 17px; display: grid; place-items: center; padding: 0 4px; border: 2px solid var(--brand-surface); border-radius: 999px; background: var(--studio-danger); color: white; font-size: 10px; line-height: 1; }
+.notificationCenter__panel { position: absolute; z-index: 950; top: calc(100% + 8px); inset-inline-end: 0; width: min(390px, calc(100vw - 28px)); max-height: min(70vh, 540px); overflow: auto; padding: 16px; border: 1px solid var(--studio-border-subtle); border-radius: 14px; background: var(--brand-surface); box-shadow: var(--studio-shadow-soft); }
+.notificationCenter__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--studio-border-subtle); }
+.notificationCenter__heading h2 { margin: 0; color: var(--brand-dark); font-size: var(--type-subheading); }
+.notificationCenter__heading > span { color: var(--studio-muted); font-size: var(--type-caption); }
+.notificationCenter__refresh { width: 32px; min-height: 32px; padding: 0; }
+.notificationCenter__empty { display: flex; align-items: center; gap: 9px; margin: 16px 0 0; color: var(--studio-muted); font-size: var(--type-body); }
+.notificationCenter__list { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.notificationCenter__list a { display: flex; align-items: center; gap: 10px; padding: 10px 6px; border-radius: 8px; color: inherit; text-decoration: none; }
+.notificationCenter__list a:hover, .notificationCenter__list a:focus-visible { outline: none; background: var(--studio-surface-soft); }
+.notificationCenter__icon { display: grid; flex: 0 0 30px; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: var(--studio-surface-soft); color: var(--brand-primary); }
+.notificationCenter__icon.is-error { background: var(--studio-danger-surface); color: var(--studio-danger); }
+.notificationCenter__copy { min-width: 0; flex: 1; display: grid; gap: 3px; }
+.notificationCenter__copy strong { overflow: hidden; color: var(--brand-dark); font-size: var(--type-body); text-overflow: ellipsis; white-space: nowrap; }
+.notificationCenter__copy small { color: var(--studio-muted); font-size: var(--type-caption); line-height: 1.4; }
+.workspaceHeaderActions { gap: 10px; }
+.socialConnectionPlatform__name { display: inline-flex; align-items: center; gap: 8px; }
+.brandCollection__profileName > svg, .brandCollection__profileName > span:first-child { flex: 0 0 auto; }
+.brandCollection__profileName { display: inline-flex; align-items: center; gap: 7px; }
+.teamSection__tabs, .accountProfile__tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--studio-border-subtle); }
+.teamSection__tab, .accountProfile__tab { min-height: 42px; padding: 9px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--studio-muted); font: inherit; font-weight: 600; cursor: pointer; }
+.teamSection__tab[aria-selected="true"], .accountProfile__tab[aria-selected="true"] { border-bottom-color: var(--studio-primary); color: var(--brand-dark); }
+.teamSection__panel, .accountProfile__panel { min-width: 0; }
+.accountProfile__panel[hidden], .teamSection__panel[hidden], .teamAccess__section[hidden], .notificationCenter__panel[hidden] { display: none !important; }
+.teamSection { margin-top: 30px; }
+.accountProfile__panel { display: grid; gap: 22px; }
+.accountProfile__form { display: grid; gap: 16px; }
+.accountProfile__form > button { justify-self: start; }
+@media (max-width: 640px) {
+  .teamSection__tabs, .accountProfile__tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .teamSection__tab, .accountProfile__tab { flex: 0 0 auto; }
+}
 .analyticsWorkspace { min-width: 0; display: grid; gap: 16px; }
 .analyticsWorkspace__tabList { display: flex; flex-wrap: wrap; align-items: end; gap: 4px; border-bottom: 1px solid var(--studio-border-subtle); }
 .analyticsWorkspace__tab { min-height: 40px; padding: 8px 14px; border-radius: 8px 8px 0 0; color: var(--studio-muted); font-size: var(--type-body); }

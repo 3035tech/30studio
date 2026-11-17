@@ -281,7 +281,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
     {data?.canManage ? <section className="competitorIntelligence__addProfile" aria-labelledby="competitor-add-profile-title">
       <div><h3 id="competitor-add-profile-title">{t("addProfileTitle")}</h3><p>{t("addProfileDescription")}</p></div>
       <form className="competitorIntelligence__form" onSubmit={(event) => void lookupProfile(event)}>
-        <SelectField id="competitor-profile-network" label={t("network")} value={lookupPlatform} onChange={(event) => { setLookupPlatform(event.target.value as typeof lookupPlatform); setIdentifier(""); setProfilePreview(null); setLookupError(null); }}>
+        <SelectField id="competitor-profile-network" label={t("network")} value={lookupPlatform} onChange={(event) => { const platform = event.target.value; if (platform === "youtube" || platform === "instagram" || platform === "facebook" || platform === "x") setLookupPlatform(platform); setIdentifier(""); setProfilePreview(null); setLookupError(null); }}>
           {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform} disabled={platform !== "youtube" && platform !== "instagram" && platform !== "facebook" && (platform !== "x" || !currentData?.features.xApiEnabled)}>{platform === "x" && !currentData?.features.xApiEnabled ? t("platformLookupXDisabled") : platform === "linkedin" ? t("platformLookupLinkedInUnavailable") : platform !== "youtube" && platform !== "instagram" && platform !== "facebook" && platform !== "x" ? t("platformLookupUnavailable", { platform: tPlatforms(platform) }) : tPlatforms(platform)}</option>)}
         </SelectField>
         <Disclosure className="competitorIntelligence__websiteDisclosure" title={t("linkedinReadBoundaryTitle")}>

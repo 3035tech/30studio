@@ -21,6 +21,7 @@ export function WorkspaceNameSettings() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [hasError, setHasError] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,7 +40,7 @@ export function WorkspaceNameSettings() {
       })
       .finally(() => setPending(false));
     return () => controller.abort();
-  }, []);
+  }, [reloadCount]);
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,7 +74,7 @@ export function WorkspaceNameSettings() {
         <h2 id="workspace-name-settings-title">{t("title")}</h2>
         <p>{t("description")}</p>
       </header>
-      {pending ? <p className="workspaceNameSettings__status" role="status">{t("loading")}</p> : hasError || !settings ? <p className="workspaceNameSettings__status workspaceNameSettings__status--error" role="alert">{t("loadError")}</p> : <>
+      {pending ? <p className="workspaceNameSettings__status" role="status">{t("loading")}</p> : hasError || !settings ? <div className="workspaceNameSettings__status workspaceNameSettings__status--error" role="alert"><span>{t("loadError")}</span><Button appearance="quiet" type="button" onClick={() => { setPending(true); setReloadCount((count) => count + 1); }}>{t("retry")}</Button></div> : <>
         {settings.canManage ? <form className="workspaceNameSettings__form" onSubmit={(event) => void saveName(event)}>
           <TextField id="workspace-display-name" label={t("name")} value={name} onChange={(event) => setName(event.target.value)} maxLength={WORKSPACE_LIMITS.nameCharacters} required disabled={busy} />
           <p className="workspaceNameSettings__slug"><span>{t("identifier")}</span><code>{settings.data.slug}</code><small>{t("identifierHelp")}</small></p>

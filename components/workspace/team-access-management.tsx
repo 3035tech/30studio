@@ -5,7 +5,7 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { SelectField, TextField } from "@/components/ui/field";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { API_ERROR_CODES, INVITATION_STATUS, TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_AUDIT_ACTIONS, TEAM_ROLES, TENANT_ROLE, type Locale, type TenantRole } from "@/lib/constants";
+import { API_ERROR_CODES, AUTH_LIMITS, INVITATION_STATUS, TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_AUDIT_ACTIONS, TEAM_ROLES, TENANT_ROLE, type Locale, type TenantRole } from "@/lib/constants";
 import { teamAuditResponseSchema, teamInvitationsResponseSchema, type TeamAuditEvent, type TeamInvitation } from "@/lib/validation/team";
 
 const ACTION_TRANSLATION_KEYS: Record<(typeof TEAM_AUDIT_ACTIONS)[keyof typeof TEAM_AUDIT_ACTIONS], string> = {
@@ -28,6 +28,7 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [auditEvents, setAuditEvents] = useState<TeamAuditEvent[]>([]);
   const [pending, setPending] = useState(true);
+  const [activeTab, setActiveTab] = useState<"invite" | "invitations" | "audit">(canManage ? "invite" : "invitations");
   const [loadError, setLoadError] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
@@ -137,31 +138,47 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
 
   return <div className="teamAccess">
     {message ? <p className={`entryMessage${messageIsError ? " entryMessage--error" : ""}`} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
-    {canManage ? <section className="teamAccess__section" aria-labelledby="team-invite-title">
+    <div className="teamAccess__tabs" role="tablist" aria-label={t("accessSectionsLabel")} onKeyDown={(event) => {
+      const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']"));
+      const current = tabs.findIndex((tab) => tab === document.activeElement);
+      const next = event.key === "ArrowRight" ? (current + 1) % tabs.length : event.key === "ArrowLeft" ? (current - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+      if (next >= 0) { event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click(); }
+    }}>
+      {canManage ? <button className="teamSection__tab" type="button" role="tab" id="team-access-tab-invite" tabIndex={activeTab === "invite" ? 0 : -1} aria-selected={activeTab === "invite"} aria-controls="team-access-panel-invite" onClick={() => setActiveTab("invite")}>{t("inviteTab")}</button> : null}
+      <button className="teamSection__tab" type="button" role="tab" id="team-access-tab-invitations" tabIndex={activeTab === "invitations" ? 0 : -1} aria-selected={activeTab === "invitations"} aria-controls="team-access-panel-invitations" onClick={() => setActiveTab("invitations")}>{t("invitationsTab")}</button>
+      <button className="teamSection__tab" type="button" role="tab" id="team-access-tab-audit" tabIndex={activeTab === "audit" ? 0 : -1} aria-selected={activeTab === "audit"} aria-controls="team-access-panel-audit" onClick={() => setActiveTab("audit")}>{t("auditTab")}</button>
+    </div>
+    <section className="teamAccess__section" id="team-access-panel-invite" role="tabpanel" aria-labelledby="team-access-tab-invite" tabIndex={0} hidden={!canManage || activeTab !== "invite"}>
+      {canManage && activeTab === "invite" ? <>
       <div className="workspaceHeading"><div><h3 id="team-invite-title">{t("inviteTitle")}</h3><p className="entryDescription">{t("inviteDescription")}</p></div></div>
       <form className="teamInviteForm" onSubmit={(event) => void createInvitation(event)}>
-        <TextField id={`${TEAM_FORM_ID_PREFIXES.invite}email`} name="email" type="email" label={t("inviteEmail")} autoComplete="email" required />
+        <TextField id={`${TEAM_FORM_ID_PREFIXES.invite}email`} name="email" type="email" label={t("inviteEmail")} autoComplete="email" maxLength={AUTH_LIMITS.emailCharacters} required />
         <SelectField id={`${TEAM_FORM_ID_PREFIXES.invite}role`} name="role" label={t("inviteRole")} defaultValue={TENANT_ROLE.editor}>
           {TEAM_ROLES.filter((role) => role !== TENANT_ROLE.owner && (actorRole === TENANT_ROLE.owner || role !== TENANT_ROLE.admin)).map((role) => <option key={role} value={role}>{tRoles(role)}</option>)}
         </SelectField>
         <Button type="submit">{t("sendInvite")}</Button>
       </form>
-    </section> : null}
-    <section className="teamAccess__section" aria-labelledby="team-invitations-title">
+      </> : null}
+    </section>
+    <section className="teamAccess__section" id="team-access-panel-invitations" role="tabpanel" aria-labelledby="team-access-tab-invitations" tabIndex={0} hidden={activeTab !== "invitations"}>
+      {activeTab === "invitations" ? <>
       <div className="workspaceHeading"><div><h3 id="team-invitations-title">{t("invitationTitle")}</h3><p className="entryDescription">{t("invitationDescription")}</p></div></div>
       {pending ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : loadError ? <p className="workspaceEmpty" role="alert">{t("loadError")} <Button appearance="quiet" type="button" onClick={() => { setPending(true); setReloadCount((count) => count + 1); }}>{t("retry")}</Button></p> : <DataTable
         id="team-invitations" rows={invitations} columns={invitationColumns} getRowId={(row) => row.id} initialSortColumnId="created"
         searchValue={(row) => `${row.email} ${row.role} ${row.status} ${row.inviterName}`} searchLabel={t("invitationSearch")}
         pageSizeLabel={tTable("pageSize")} emptyMessage={t("invitationEmpty")} noMatchesMessage={tTable("noMatches")} locale={locale}
       />}
+      </> : null}
     </section>
-    <section className="teamAccess__section" aria-labelledby="team-audit-title">
+    <section className="teamAccess__section" id="team-access-panel-audit" role="tabpanel" aria-labelledby="team-access-tab-audit" tabIndex={0} hidden={activeTab !== "audit"}>
+      {activeTab === "audit" ? <>
       <div className="workspaceHeading"><div><h3 id="team-audit-title">{t("auditTitle")}</h3><p className="entryDescription">{t("auditDescription")}</p></div></div>
       {pending ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : loadError ? <p className="workspaceEmpty" role="alert">{t("auditLoadError")} <Button appearance="quiet" type="button" onClick={() => { setPending(true); setReloadCount((count) => count + 1); }}>{t("auditRetry")}</Button></p> : <DataTable
         id="team-audit" rows={auditEvents} columns={auditColumns} getRowId={(row) => row.id} initialSortColumnId="time"
         searchValue={(row) => `${row.actorName} ${row.actorEmail} ${row.targetName} ${row.targetEmail ?? ""} ${row.action}`} searchLabel={t("auditSearch")}
         pageSizeLabel={tTable("pageSize")} emptyMessage={t("auditEmpty")} noMatchesMessage={tTable("noMatches")} locale={locale}
       />}
+      </> : null}
     </section>
   </div>;
 }

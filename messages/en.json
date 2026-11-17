@@ -56,6 +56,21 @@
     "english": "English",
     "portuguese": "Português"
   },
+  "notifications": {
+    "title": "Important notifications",
+    "open": "Open notifications. {count, plural, =0 {No active alerts} one {# active alert} other {# active alerts}}",
+    "activeCount": "{count, plural, =0 {No active alerts} one {# active alert} other {# active alerts}}",
+    "loading": "Loading alerts…",
+    "refresh": "Refresh notifications",
+    "retry": "Try again",
+    "loadError": "Could not load alerts right now.",
+    "empty": "All clear. There are no important alerts.",
+    "publication": { "failed": "Publication failed", "indeterminate": "Confirm publication status" },
+    "approvalPending": "Approval pending · {brand}",
+    "connectionNeedsAttention": "Reconnect {platform} · {brand}",
+    "worker": { "stale": "Publishing queue is inactive", "unknown": "Publishing queue status unavailable" },
+    "workerDetail": "Check the publishing service in analytics."
+  },
   "auth": {
     "title": "30studio",
     "description": "Create, plan, and publish with intelligence.",
@@ -127,6 +142,7 @@
     "save": "Save name",
     "loading": "Loading workspace settings…",
     "loadError": "Could not load workspace settings.",
+    "retry": "Try again",
     "saved": "Workspace name updated.",
     "saveError": "Could not update the workspace name.",
     "restricted": "Only the workspace owner can change its name."
@@ -140,7 +156,10 @@
     "passwordChanged": "Password changed.",
     "passwordChangeError": "We could not change the password. Check your current password and try again.",
     "sendRecovery": "Send password reset link",
-    "recoverySent": "If the email is registered, you will receive recovery instructions."
+    "recoverySent": "If the email is registered, you will receive recovery instructions.",
+    "sectionsLabel": "Profile sections",
+    "accountTab": "My account",
+    "workspaceTab": "Workspace"
   },
   "portfolio": {
     "eyebrow": "YOUR PORTFOLIO",
@@ -270,6 +289,9 @@
     "socialMixedCount": "{connected, plural, one {# connected} other {# connected}} · {reauth, plural, one {# needs reconnection} other {# need reconnection}}"
   },
   "calendar": {
+    "approvalQueueEyebrow": "CONTENT REVIEW",
+    "approvalQueueTitle": "Approval queue",
+    "approvalQueueDescription": "Review pending posts and approve each item or request changes.",
     "eyebrow": "EDITORIAL PLANNING",
     "title": "Monthly calendar",
     "description": "Organize one central idea and schedule each social network independently.",
@@ -513,6 +535,14 @@
     "eyebrow": "WORKSPACE ACCESS",
     "title": "Team members",
     "description": "Manage the people and roles that can access this workspace.",
+    "sectionsLabel": "Team management sections",
+    "accessSectionsLabel": "Invitations and access history",
+    "membersTab": "People",
+    "accessTab": "Invitations and history",
+    "approvalTab": "Approval policy",
+    "inviteTab": "Invite someone",
+    "invitationsTab": "Invitations",
+    "auditTab": "Access history",
     "memberName": "Name and email",
     "memberJoined": "Joined",
     "memberRole": "Role",

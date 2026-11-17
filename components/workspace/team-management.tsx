@@ -37,6 +37,8 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
+  const [activeTab, setActiveTab] = useState<"members" | "access" | "approval">("members");
   const currentTeamData = teamData.organizationId === organizationId ? teamData : INITIAL_TEAM_DATA;
   const currentLoadState = organizationId === null
     ? { organizationId, pending: true, hasError: false }
@@ -72,6 +74,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
     if (!role) return;
     setBusyMemberId(memberId);
     setMessage("");
+    setMessageIsError(false);
 
     try {
       const response = await fetch(`${TEAM_API_PATHS.collection}/${memberId}`, {
@@ -94,6 +97,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
       setMessage(t("roleUpdated"));
     } catch {
       setMessage(t("updateError"));
+      setMessageIsError(true);
     } finally {
       setBusyMemberId(null);
     }
@@ -102,6 +106,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
   async function removeMember(memberId: string) {
     setBusyMemberId(memberId);
     setMessage("");
+    setMessageIsError(false);
 
     try {
       const response = await fetch(`${TEAM_API_PATHS.collection}/${memberId}`, { method: "DELETE", credentials: "same-origin" });
@@ -115,6 +120,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
       setMessage(t("memberRemoved"));
     } catch {
       setMessage(t("removeError"));
+      setMessageIsError(true);
     } finally {
       setBusyMemberId(null);
     }
@@ -161,7 +167,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
           <p className="entryDescription">{t("description")}</p>
         </div>
       </div>
-      {message ? <p className="entryMessage" role="status">{message}</p> : null}
+      {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
       {currentLoadState.pending ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : null}
       {!currentLoadState.pending && currentLoadState.hasError ? (
         <div className="workspaceEmpty teamSection__error" role="alert">
@@ -170,13 +176,27 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
         </div>
       ) : null}
       {!currentLoadState.pending && !currentLoadState.hasError && !currentTeamData.canManage ? <p className="workspaceEmpty">{t("restricted")}</p> : null}
-      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <DataTable
-        id="team-members" rows={currentTeamData.members} columns={memberColumns} getRowId={(member) => member.id} initialSortColumnId="name"
-        searchValue={(member) => `${member.name} ${member.email} ${member.role}`} searchLabel={t("memberSearch")}
-        pageSizeLabel={t("tablePageSize")} emptyMessage={t("empty")} noMatchesMessage={t("tableNoMatches")} locale={locale}
-      /> : null}
-      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <TeamAccessManagement organizationId={organizationId ?? ""} canManage={currentTeamData.canManage} actorRole={currentTeamData.actorRole} /> : null}
-      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <ApprovalPolicySettings brands={brands} /> : null}
+      {!currentLoadState.pending && !currentLoadState.hasError && currentTeamData.canManage ? <>
+        <div className="teamSection__tabs" role="tablist" aria-label={t("sectionsLabel")} onKeyDown={(event) => {
+          const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']"));
+          const current = tabs.findIndex((tab) => tab === document.activeElement);
+          const next = event.key === "ArrowRight" ? (current + 1) % tabs.length : event.key === "ArrowLeft" ? (current - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+          if (next >= 0) { event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click(); }
+        }}>
+          <button className="teamSection__tab" id="team-tab-members" type="button" role="tab" tabIndex={activeTab === "members" ? 0 : -1} aria-selected={activeTab === "members"} aria-controls="team-panel-members" onClick={() => setActiveTab("members")}>{t("membersTab")}</button>
+          <button className="teamSection__tab" id="team-tab-access" type="button" role="tab" tabIndex={activeTab === "access" ? 0 : -1} aria-selected={activeTab === "access"} aria-controls="team-panel-access" onClick={() => setActiveTab("access")}>{t("accessTab")}</button>
+          <button className="teamSection__tab" id="team-tab-approval" type="button" role="tab" tabIndex={activeTab === "approval" ? 0 : -1} aria-selected={activeTab === "approval"} aria-controls="team-panel-approval" onClick={() => setActiveTab("approval")}>{t("approvalTab")}</button>
+        </div>
+        <div className="teamSection__panel" id="team-panel-members" role="tabpanel" aria-labelledby="team-tab-members" tabIndex={0} hidden={activeTab !== "members"}>
+          {activeTab === "members" ? <DataTable
+            id="team-members" rows={currentTeamData.members} columns={memberColumns} getRowId={(member) => member.id} initialSortColumnId="name"
+            searchValue={(member) => `${member.name} ${member.email} ${member.role}`} searchLabel={t("memberSearch")}
+            pageSizeLabel={t("tablePageSize")} emptyMessage={t("empty")} noMatchesMessage={t("tableNoMatches")} locale={locale}
+          /> : null}
+        </div>
+        <div className="teamSection__panel" id="team-panel-access" role="tabpanel" aria-labelledby="team-tab-access" tabIndex={0} hidden={activeTab !== "access"}>{activeTab === "access" ? <TeamAccessManagement organizationId={organizationId ?? ""} canManage={currentTeamData.canManage} actorRole={currentTeamData.actorRole} /> : null}</div>
+        <div className="teamSection__panel" id="team-panel-approval" role="tabpanel" aria-labelledby="team-tab-approval" tabIndex={0} hidden={activeTab !== "approval"}>{activeTab === "approval" ? <ApprovalPolicySettings brands={brands} /> : null}</div>
+      </> : null}
     </section>
   );
 }

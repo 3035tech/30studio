@@ -118,7 +118,7 @@ export function InvitationAcceptance({ invitationId }: { invitationId: string | 
               {authMode === "sign_up" ? (
                 <TextField id="invitation-name" name="name" label={tAuth("name")} autoComplete="name" maxLength={AUTH_LIMITS.nameCharacters} required />
               ) : null}
-              <TextField id="invitation-email" name="email" label={tAuth("email")} type="email" autoComplete="email" required disabled={busy && authMode === "request_reset"} onChange={() => { if (authMode === "request_reset") { setResetLinkSent(false); setMessage(""); } }} />
+              <TextField id="invitation-email" name="email" label={tAuth("email")} type="email" autoComplete="email" maxLength={AUTH_LIMITS.emailCharacters} required disabled={busy && authMode === "request_reset"} onChange={() => { if (authMode === "request_reset") { setResetLinkSent(false); setMessage(""); } }} />
               {authMode !== "request_reset" ? <PasswordField id="invitation-password" name="password" label={tAuth("password")} autoComplete={authMode === "sign_up" ? "new-password" : "current-password"} minLength={AUTH_LIMITS.passwordCharacters} helpText={authMode === "sign_up" ? tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters }) : undefined} required /> : null}
               {authMode === "sign_in" ? <div className="entryLoginOptions">
                 <CheckboxField id="invitation-remember-me" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} label={tAuth("rememberMe")} className="entryLoginOptions__remember" />

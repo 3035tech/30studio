@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { SelectField } from "@/components/ui/field";
+import { NotificationCenter } from "@/components/workspace/notification-center";
 import { Link } from "@/lib/i18n/routing";
 import { BRAND_ASSETS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type Locale } from "@/lib/constants";
 
@@ -147,6 +148,7 @@ export function WorkspaceShell({
         <div className="workspaceMain">
           <header className="workspaceHeader">
             <div className="workspaceHeaderActions">
+              <NotificationCenter />
               <SelectField
                 id="organization"
                 label={tWorkspace("switchOrganization")}

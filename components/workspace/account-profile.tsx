@@ -15,6 +15,7 @@ export function AccountProfile({ email }: { email: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [activeTab, setActiveTab] = useState<"account" | "workspace">("account");
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,17 +73,32 @@ export function AccountProfile({ email }: { email: string }) {
           <p className="entryDescription">{t("description")}</p>
         </div>
       </header>
-      <div className="accountProfile__identity"><span>{t("email")}</span><strong>{email}</strong></div>
-      <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
-        <h2>{t("changePassword")}</h2>
-        <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
-        <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} required />
-        <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} required />
-        {message ? <p className={isError ? "entryMessage entryMessage--error" : "entryMessage"} role={isError ? "alert" : "status"}>{message}</p> : null}
-        <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
-        <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>
-      </form>
-      <WorkspaceNameSettings />
+      <div className="accountProfile__tabs" role="tablist" aria-label={t("sectionsLabel")} onKeyDown={(event) => {
+        const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']"));
+        const current = tabs.findIndex((tab) => tab === document.activeElement);
+        const next = event.key === "ArrowRight" ? (current + 1) % tabs.length : event.key === "ArrowLeft" ? (current - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+        if (next >= 0) { event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click(); }
+      }}>
+        <button className="accountProfile__tab" id="profile-tab-account" type="button" role="tab" tabIndex={activeTab === "account" ? 0 : -1} aria-selected={activeTab === "account"} aria-controls="profile-panel-account" onClick={() => setActiveTab("account")}>{t("accountTab")}</button>
+        <button className="accountProfile__tab" id="profile-tab-workspace" type="button" role="tab" tabIndex={activeTab === "workspace" ? 0 : -1} aria-selected={activeTab === "workspace"} aria-controls="profile-panel-workspace" onClick={() => setActiveTab("workspace")}>{t("workspaceTab")}</button>
+      </div>
+      <div className="accountProfile__panel" id="profile-panel-account" role="tabpanel" aria-labelledby="profile-tab-account" tabIndex={0} hidden={activeTab !== "account"}>
+        {activeTab === "account" ? <>
+        <div className="accountProfile__identity"><span>{t("email")}</span><strong>{email}</strong></div>
+        <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
+          <h2>{t("changePassword")}</h2>
+          <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
+          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} required />
+          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} required />
+          {message ? <p className={isError ? "entryMessage entryMessage--error" : "entryMessage"} role={isError ? "alert" : "status"}>{message}</p> : null}
+          <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
+          <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>
+        </form>
+        </> : null}
+      </div>
+      <div className="accountProfile__panel" id="profile-panel-workspace" role="tabpanel" aria-labelledby="profile-tab-workspace" tabIndex={0} hidden={activeTab !== "workspace"}>
+        {activeTab === "workspace" ? <WorkspaceNameSettings /> : null}
+      </div>
     </section>
   );
 }

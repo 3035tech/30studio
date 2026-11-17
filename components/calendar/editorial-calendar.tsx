@@ -670,9 +670,9 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
     <section className="editorialCalendar" id={CALENDAR_UI_IDS.section} aria-labelledby={CALENDAR_UI_IDS.title}>
       <header className="editorialCalendar__header">
         <div>
-          <p className="entryKicker">{t("eyebrow")}</p>
-          <h2 id={CALENDAR_UI_IDS.title}>{t("title")}</h2>
-          <p className="entryDescription">{t("description")}</p>
+          <p className="entryKicker">{statusFilter === CONTENT_STATUS.inReview ? t("approvalQueueEyebrow") : t("eyebrow")}</p>
+          <h2 id={CALENDAR_UI_IDS.title}>{statusFilter === CONTENT_STATUS.inReview ? t("approvalQueueTitle") : t("title")}</h2>
+          <p className="entryDescription">{statusFilter === CONTENT_STATUS.inReview ? t("approvalQueueDescription") : t("description")}</p>
         </div>
         {state.canManage && brands.length > 0 ? (
           <Button type="button" onClick={() => { const now = new Date(); const isCurrentMonth = month.getFullYear() === now.getFullYear() && month.getMonth() === now.getMonth(); openCampaignForm(isCurrentMonth ? now : new Date(month.getFullYear(), month.getMonth(), 1)); }}>

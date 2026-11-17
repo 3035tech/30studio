@@ -56,6 +56,21 @@
     "english": "English",
     "portuguese": "Português"
   },
+  "notifications": {
+    "title": "Notificações importantes",
+    "open": "Abrir notificações. {count, plural, =0 {Nenhum alerta ativo} one {# alerta ativo} other {# alertas ativos}}",
+    "activeCount": "{count, plural, =0 {Nenhum alerta ativo} one {# alerta ativo} other {# alertas ativos}}",
+    "loading": "Carregando alertas…",
+    "refresh": "Atualizar notificações",
+    "retry": "Tentar novamente",
+    "loadError": "Não foi possível carregar os alertas agora.",
+    "empty": "Tudo em dia. Não há alertas importantes.",
+    "publication": { "failed": "Publicação com falha", "indeterminate": "Confirme o estado da publicação" },
+    "approvalPending": "Aprovação pendente · {brand}",
+    "connectionNeedsAttention": "Reconecte {platform} · {brand}",
+    "worker": { "stale": "Fila de publicação sem atividade", "unknown": "Estado da fila de publicação indisponível" },
+    "workerDetail": "Confira o serviço de publicação na área de analytics."
+  },
   "auth": {
     "title": "30studio",
     "description": "Crie, planeje e publique com inteligência.",
@@ -127,6 +142,7 @@
     "save": "Salvar nome",
     "loading": "Carregando configurações do espaço…",
     "loadError": "Não foi possível carregar as configurações do espaço.",
+    "retry": "Tentar novamente",
     "saved": "Nome do espaço atualizado.",
     "saveError": "Não foi possível atualizar o nome do espaço.",
     "restricted": "Somente a pessoa proprietária pode alterar o nome do espaço."
@@ -140,7 +156,10 @@
     "passwordChanged": "Senha alterada.",
     "passwordChangeError": "Não foi possível alterar a senha. Confira a senha atual e tente novamente.",
     "sendRecovery": "Enviar link para redefinir senha",
-    "recoverySent": "Se o e-mail estiver cadastrado, você receberá as instruções de recuperação."
+    "recoverySent": "Se o e-mail estiver cadastrado, você receberá as instruções de recuperação.",
+    "sectionsLabel": "Seções do perfil",
+    "accountTab": "Minha conta",
+    "workspaceTab": "Espaço de trabalho"
   },
   "portfolio": {
     "eyebrow": "SEU PORTFÓLIO",
@@ -270,6 +289,9 @@
     "socialMixedCount": "{connected, plural, one {# conectada} other {# conectadas}} · {reauth, plural, one {# reconexão necessária} other {# reconexões necessárias}}"
   },
   "calendar": {
+    "approvalQueueEyebrow": "REVISÃO DE CONTEÚDO",
+    "approvalQueueTitle": "Fila de aprovações",
+    "approvalQueueDescription": "Revise as publicações pendentes e aprove ou solicite ajustes em cada conteúdo.",
     "eyebrow": "PLANEJAMENTO EDITORIAL",
     "title": "Agenda mensal",
     "description": "Organize uma ideia central e programe cada rede social em seu próprio horário.",
@@ -513,6 +535,14 @@
     "eyebrow": "ACESSO AO WORKSPACE",
     "title": "Pessoas da equipe",
     "description": "Gerencie quem pode acessar este workspace e quais ações cada pessoa pode realizar.",
+    "sectionsLabel": "Seções de gerenciamento da equipe",
+    "accessSectionsLabel": "Convites e histórico de acesso",
+    "membersTab": "Pessoas",
+    "accessTab": "Convites e histórico",
+    "approvalTab": "Política de aprovação",
+    "inviteTab": "Convidar pessoa",
+    "invitationsTab": "Convites",
+    "auditTab": "Histórico de acesso",
     "memberName": "Nome e e-mail",
     "memberJoined": "Entrada",
     "memberRole": "Papel",

@@ -152,3 +152,31 @@ Existing durable docs to consult first: `AGENTS.md`, `docs/PRODUCT_CONTEXT.md`, 
 - Validation passed: 38 unit tests, TypeScript, focused lint, Drizzle journal check, locale-key parity, `git diff --check`, and calendar integration. The full integration suite completed with six passes and two environment-dependent skips (Mailpit and LocalStack).
 - Browser visual QA remains outstanding because the CUA browser host is unavailable and Playwright is not installed. SMTP/Mailpit, LocalStack, provider credentials, external social accounts and deployment homologation are also not configured here.
 - The working tree contains broad pre-existing uncommitted feature work. Do not reset, clean, or assume every change belongs to this status update.
+
+## Restart handoff — 2026-11-17
+
+### Application and UI audit
+
+- Application repository: `/Users/thomasmetz/workspace/3035/30studio`, branch `main`, HEAD `b9fb085` (`ci: verify migrations and integration tests`). The latest GitHub Actions run for this commit completed quality checks and published the GHCR image successfully; the image tag produced by the workflow is `sha-b9fb085`.
+- The current working tree has uncommitted UI audit changes in `app/globals.css`, `components/workspace/workspace-entry.tsx`, `components/workspace/team-management.tsx`, and `docs/UX_AUDIT.md`. Preserve them. Focused ESLint, `tsc --noEmit --incremental false`, and `git diff --check` passed after these changes. No commit or deploy was made.
+- The UI fixes isolate the Connections destination, make login/organization/brand/team failures use alert semantics and error styling, and clear stale login errors while credentials are edited. Browser visual review is still outstanding.
+- The Docker web container was listed as running, but `http://127.0.0.1:3001/pt` refused the connection. The browser automation host was unavailable. Do not claim a visual or click-through validation.
+
+### GitOps and deployment diagnosis
+
+- GitOps repository: `/Users/thomasmetz/workspace/3035/gitops`, branch `main`, HEAD and `origin/main` at `d3eec67` (`fix(sales): probe backend health endpoint`). Its worktree has an untracked `docs/` directory; do not delete or overwrite it.
+- `dublin/studio/helm-values.yaml` still selects image tag `sha-f613a5d`, although the current app commit `b9fb085` has a successful published image. The new image is not selected by GitOps yet.
+- Current GitOps secret resources consistently declare `SecretStore studio-postgres-store` and `ExternalSecret studio-database-secret`; the latter reads property `pgbouncer-uri` from the existing `studio30-db-credentials` secret. The chart references `studio-database-secret`.
+- The user's last Argo screenshot showed `studio30-database-secret` failing because `SecretStore studio30-postgres-store` was not found. That is the last cluster-side error actually observed. The current Argo state could not be inspected: CUA reported “browser access host unavailable,” and `argocd app get studio --server localhost:8080` failed because no local Argo endpoint listens there. Do not use local `kubectl`; the user previously specified that cluster commands must be run from Argo.
+- `studio.3035service.com` currently does not resolve in DNS. This alone prevents reaching the public app hostname; it does not prove whether the Kubernetes deployment is healthy.
+- No cluster sync, resource edit, GitOps image update, or DNS change was made during diagnosis. The user asked for an evaluation, not for a deployment fix.
+
+### Resume here
+
+1. Once Chrome/Argo is accessible, inspect the `studio` Application's current sync/health state and Events for `SecretStore`, `ExternalSecret`, Deployment, and Pod. Compare live resource names with the current GitOps declarations above.
+2. Confirm whether the old missing-SecretStore event remains or whether Argo has applied the renamed `studio-postgres-store` and `studio-database-secret` resources. Do not infer current cluster health from Git alone.
+3. If the user asks to roll forward the app, update the GitOps desired image from `sha-f613a5d` to the successfully published `sha-b9fb085`, then follow the user's established commit/push authorization. Verify Argo sync and pod readiness afterward.
+4. Resolve the missing DNS record/route for `studio.3035service.com` through the authorized Cloudflare/GitOps workflow, then recheck the hostname.
+5. Continue the UI audit after the local web endpoint or browser is available; keep runtime visual QA clearly separate from source-level review.
+
+Never copy credentials, tokens, connection strings, or generated secret values into this handoff.

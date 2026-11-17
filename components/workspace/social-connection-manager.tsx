@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { SOCIAL_PLATFORMS, type Locale, type SocialPlatform, type SocialProfileStatus } from "@/lib/constants";
 import { socialConnectionConfigurationResponseSchema, socialConnectionListResponseSchema } from "@/lib/validation/social-connections";
 
@@ -99,7 +100,7 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
         const publicationCapability = publicationCapabilities.get(platform) ?? { publication: "connection_only" as const, maximumTextCharacters: null };
         return <li className="brandCollection__profile" key={platform}>
           <div className="socialConnectionPlatform">
-            <strong>{platforms(platform)}</strong>
+            <strong className="socialConnectionPlatform__name"><SocialPlatformIcon platform={platform} />{platforms(platform)}</strong>
             {canManage ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null || !configurationReady || !configured.includes(platform)} onClick={() => void connect(platform)}>
               {busyPlatform === platform ? t("working") : !configurationReady ? t("loading") : configured.includes(platform) ? t("connect") : t("notConfigured")}
             </Button> : null}

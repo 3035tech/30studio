@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
-import { ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Children, Fragment, isValidElement, useRef, useState, type FormEvent, type FormEventHandler, type InputHTMLAttributes, type ReactElement, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Check, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 type ValidationMessageKey = "required" | "email" | "url" | "number" | "range" | "step" | "length" | "format";
@@ -146,24 +147,75 @@ export function FileField({ label, error, helpText, id, className = "", required
   );
 }
 
-type SelectFieldProps = SelectHTMLAttributes<HTMLSelectElement> & {
+type SelectOptionProps = { value?: string; disabled?: boolean; children?: ReactNode; selected?: boolean };
+type SelectChangeEvent = { target: { value: string } };
+type SelectFieldProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange" | "onInvalid" | "children"> & {
   label: string;
   id: string;
   children: ReactNode;
   error?: string;
   helpText?: string;
+  onChange?: (event: SelectChangeEvent) => void;
+  onInvalid?: FormEventHandler<HTMLSelectElement>;
 };
 
-export function SelectField({ label, id, children, className = "", error, helpText, required, onInvalid, onChange, ...props }: SelectFieldProps) {
+const EMPTY_SELECT_VALUE = "__30studio_empty_select_value__";
+
+function collectSelectOptions(children: ReactNode): ReactElement<SelectOptionProps>[] {
+  const options: ReactElement<SelectOptionProps>[] = [];
+  Children.forEach(children, (child) => {
+    if (!isValidElement<SelectOptionProps>(child)) return;
+    if (child.type === "option" && typeof child.props.value === "string") options.push(child);
+    else if (child.type === Fragment) options.push(...collectSelectOptions(child.props.children));
+  });
+  return options;
+}
+
+export function SelectField({ label, id, children, className = "", error, helpText, required, onInvalid, onChange, value, defaultValue, name, disabled, ...props }: SelectFieldProps) {
   const validation = useFieldValidation();
+  const options = collectSelectOptions(children);
+  const firstValue = options.find((option) => option.props.selected)?.props.value ?? options[0]?.props.value ?? "";
+  const [uncontrolledValue, setUncontrolledValue] = useState(String(defaultValue ?? firstValue));
+  const [invalid, setInvalid] = useState(false);
+  const [formError, setFormError] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectedValue = String(value ?? uncontrolledValue);
+  const internalValue = selectedValue === "" ? EMPTY_SELECT_VALUE : selectedValue;
+
   return (
     <div className="fieldControl">
       <FieldLabel id={id} label={label} required={required} />
-      <div className={`fieldControl__selectWrap${error ? " is-invalid" : ""}`}>
-        <select id={id} className={`fieldControl__select ${className}`.trim()} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : helpText ? `${id}-description` : undefined} required={required} onInvalid={(event) => { validation.onInvalid(event); onInvalid?.(event); }} onChange={(event) => { validation.onInput(event); onChange?.(event); if (error) event.currentTarget.setAttribute("aria-invalid", "true"); }} {...props}>{children}</select>
-        <ChevronDown className="fieldControl__selectIcon" aria-hidden="true" size={17} />
-      </div>
-      <FieldFeedback error={error} helpText={helpText} id={id} />
+      <SelectPrimitive.Root
+        value={internalValue}
+        disabled={disabled}
+        onValueChange={(nextValue) => {
+          const next = nextValue === EMPTY_SELECT_VALUE ? "" : nextValue;
+          if (value === undefined) setUncontrolledValue(next);
+          setInvalid(false);
+          setFormError("");
+          onChange?.({ target: { value: next } });
+        }}
+      >
+        <SelectPrimitive.Trigger ref={triggerRef} id={id} className={`fieldControl__select ${className}`.trim()} aria-invalid={Boolean(error) || invalid} aria-describedby={error ? `${id}-error` : helpText ? `${id}-description` : undefined}>
+          <SelectPrimitive.Value />
+          <SelectPrimitive.Icon asChild><ChevronDown className="fieldControl__selectIcon" aria-hidden="true" size={17} /></SelectPrimitive.Icon>
+        </SelectPrimitive.Trigger>
+        <SelectPrimitive.Portal>
+          <SelectPrimitive.Content className="fieldControl__selectContent" position="popper" side="bottom" align="start" sideOffset={4} avoidCollisions={false}>
+            <SelectPrimitive.Viewport className="fieldControl__selectViewport">
+              {options.map((option, index) => {
+                const optionValue = option.props.value ?? "";
+                return <SelectPrimitive.Item className="fieldControl__selectItem" key={option.key ?? `${optionValue}-${index}`} value={optionValue === "" ? EMPTY_SELECT_VALUE : optionValue} disabled={option.props.disabled} textValue={typeof option.props.children === "string" ? option.props.children : undefined}>
+                  <SelectPrimitive.ItemText>{option.props.children}</SelectPrimitive.ItemText>
+                  <SelectPrimitive.ItemIndicator><Check aria-hidden="true" size={15} /></SelectPrimitive.ItemIndicator>
+                </SelectPrimitive.Item>;
+              })}
+            </SelectPrimitive.Viewport>
+          </SelectPrimitive.Content>
+        </SelectPrimitive.Portal>
+      </SelectPrimitive.Root>
+      {name || required ? <select className="fieldControl__formSelect" aria-hidden="true" tabIndex={-1} name={name} value={selectedValue} required={required} disabled={disabled} onChange={() => {}} onInvalid={(event) => { event.preventDefault(); validation.onInvalid(event); setFormError(event.currentTarget.validationMessage); setInvalid(true); onInvalid?.(event); triggerRef.current?.focus(); }} {...props}>{children}</select> : null}
+      <FieldFeedback error={error ?? formError} helpText={helpText} id={id} />
     </div>
   );
 }

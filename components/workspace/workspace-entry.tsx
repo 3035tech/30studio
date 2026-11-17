@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { Facebook, Instagram, Linkedin, X, Youtube } from "lucide-react";
+import { X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { TeamManagement } from "@/components/workspace/team-management";
 import { BrandKitEditor } from "@/components/brand/brand-kit-editor";
 import { EditorialCalendar } from "@/components/calendar/editorial-calendar";
 import { SocialConnectionManager } from "@/components/workspace/social-connection-manager";
+import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { AnalyticsWorkspace } from "@/components/workspace/analytics-workspace";
 import { CompetitorIntelligence } from "@/components/workspace/competitor-intelligence";
 import { AccountProfile } from "@/components/workspace/account-profile";
@@ -58,6 +59,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
   const [busy, setBusy] = useState(false);
   const [isChangingOrganization, setIsChangingOrganization] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [brands, setBrands] = useState<BrandState>(INITIAL_BRANDS);
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
   const [activeBrandKitId, setActiveBrandKitId] = useState<string | null>(null);
@@ -187,6 +189,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    setMessageIsError(false);
     setResetLinkSent(false);
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") ?? "").trim();
@@ -216,6 +219,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       }
     } catch {
       setMessage(tAuth("genericError"));
+      setMessageIsError(true);
     } finally {
       setBusy(false);
     }
@@ -225,6 +229,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    setMessageIsError(false);
     const name = organizationName.trim();
     const slug = makeSlug(organizationSlug);
 
@@ -236,6 +241,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       setOrganizationName("");
     } catch {
       setMessage(tWorkspace("organizationError"));
+      setMessageIsError(true);
     } finally {
       setBusy(false);
     }
@@ -246,12 +252,14 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     setCanManageContent(null);
     setIsChangingOrganization(true);
     setMessage("");
+    setMessageIsError(false);
     try {
       const result = await authClient.organization.setActive({ organizationId });
       if (result.error) throw new Error();
       await refreshSession();
     } catch {
       setMessage(tWorkspace("organizationError"));
+      setMessageIsError(true);
     } finally {
       setIsChangingOrganization(false);
       setBusy(false);
@@ -264,6 +272,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     const formElement = event.currentTarget;
     setBusy(true);
     setMessage("");
+    setMessageIsError(false);
     const form = new FormData(event.currentTarget);
     const payload = {
       name: String(form.get("brandName") ?? "").trim(),
@@ -298,6 +307,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       setMessage(logoUploadFailed ? tPortfolio("brandAddedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandAddedLogoPending") : tWorkspace("brandAdded"));
     } catch {
       setMessage(tWorkspace("brandError"));
+      setMessageIsError(true);
     } finally {
       setBusy(false);
     }
@@ -350,6 +360,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     if (!activeOrganizationId) return;
     setBusy(true);
     setMessage("");
+    setMessageIsError(false);
     const form = new FormData(event.currentTarget);
     const logoFile = form.get("brandLogo");
     let logoUploadFailed = false;
@@ -379,6 +390,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       setMessage(logoUploadFailed ? tPortfolio("brandUpdatedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandUpdatedLogoPending") : tPortfolio("brandUpdated"));
     } catch {
       setMessage(tPortfolio("updateError"));
+      setMessageIsError(true);
     } finally {
       setBusy(false);
     }
@@ -388,6 +400,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
     if (!activeOrganizationId) return;
     setBusy(true);
     setMessage("");
+    setMessageIsError(false);
 
     try {
       const response = await fetch(`/api/brands/${brandId}`, { method: "DELETE", credentials: "same-origin" });
@@ -397,6 +410,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       setMessage(tPortfolio("brandArchived"));
     } catch {
       setMessage(tPortfolio("archiveError"));
+      setMessageIsError(true);
     } finally {
       setBusy(false);
     }
@@ -423,13 +437,13 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
             {authMode === "sign_up" ? (
               <TextField id="name" name="name" label={tAuth("name")} autoComplete="name" maxLength={AUTH_LIMITS.nameCharacters} required />
             ) : null}
-            <TextField id="email" name="email" label={tAuth("email")} type="email" autoComplete="email" required disabled={busy && authMode === "request_reset"} onChange={() => { if (authMode === "request_reset") { setResetLinkSent(false); setMessage(""); } }} />
-            {authMode !== "request_reset" ? <PasswordField id="password" name="password" label={tAuth("password")} autoComplete={authMode === "sign_up" ? "new-password" : "current-password"} minLength={AUTH_LIMITS.passwordCharacters} helpText={authMode === "sign_up" ? tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters }) : undefined} required /> : null}
+            <TextField id="email" name="email" label={tAuth("email")} type="email" autoComplete="email" maxLength={AUTH_LIMITS.emailCharacters} required disabled={busy && authMode === "request_reset"} onChange={() => { if (authMode === "request_reset") setResetLinkSent(false); if (messageIsError || authMode === "request_reset") { setMessage(""); setMessageIsError(false); } }} />
+            {authMode !== "request_reset" ? <PasswordField id="password" name="password" label={tAuth("password")} autoComplete={authMode === "sign_up" ? "new-password" : "current-password"} minLength={AUTH_LIMITS.passwordCharacters} helpText={authMode === "sign_up" ? tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters }) : undefined} required onChange={() => { if (messageIsError) { setMessage(""); setMessageIsError(false); } }} /> : null}
             {authMode === "sign_in" ? <div className="entryLoginOptions">
               <CheckboxField id="remember-me" name="rememberMe" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} label={tAuth("rememberMe")} className="entryLoginOptions__remember" />
               <a className="entryLoginOptions__recovery" href="#request-password-reset" onClick={(event) => { event.preventDefault(); setAuthMode("request_reset"); setResetLinkSent(false); setMessage(""); }}>{tAuth("forgotPassword")}</a>
             </div> : null}
-            {message ? <p className="entryMessage" role="status">{message}</p> : null}
+            {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
             <Button type="submit" disabled={busy}>{busy ? tAuth("working") : authMode === "sign_up" ? tAuth("signUp") : authMode === "request_reset" ? tAuth(resetLinkSent ? "sendAnotherResetLink" : "sendResetLink") : tAuth("signIn")}</Button>
           </form>
           <Button appearance="quiet" className="entrySwitch" type="button" onClick={() => { setAuthMode(authMode === "sign_up" ? "sign_in" : authMode === "request_reset" ? "sign_in" : "sign_up"); setResetLinkSent(false); setMessage(""); }}>
@@ -477,7 +491,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       onOrganizationChange={(organizationId) => void handleOrganizationChange(organizationId)}
       onSignOut={() => void handleSignOut()}
     >
-      {message ? <p className="entryMessage" role="status">{message}</p> : null}
+      {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
       {socialConnectionResult === "connected" || socialConnectionResult === "failed" || socialConnectionResult === "already_connected" || socialConnectionResult === "no_publishable_pages" ? <p className="entryMessage" role="status">{tSocialConnections(socialConnectionResult)}</p> : null}
       <section className="workspaceOverview" id={WORKSPACE_SECTION_IDS.overview} aria-labelledby="workspace-overview-title">
         <div className="workspaceOverview__intro">
@@ -584,7 +598,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
                 <span className="brandCollection__social">
                   {brand.socialProfiles.length === 0 ? tPortfolio("noChannels") : brand.socialProfiles.map((profile) => (
                     <span className="brandCollection__profile" key={profile.id}>
-                      <span className="brandCollection__profileName">{profile.platform === "facebook" ? <Facebook aria-hidden="true" /> : profile.platform === "instagram" ? <Instagram aria-hidden="true" /> : profile.platform === "linkedin" ? <Linkedin aria-hidden="true" /> : profile.platform === "youtube" ? <Youtube aria-hidden="true" /> : <span className={`brandCollection__platformGlyph brandCollection__platformGlyph--${profile.platform}`} aria-hidden="true">{profile.platform === "tiktok" ? "♪" : profile.platform === "threads" ? "@" : profile.platform === "pinterest" ? "P" : "X"}</span>}<span>{tPlatforms(profile.platform)} · {profile.displayName}</span></span>
+                      <span className="brandCollection__profileName"><SocialPlatformIcon platform={profile.platform} /><span>{tPlatforms(profile.platform)} · {profile.displayName}</span></span>
                       <small className={`brandProfileStatus brandProfileStatus--${profile.status}`}>{tProfileStatus(profile.status)}</small>
                     </span>
                   ))}

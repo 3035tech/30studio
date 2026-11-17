@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { INVITATION_STATUSES, TEAM_AUDIT_ACTION_VALUES, TENANT_ROLE, TENANT_ROLES } from "@/lib/constants";
+import { AUTH_LIMITS, INVITATION_STATUSES, TEAM_AUDIT_ACTION_VALUES, TENANT_ROLE, TENANT_ROLES } from "@/lib/constants";
 
 export const tenantRoleSchema = z.enum(TENANT_ROLES);
 export const invitationStatusSchema = z.enum(INVITATION_STATUSES);
@@ -9,7 +9,7 @@ export const teamMemberRoleUpdateSchema = z.object({
 }).strict();
 
 export const teamInvitationCreateSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
+  email: z.string().trim().toLowerCase().email().max(AUTH_LIMITS.emailCharacters),
   role: z.enum(TENANT_ROLES).refine((role) => role !== TENANT_ROLE.owner),
 }).strict();
 

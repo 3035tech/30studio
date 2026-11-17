@@ -532,6 +532,7 @@ export const BRAND_KIT_LIMITS = {
 } as const;
 
 export const AUTH_LIMITS = {
+  emailCharacters: 254,
   passwordCharacters: 8,
   nameCharacters: 100,
   slugCharacters: 48,

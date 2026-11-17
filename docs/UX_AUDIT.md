@@ -135,3 +135,20 @@ The live browser became unavailable during the latest audit pass, so these are d
 - A shared password field now lets users reveal or hide the value in sign-in, invitation, reset, and account password forms. The toggle has localized accessible names and a visible keyboard focus state.
 - Invitation sign-in now offers password recovery without losing the invitation context. The reset link returns to the pending invitation after the password is changed.
 - TypeScript, focused ESLint, translation JSON parsing, and `git diff --check` passed. Actual delivery still depends on SMTP being configured; browser/email click-through was not exercised.
+
+## Navigation and feedback review — 2026-11-17
+
+- Source review found that the Connections destination changed the active section but had no matching content-visibility rules. This could leave the dashboard, calendar, and brand list visible alongside connection management. The workspace now isolates the Connections panel, and the panel explicitly respects its `hidden` state despite its grid display style.
+- Sign-in failures and organization/brand mutation failures previously used the same green success notice and `role="status"`. They now use the shared error treatment and `role="alert"`; editing credentials clears the stale sign-in error.
+- Team role changes and member removal now use the same localized error style and alert semantics on failure; successful actions keep the status treatment.
+- Focused ESLint and `git diff --check` pass. Browser automation is unavailable, the local server is not responding, and the new `studio.3035service.com` hostname does not resolve, so visual and click-through confirmation remain outstanding.
+
+## Product-wide controls and profile pass — 2026-11-17
+
+- Replaced the shared native select popup with Radix Select, using a fixed bottom placement and keyboard-accessible options. The form bridge preserves actual option values, including empty filter values, and keeps required-field validation connected to the visible trigger.
+- Added local Simple Icons logos for all supported social networks in connection management and brand profile summaries. The icon package is CC0-licensed, bundled locally, and makes no external requests.
+- Added a workspace notification popover backed by the organization-scoped publication analytics response. It surfaces failed or uncertain publications, pending approvals, social connections requiring attention, and a stale or unknown publishing worker. The list refreshes while open and supports a manual retry.
+- Split Profile into account and workspace tabs; split team management into people, invitations, access history, and approval policy tabs. The Profile workspace-settings error now offers retry, but the previously observed API load failure still needs diagnosis if it persists after retry.
+- Added explicit approval-queue title and guidance, and aligned email input length with the 254-character server schema.
+- Audited input metadata and schemas for the reviewed forms: invitation email and organization display name are bounded, social and role values use shared domain types, and server requests continue to be validated by Zod. Existing multi-tenant authorization paths were not changed.
+- Verification: production build, full ESLint, and 46 unit tests pass; Portuguese and English catalogs have matching keys. Browser-level visual testing remains unverified because the local Python Playwright package is unavailable. The notification list is an active-issues summary, not a persistent inbox with read/unread messages or historical event storage.
