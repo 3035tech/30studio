@@ -123,9 +123,9 @@ export function IntegerField(props: IntegerFieldProps) {
   return <BaseTextField {...props} type="number" step={1} inputMode="numeric" />;
 }
 
-type FileFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "type"> & { id: string; label: string; error?: string };
+type FileFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "type"> & { id: string; label: string; error?: string; helpText?: string };
 
-export function FileField({ label, error, id, className = "", required, onInvalid, onInput, ...props }: FileFieldProps) {
+export function FileField({ label, error, helpText, id, className = "", required, onInvalid, onInput, ...props }: FileFieldProps) {
   const validation = useFieldValidation();
   return (
     <div className="fieldControl">
@@ -135,13 +135,13 @@ export function FileField({ label, error, id, className = "", required, onInvali
         type="file"
         className={`fieldControl__file ${error ? "is-invalid" : ""} ${className}`.trim()}
         aria-invalid={Boolean(error)}
-        aria-describedby={error && id ? `${id}-error` : undefined}
+        aria-describedby={error ? `${id}-error` : helpText ? `${id}-description` : undefined}
         required={required}
         onInvalid={(event) => { validation.onInvalid(event); onInvalid?.(event); }}
         onInput={(event) => { validation.onInput(event); onInput?.(event); if (error) event.currentTarget.setAttribute("aria-invalid", "true"); }}
         {...props}
       />
-      <FieldFeedback error={error} id={id} />
+      <FieldFeedback error={error} helpText={helpText} id={id} />
     </div>
   );
 }

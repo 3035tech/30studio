@@ -8,7 +8,7 @@ import { socialConnectionConfigurationResponseSchema, socialConnectionListRespon
 
 type Connection = { id: string; platform: SocialPlatform; displayName: string; handle: string | null; status: SocialProfileStatus; connectedAt: string | null; connectedByName: string | null; grantedScopes: string[]; missingScopes: string[]; tokenExpiresAt: string | null; refreshTokenExpiresAt: string | null; credentialsUpdatedAt: string | null };
 
-export function SocialConnectionManager({ brandId }: { brandId: string }) {
+export function SocialConnectionManager({ brandId, canManage = true }: { brandId: string; canManage?: boolean }) {
   const t = useTranslations("socialConnections");
   const platforms = useTranslations("platforms");
   const statusLabel = useTranslations("profileStatus");
@@ -100,9 +100,9 @@ export function SocialConnectionManager({ brandId }: { brandId: string }) {
         return <li className="brandCollection__profile" key={platform}>
           <div className="socialConnectionPlatform">
             <strong>{platforms(platform)}</strong>
-            <Button appearance="quiet" type="button" disabled={busyPlatform !== null || !configurationReady || !configured.includes(platform)} onClick={() => void connect(platform)}>
+            {canManage ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null || !configurationReady || !configured.includes(platform)} onClick={() => void connect(platform)}>
               {busyPlatform === platform ? t("working") : !configurationReady ? t("loading") : configured.includes(platform) ? t("connect") : t("notConfigured")}
-            </Button>
+            </Button> : null}
           </div>
           <small className="socialConnectionManager__capability">{t(`capabilities.${publicationCapability.publication}`)}</small>
           {publicationCapability.maximumTextCharacters !== null ? <small className="socialConnectionManager__capability">{t("maximumTextCharacters", { maximum: publicationCapability.maximumTextCharacters })}</small> : null}
@@ -124,7 +124,7 @@ export function SocialConnectionManager({ brandId }: { brandId: string }) {
               {connection.grantedScopes.length ? <small>{t("health.grantedScopes", { scopes: connection.grantedScopes.join(", ") })}</small> : null}
               <small>{t("health.remoteCheckUnavailable")}</small>
             </div>
-            {connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => void disconnect(connection)}>
+            {canManage && connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => void disconnect(connection)}>
               {busyPlatform === platform ? t("working") : t("disconnect")}
             </Button> : null}
           </div>;

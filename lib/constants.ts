@@ -12,8 +12,9 @@ export const WORKSPACE_SECTION_IDS = {
   calendar: "workspace-calendar",
   approvals: "workspace-approvals",
   analytics: "workspace-analytics",
+  competitors: "workspace-competitors",
   brands: "workspace-brands",
-  createBrand: "workspace-create-brand",
+  connections: "workspace-connections",
   team: "workspace-team",
   profile: "workspace-profile",
 } as const;
@@ -118,8 +119,27 @@ export const BRAND_LIMITS = {
   nameCharacters: 80,
   descriptionCharacters: 180,
   industryCharacters: 80,
+  websiteUrlCharacters: 2_048,
   markCharacters: 2,
 } as const;
+
+export const BRAND_SEGMENTS = [
+  "personal",
+  "technology",
+  "marketing",
+  "education",
+  "finance",
+  "health",
+  "retail",
+  "food",
+  "fashion",
+  "entertainment",
+  "professional_services",
+  "industry",
+  "nonprofit",
+  "other",
+] as const;
+export type BrandSegment = (typeof BRAND_SEGMENTS)[number];
 
 export const CONTENT_STATUSES = ["idea", "draft", "in_review", "approved", "scheduled", "published", "failed", "cancelled"] as const;
 export type ContentStatus = (typeof CONTENT_STATUSES)[number];
@@ -229,11 +249,12 @@ export const COMPETITOR_SOURCE_STATUSES = ["active", "paused", "archived"] as co
 export const COMPETITOR_SOURCE_STATUS = { active: "active", paused: "paused", archived: "archived" } as const;
 export const COMPETITOR_FETCH_RUN_STATUSES = ["running", "succeeded", "failed", "interrupted"] as const;
 export const COMPETITOR_FETCH_RUN_STATUS = { running: "running", succeeded: "succeeded", failed: "failed", interrupted: "interrupted" } as const;
-export const COMPETITOR_ALERT_TYPES = ["failures", "stale"] as const;
+export const COMPETITOR_ALERT_TYPES = ["failures", "stale", "new_publications"] as const;
 export const COMPETITOR_WORKER_HEALTH_STATUSES = ["healthy", "stale", "unknown"] as const;
 export const COMPETITOR_WORKER_HEALTH_STATUS = { healthy: "healthy", stale: "stale", unknown: "unknown" } as const;
 export const COMPETITOR_OBSERVATION_DATA_QUALITIES = ["metadata_only"] as const;
-export const COMPETITOR_RETRIEVAL_METHODS = ["rss_atom"] as const;
+export const COMPETITOR_RETRIEVAL_METHODS = ["rss_atom", "instagram_graph", "facebook_graph", "website_crawl", "x_api"] as const;
+export const COMPETITOR_FEATURES = { xApi: process.env.X_COMPETITOR_RESEARCH_ENABLED === "true" } as const;
 export const COMPETITOR_OBSERVATION_ANALYSIS_STATUSES = ["pending", "processing", "ready", "unavailable"] as const;
 export const COMPETITOR_OBSERVATION_ANALYSIS_STATUS = { pending: "pending", processing: "processing", ready: "ready", unavailable: "unavailable" } as const;
 export const COMPETITOR_TOPIC_KEYS = ["product_news", "education", "customer_story", "promotion", "event", "industry_news", "opinion", "other"] as const;
@@ -248,6 +269,12 @@ export const COMPETITOR_SOURCE_ERROR_CODES = {
   analysisUnavailable: "analysis_unavailable",
   analysisProviderFailed: "analysis_provider_failed",
   analysisOutputInvalid: "analysis_output_invalid",
+  socialConnectionRequired: "social_connection_required",
+  socialPermissionRequired: "social_permission_required",
+  xApiDisabled: "x_api_disabled",
+  siteRobotsBlocked: "site_robots_blocked",
+  siteSitemapUnavailable: "site_sitemap_unavailable",
+  siteContentUnsupported: "site_content_unsupported",
   workerInterrupted: "worker_interrupted",
 } as const;
 export const COMPETITOR_WORKER = {
@@ -255,12 +282,19 @@ export const COMPETITOR_WORKER = {
   leaseMilliseconds: 120_000,
   pollIntervalMinutes: 60,
   maximumFeedBytes: 1_000_000,
+  maximumWebsitePagesPerFetch: 5,
+  maximumWebsiteSitemapsPerFetch: 2,
+  maximumWebsitePagesPerSitemap: 100,
+  recentPublicationAlertHours: 24,
+  trendWindowDays: 30,
   maximumEntriesPerFetch: 50,
   maximumTitleCharacters: 300,
   maximumSummaryCharacters: 1_500,
   requestTimeoutMilliseconds: 10_000,
   retryDelayMinutes: [5, 30, 120, 360] as const,
   maximumSourcesPerBrand: 25,
+  maximumProfileIdentifierCharacters: 300,
+  profileLookupTimeoutMilliseconds: 8_000,
   analysisBatchSize: 10,
   analysisMaximumAttempts: 3,
   analysisLeaseMilliseconds: 120_000,
@@ -538,6 +572,13 @@ export const API_ERROR_CODES = {
   competitorSourceNotFound: "COMPETITOR_SOURCE_NOT_FOUND",
   competitorSourceExists: "COMPETITOR_SOURCE_EXISTS",
   competitorSourceLimitReached: "COMPETITOR_SOURCE_LIMIT_REACHED",
+  competitorYouTubeConnectionRequired: "COMPETITOR_YOUTUBE_CONNECTION_REQUIRED",
+  competitorInstagramConnectionRequired: "COMPETITOR_INSTAGRAM_CONNECTION_REQUIRED",
+  competitorFacebookConnectionRequired: "COMPETITOR_FACEBOOK_CONNECTION_REQUIRED",
+  competitorXConnectionRequired: "COMPETITOR_X_CONNECTION_REQUIRED",
+  competitorXApiDisabled: "COMPETITOR_X_API_DISABLED",
+  competitorProfileNotFound: "COMPETITOR_PROFILE_NOT_FOUND",
+  competitorProfileLookupUnavailable: "COMPETITOR_PROFILE_LOOKUP_UNAVAILABLE",
   socialOAuthInvalid: "SOCIAL_OAUTH_INVALID",
   brandAssetNotFound: "BRAND_ASSET_NOT_FOUND",
   brandAssetInvalid: "BRAND_ASSET_INVALID",

@@ -1,19 +1,56 @@
-import { COMPETITOR_SOURCE_ERROR_CODES, COMPETITOR_WORKER } from "@/lib/constants";
-import { claimCompetitorAnalysisBatch, claimDueCompetitorSource, completeCompetitorAnalysis, completeCompetitorFetch, failCompetitorAnalysis, failCompetitorFetch, recordCompetitorWorkerHeartbeat } from "@/lib/db/repositories/competitors";
+import { COMPETITOR_FEATURES, COMPETITOR_SOURCE_ERROR_CODES, COMPETITOR_WORKER } from "@/lib/constants";
+import { claimCompetitorAnalysisBatch, claimDueCompetitorSource, completeCompetitorAnalysis, completeCompetitorFetch, failCompetitorAnalysis, failCompetitorFetch, getCompetitorFacebookPageId, recordCompetitorWorkerHeartbeat } from "@/lib/db/repositories/competitors";
 import { analyzeCompetitorObservations, CompetitorAnalysisError } from "@/lib/server/competitor-analysis";
 import { collectCompetitorFeed, CompetitorFeedError } from "@/lib/server/competitor-feed";
+import { InstagramCompetitorError, lookupInstagramCompetitor } from "@/lib/server/competitor-instagram";
+import { FacebookCompetitorError, lookupFacebookCompetitor } from "@/lib/server/competitor-facebook";
+import { collectCompetitorWebsite } from "@/lib/server/competitor-website";
+import { collectXCompetitorPosts, XCompetitorError } from "@/lib/server/competitor-x";
+import { getValidSocialAccessToken } from "@/lib/server/social-access-token";
+import type { CompetitorFeedItem } from "@/lib/db/repositories/competitors";
 
 async function processDueSource() {
   const source = await claimDueCompetitorSource();
   if (!source) return false;
   try {
-    const result = await collectCompetitorFeed({ feedUrl: source.feedUrl, etag: source.etag, lastModified: source.lastModified });
-    await completeCompetitorFetch(source, result.kind === "updated" ? result.items : [], {
-      etag: result.etag,
-      lastModified: result.lastModified,
-    });
+    let items: CompetitorFeedItem[];
+    let etag: string | null = null;
+    let lastModified: string | null = null;
+    if (source.retrievalMethod === "instagram_graph") {
+      const token = source.socialProfileId ? await getValidSocialAccessToken(source.organizationId, source.socialProfileId) : null;
+      if (!token) throw new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired);
+      const pageId = source.socialProfileId ? await getCompetitorFacebookPageId(source.organizationId, source.brandId, source.socialProfileId) : null;
+      if (!pageId) throw new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired);
+      const result = await lookupInstagramCompetitor(token, pageId, source.externalProfileId ?? "");
+      items = result.items;
+    } else if (source.retrievalMethod === "facebook_graph") {
+      const token = source.socialProfileId ? await getValidSocialAccessToken(source.organizationId, source.socialProfileId) : null;
+      if (!token) throw new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired);
+      const result = await lookupFacebookCompetitor(token, source.externalProfileId ?? "", true);
+      items = result.items;
+    } else if (source.retrievalMethod === "x_api") {
+      if (!COMPETITOR_FEATURES.xApi) throw new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.xApiDisabled);
+      const token = source.socialProfileId ? await getValidSocialAccessToken(source.organizationId, source.socialProfileId) : null;
+      if (!token) throw new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired);
+      items = await collectXCompetitorPosts(token, source.externalProfileId ?? "", source.feedUrl);
+    } else if (source.retrievalMethod === "website_crawl") {
+      items = await collectCompetitorWebsite({ websiteUrl: source.feedUrl });
+    } else {
+      const feedResult = await collectCompetitorFeed({ feedUrl: source.feedUrl, etag: source.etag, lastModified: source.lastModified });
+      items = feedResult.kind === "updated" ? feedResult.items : [];
+      etag = feedResult.etag;
+      lastModified = feedResult.lastModified;
+    }
+    await completeCompetitorFetch(source, items, { etag, lastModified });
   } catch (error) {
-    const errorCode = error instanceof CompetitorFeedError ? error.code : COMPETITOR_SOURCE_ERROR_CODES.requestFailed;
+    const errorCode = error instanceof CompetitorFeedError ? error.code
+      : error instanceof InstagramCompetitorError && error.code === "connection_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired
+        : error instanceof InstagramCompetitorError && error.code === "permission_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialPermissionRequired
+          : error instanceof FacebookCompetitorError && error.code === "connection_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired
+            : error instanceof FacebookCompetitorError && error.code === "permission_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialPermissionRequired
+            : error instanceof XCompetitorError && error.code === "connection_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialConnectionRequired
+              : error instanceof XCompetitorError && error.code === "permission_required" ? COMPETITOR_SOURCE_ERROR_CODES.socialPermissionRequired
+              : COMPETITOR_SOURCE_ERROR_CODES.requestFailed;
     await failCompetitorFetch(source, errorCode);
   }
   return true;

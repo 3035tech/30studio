@@ -48,7 +48,7 @@ function isPublicIp(address: string) {
   );
 }
 
-async function readBoundedResponse(url: URL, headers: IncomingHttpHeaders): Promise<{ statusCode: number; headers: IncomingHttpHeaders; body: string }> {
+export async function readBoundedResponse(url: URL, headers: IncomingHttpHeaders, options: { accept?: string; maximumBytes?: number } = {}): Promise<{ statusCode: number; headers: IncomingHttpHeaders; body: string }> {
   let addresses;
   try {
     addresses = await lookup(url.hostname, { all: true, verbatim: true });
@@ -70,7 +70,7 @@ async function readBoundedResponse(url: URL, headers: IncomingHttpHeaders): Prom
         if (options.all) callback(null, publicAddresses);
         else callback(null, address.address, address.family);
       },
-      headers: { "User-Agent": "30studio-competitor-feed/1.0", Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml", ...headers },
+      headers: { "User-Agent": "30studio-competitor-research/1.0", Accept: options.accept ?? "application/rss+xml, application/atom+xml, application/xml, text/xml", ...headers },
       timeout: COMPETITOR_WORKER.requestTimeoutMilliseconds,
     }, (response) => {
       const chunks: Buffer[] = [];
@@ -78,7 +78,7 @@ async function readBoundedResponse(url: URL, headers: IncomingHttpHeaders): Prom
       response.on("data", (chunk: Buffer | string) => {
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         totalBytes += buffer.byteLength;
-        if (totalBytes > COMPETITOR_WORKER.maximumFeedBytes) {
+        if (totalBytes > (options.maximumBytes ?? COMPETITOR_WORKER.maximumFeedBytes)) {
           response.destroy(new CompetitorFeedError(COMPETITOR_SOURCE_ERROR_CODES.responseTooLarge));
           return;
         }

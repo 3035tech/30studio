@@ -41,7 +41,7 @@ function parseStringList(value: string) {
   return value.split("\n").map((item) => item.trim()).filter(Boolean);
 }
 
-export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandName: string }) {
+export function BrandKitEditor({ brandId, brandName, showHeader = true }: { brandId: string; brandName: string; showHeader?: boolean }) {
   const t = useTranslations("brandKit");
   const tTable = useTranslations("brandKitTable");
   const tAssets = useTranslations("brandAssets");
@@ -189,14 +189,14 @@ export function BrandKitEditor({ brandId, brandName }: { brandId: string; brandN
   const titleId = `${editorId}${BRAND_KIT_UI_IDS.titleSuffix}`;
 
   return (
-    <section className="brandKitEditor" aria-labelledby={titleId}>
-      <header className="brandKitEditor__header">
+    <section className="brandKitEditor" aria-labelledby={showHeader ? titleId : undefined} aria-label={!showHeader ? t("title", { brand: brandName }) : undefined}>
+      {showHeader ? <header className="brandKitEditor__header">
         <div>
           <h3 id={titleId}>{t("title", { brand: brandName })}</h3>
           <p>{t("description")}</p>
         </div>
         {canManage && !canEdit ? <Button type="button" onClick={startNewVersion}>{t("createVersion")}</Button> : null}
-      </header>
+      </header> : null}
       {notice ? <p className={`entryMessage${noticeIsError ? " entryMessage--error" : ""}`} role={noticeIsError ? "alert" : "status"}>{notice}</p> : null}
       {pending ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : hasError ? (
         <div className="workspaceEmpty brandKitEditor__error" role="alert"><span>{t("loadError")}</span><Button appearance="quiet" type="button" onClick={() => { setPending(true); void reload().catch(() => { setHasError(true); setPending(false); }); }}>{t("retry")}</Button></div>

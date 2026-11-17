@@ -1,0 +1,1 @@
+ALTER TYPE "public"."competitor_retrieval_method" ADD VALUE 'website_crawl';

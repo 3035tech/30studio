@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, count, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
-import { COMPETITOR_FETCH_RUN_STATUS, COMPETITOR_OBSERVATION_ANALYSIS_STATUS, COMPETITOR_SOURCE_ERROR_CODES, COMPETITOR_SOURCE_STATUS, COMPETITOR_WORKER, COMPETITOR_WORKER_HEALTH_STATUS } from "@/lib/constants";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { COMPETITOR_FEATURES, COMPETITOR_FETCH_RUN_STATUS, COMPETITOR_OBSERVATION_ANALYSIS_STATUS, COMPETITOR_SOURCE_ERROR_CODES, COMPETITOR_SOURCE_STATUS, COMPETITOR_TOPIC_KEYS, COMPETITOR_WORKER, COMPETITOR_WORKER_HEALTH_STATUS } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
-import { brands, competitorAlertSettings, competitorFetchRuns, competitorObservations, competitorSources, competitorWorkerHeartbeat } from "@/lib/db/schema";
+import { brands, competitorAlertSettings, competitorFetchRuns, competitorObservations, competitorSources, competitorWorkerHeartbeat, socialProfileCredentials, socialProfiles } from "@/lib/db/schema";
 import type { competitorAnalysisItemSchema } from "@/lib/validation/competitors";
 import type { z } from "zod";
 
@@ -45,6 +45,7 @@ export async function listCompetitorSources(organizationId: string, brandId: str
   };
   const sources = await database.select({
     id: competitorSources.id, name: competitorSources.name, feedUrl: competitorSources.feedUrl,
+    retrievalMethod: competitorSources.retrievalMethod,
     status: competitorSources.status, lastFetchedAt: competitorSources.lastFetchedAt,
     nextFetchAt: competitorSources.nextFetchAt, failureCount: competitorSources.failureCount,
     createdAt: competitorSources.createdAt,
@@ -56,13 +57,45 @@ export async function listCompetitorSources(organizationId: string, brandId: str
   const [worker] = await database.select({ lastSeenAt: competitorWorkerHeartbeat.lastSeenAt }).from(competitorWorkerHeartbeat)
     .where(eq(competitorWorkerHeartbeat.workerKey, COMPETITOR_WORKER.heartbeatKey)).limit(1);
   const now = new Date();
+  const recentPublicationSince = new Date(now.getTime() - COMPETITOR_WORKER.recentPublicationAlertHours * 60 * 60_000);
+  const currentTrendStart = new Date(now.getTime() - COMPETITOR_WORKER.trendWindowDays * 24 * 60 * 60_000);
+  const previousTrendStart = new Date(now.getTime() - COMPETITOR_WORKER.trendWindowDays * 2 * 24 * 60 * 60_000);
   const workerLastSeenAt = worker?.lastSeenAt ?? null;
   const workerStatus = workerLastSeenAt
     ? now.getTime() - workerLastSeenAt.getTime() <= COMPETITOR_WORKER.heartbeatStaleMilliseconds ? COMPETITOR_WORKER_HEALTH_STATUS.healthy : COMPETITOR_WORKER_HEALTH_STATUS.stale
     : COMPETITOR_WORKER_HEALTH_STATUS.unknown;
   if (sources.length === 0) return {
     sources: [], worker: { status: workerStatus, lastSeenAt: workerLastSeenAt?.toISOString() ?? null },
+    features: { xApiEnabled: COMPETITOR_FEATURES.xApi },
     coverage: { total: 0, pending: 0, processing: 0, ready: 0, unavailable: 0 }, alertSettings, alerts: [],
+    trendComparison: { windowDays: COMPETITOR_WORKER.trendWindowDays, currentTotal: 0, previousTotal: 0, topics: [] },
+  };
+
+  const recentCounts = await database.select({ sourceId: competitorObservations.sourceId, total: count() }).from(competitorObservations).where(and(
+    eq(competitorObservations.organizationId, organizationId), eq(competitorObservations.brandId, brandId),
+    inArray(competitorObservations.sourceId, sources.map((source) => source.id)), gte(competitorObservations.capturedAt, recentPublicationSince),
+  )).groupBy(competitorObservations.sourceId);
+  const recentCountBySource = new Map(recentCounts.map((item) => [item.sourceId, Number(item.total)]));
+  const currentTopicCounts = await database.select({ topic: competitorObservations.topic, total: count() }).from(competitorObservations).where(and(
+    eq(competitorObservations.organizationId, organizationId), eq(competitorObservations.brandId, brandId),
+    gte(competitorObservations.contentPublishedAt, currentTrendStart), lt(competitorObservations.contentPublishedAt, now),
+    isNotNull(competitorObservations.topic),
+  )).groupBy(competitorObservations.topic);
+  const previousTopicCounts = await database.select({ topic: competitorObservations.topic, total: count() }).from(competitorObservations).where(and(
+    eq(competitorObservations.organizationId, organizationId), eq(competitorObservations.brandId, brandId),
+    gte(competitorObservations.contentPublishedAt, previousTrendStart), lt(competitorObservations.contentPublishedAt, currentTrendStart),
+    isNotNull(competitorObservations.topic),
+  )).groupBy(competitorObservations.topic);
+  const currentTopicByKey = new Map(currentTopicCounts.flatMap((item) => item.topic ? [[item.topic, Number(item.total)] as const] : []));
+  const previousTopicByKey = new Map(previousTopicCounts.flatMap((item) => item.topic ? [[item.topic, Number(item.total)] as const] : []));
+  const trendTopics = COMPETITOR_TOPIC_KEYS.map((topic) => ({ topic, current: currentTopicByKey.get(topic) ?? 0, previous: previousTopicByKey.get(topic) ?? 0 }))
+    .filter((topic) => topic.current > 0 || topic.previous > 0)
+    .sort((left, right) => right.current - left.current || right.previous - left.previous);
+  const trendComparison = {
+    windowDays: COMPETITOR_WORKER.trendWindowDays,
+    currentTotal: trendTopics.reduce((total, item) => total + item.current, 0),
+    previousTotal: trendTopics.reduce((total, item) => total + item.previous, 0),
+    topics: trendTopics,
   };
 
   const observations = await database.select({
@@ -116,6 +149,7 @@ export async function listCompetitorSources(organizationId: string, brandId: str
   }
   const resultSources = sources.map((source) => ({
     ...source,
+    newObservationCount: recentCountBySource.get(source.id) ?? 0,
     lastFetchedAt: source.lastFetchedAt?.toISOString() ?? null,
     nextFetchAt: source.nextFetchAt.toISOString(),
     createdAt: source.createdAt.toISOString(),
@@ -129,6 +163,7 @@ export async function listCompetitorSources(organizationId: string, brandId: str
       ? [
           ...(source.failureCount >= alertSettings.failureThreshold ? ["failures" as const] : []),
           ...((source.lastFetchedAt ?? source.createdAt).getTime() < now.getTime() - alertSettings.staleAfterHours * 60 * 60_000 ? ["stale" as const] : []),
+          ...((recentCountBySource.get(source.id) ?? 0) > 0 ? ["new_publications" as const] : []),
         ]
       : [],
     observations: (observationsBySource.get(source.id) ?? []).map((item) => ({
@@ -147,6 +182,7 @@ export async function listCompetitorSources(organizationId: string, brandId: str
   }));
   return {
     sources: resultSources,
+    features: { xApiEnabled: COMPETITOR_FEATURES.xApi },
     worker: { status: workerStatus, lastSeenAt: workerLastSeenAt?.toISOString() ?? null },
     coverage: {
       total: [...coverageCounts.values()].reduce((sum, value) => sum + value, 0),
@@ -156,7 +192,8 @@ export async function listCompetitorSources(organizationId: string, brandId: str
       unavailable: coverageCounts.get(COMPETITOR_OBSERVATION_ANALYSIS_STATUS.unavailable) ?? 0,
     },
     alertSettings,
-    alerts: resultSources.flatMap((source) => source.alertReasons.map((type) => ({ sourceId: source.id, sourceName: source.name, type }))),
+    alerts: resultSources.flatMap((source) => source.alertReasons.map((type) => ({ sourceId: source.id, sourceName: source.name, type, count: type === "new_publications" ? source.newObservationCount : null }))),
+    trendComparison,
   };
 }
 
@@ -321,7 +358,7 @@ export async function retryUnavailableCompetitorAnalysis(organizationId: string,
   return updated.length;
 }
 
-export async function createCompetitorSource(organizationId: string, brandId: string, createdBy: string, input: { name: string; feedUrl: string }) {
+export async function createCompetitorSource(organizationId: string, brandId: string, createdBy: string, input: { name: string; feedUrl: string; retrievalMethod?: "rss_atom" | "website_crawl" }) {
   const database = getDatabase();
   return database.transaction(async (transaction) => {
     const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
@@ -340,7 +377,7 @@ export async function createCompetitorSource(organizationId: string, brandId: st
     if (duplicate?.status === COMPETITOR_SOURCE_STATUS.archived) {
       await transaction.update(competitorSources).set({
         name: input.name, status: COMPETITOR_SOURCE_STATUS.active, nextFetchAt: new Date(),
-        lastErrorCode: null, lockedAt: null, updatedAt: new Date(),
+        retrievalMethod: input.retrievalMethod ?? "rss_atom", lastErrorCode: null, lockedAt: null, updatedAt: new Date(),
       }).where(and(
         eq(competitorSources.organizationId, organizationId), eq(competitorSources.brandId, brandId), eq(competitorSources.id, duplicate.id),
       ));
@@ -348,6 +385,86 @@ export async function createCompetitorSource(organizationId: string, brandId: st
     }
     const [source] = await transaction.insert(competitorSources).values({
       organizationId, brandId, createdBy, name: input.name, feedUrl: input.feedUrl,
+      retrievalMethod: input.retrievalMethod ?? "rss_atom", nextFetchAt: new Date(),
+    }).onConflictDoNothing({ target: [competitorSources.organizationId, competitorSources.brandId, competitorSources.feedUrl] })
+      .returning({ id: competitorSources.id });
+    return source ? { kind: "created" as const, id: source.id } : { kind: "duplicate" as const };
+  });
+}
+
+export async function getCompetitorLookupContext(organizationId: string, brandId: string, platform: "youtube" | "facebook" | "x" = "youtube") {
+  const [row] = await getDatabase().select({
+    brandId: brands.id, profileId: socialProfiles.id, externalAccountId: socialProfiles.externalAccountId,
+    scopes: socialProfileCredentials.scopes,
+  }).from(brands).leftJoin(socialProfiles, and(
+    eq(socialProfiles.organizationId, brands.organizationId), eq(socialProfiles.brandId, brands.id),
+    eq(socialProfiles.platform, platform), eq(socialProfiles.status, "connected"),
+  )).leftJoin(socialProfileCredentials, and(
+    eq(socialProfileCredentials.organizationId, socialProfiles.organizationId),
+    eq(socialProfileCredentials.socialProfileId, socialProfiles.id),
+  )).where(and(eq(brands.organizationId, organizationId), eq(brands.id, brandId), eq(brands.isActive, true))).limit(1);
+  return row ? {
+    brandExists: true,
+    profile: row.profileId && row.scopes ? { id: row.profileId, externalAccountId: row.externalAccountId, scopes: row.scopes } : null,
+  } : { brandExists: false, profile: null };
+}
+
+export async function listCompetitorLookupProfiles(organizationId: string, brandId: string, platform: "facebook") {
+  return getDatabase().select({
+    id: socialProfiles.id, externalAccountId: socialProfiles.externalAccountId, scopes: socialProfileCredentials.scopes,
+  }).from(socialProfiles).innerJoin(socialProfileCredentials, and(
+    eq(socialProfileCredentials.organizationId, socialProfiles.organizationId),
+    eq(socialProfileCredentials.socialProfileId, socialProfiles.id),
+  )).where(and(
+    eq(socialProfiles.organizationId, organizationId), eq(socialProfiles.brandId, brandId),
+    eq(socialProfiles.platform, platform), eq(socialProfiles.status, "connected"),
+  )).orderBy(asc(socialProfiles.displayName)).limit(25);
+}
+
+export async function getCompetitorFacebookPageId(organizationId: string, brandId: string, socialProfileId: string) {
+  const [profile] = await getDatabase().select({ externalAccountId: socialProfiles.externalAccountId }).from(socialProfiles).where(and(
+    eq(socialProfiles.organizationId, organizationId), eq(socialProfiles.brandId, brandId),
+    eq(socialProfiles.id, socialProfileId), eq(socialProfiles.platform, "facebook"), eq(socialProfiles.status, "connected"),
+  )).limit(1);
+  return profile?.externalAccountId ?? null;
+}
+
+export async function createSocialGraphCompetitorSource(organizationId: string, brandId: string, createdBy: string, input: {
+  name: string; profileUrl: string; profileIdentifier: string; socialProfileId: string;
+  retrievalMethod: "instagram_graph" | "facebook_graph" | "x_api";
+}) {
+  const database = getDatabase();
+  return database.transaction(async (transaction) => {
+    const [brand] = await transaction.select({ id: brands.id }).from(brands).where(and(
+      eq(brands.organizationId, organizationId), eq(brands.id, brandId), eq(brands.isActive, true),
+    )).for("update").limit(1);
+    if (!brand) return { kind: "not_found" as const };
+    const expectedPlatform = input.retrievalMethod === "x_api" ? "x" : "facebook";
+    const [profile] = await transaction.select({ id: socialProfiles.id }).from(socialProfiles).where(and(
+      eq(socialProfiles.organizationId, organizationId), eq(socialProfiles.brandId, brandId),
+      eq(socialProfiles.id, input.socialProfileId), eq(socialProfiles.platform, expectedPlatform), eq(socialProfiles.status, "connected"),
+    )).limit(1);
+    if (!profile) return { kind: "connection_required" as const };
+    const [duplicate] = await transaction.select({ id: competitorSources.id, status: competitorSources.status }).from(competitorSources).where(and(
+      eq(competitorSources.organizationId, organizationId), eq(competitorSources.brandId, brandId), eq(competitorSources.feedUrl, input.profileUrl),
+    )).limit(1);
+    if (duplicate && duplicate.status !== COMPETITOR_SOURCE_STATUS.archived) return { kind: "duplicate" as const };
+    const [sourceCount] = await transaction.select({ total: count() }).from(competitorSources).where(and(
+      eq(competitorSources.organizationId, organizationId), eq(competitorSources.brandId, brandId),
+      inArray(competitorSources.status, [COMPETITOR_SOURCE_STATUS.active, COMPETITOR_SOURCE_STATUS.paused]),
+    ));
+    if (!duplicate && Number(sourceCount?.total ?? 0) >= COMPETITOR_WORKER.maximumSourcesPerBrand) return { kind: "limit_reached" as const };
+    if (duplicate?.status === COMPETITOR_SOURCE_STATUS.archived) {
+      await transaction.update(competitorSources).set({
+        name: input.name, externalProfileId: input.profileIdentifier, socialProfileId: profile.id,
+        retrievalMethod: input.retrievalMethod, status: COMPETITOR_SOURCE_STATUS.active,
+        nextFetchAt: new Date(), lastErrorCode: null, lockedAt: null, updatedAt: new Date(),
+      }).where(and(eq(competitorSources.organizationId, organizationId), eq(competitorSources.brandId, brandId), eq(competitorSources.id, duplicate.id)));
+      return { kind: "created" as const, id: duplicate.id };
+    }
+    const [source] = await transaction.insert(competitorSources).values({
+      organizationId, brandId, createdBy, name: input.name, feedUrl: input.profileUrl,
+      externalProfileId: input.profileIdentifier, socialProfileId: profile.id, retrievalMethod: input.retrievalMethod,
       nextFetchAt: new Date(),
     }).onConflictDoNothing({ target: [competitorSources.organizationId, competitorSources.brandId, competitorSources.feedUrl] })
       .returning({ id: competitorSources.id });

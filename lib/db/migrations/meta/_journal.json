@@ -246,6 +246,48 @@
       "when": 1794827503540,
       "tag": "0034_content_capability_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794867752464,
+      "tag": "0035_illegal_zeigeist",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794873842121,
+      "tag": "0036_exotic_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794874136126,
+      "tag": "0037_workable_jamie_braddock",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794874560753,
+      "tag": "0038_fixed_lester",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794911099196,
+      "tag": "0039_fine_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794914575632,
+      "tag": "0040_add_x_competitor_source",
+      "breakpoints": true
     }
   ]
 }

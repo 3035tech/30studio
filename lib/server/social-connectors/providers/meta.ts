@@ -23,7 +23,7 @@ export const facebook: ProviderConfig = {
   authorizationEndpoint: "https://www.facebook.com/dialog/oauth",
   tokenEndpoint: "https://graph.facebook.com/oauth/access_token",
   tokenAuth: "post",
-  scopes: ["public_profile", "pages_show_list", "pages_read_engagement", "pages_manage_posts"],
+  scopes: ["public_profile", "pages_show_list", "pages_read_engagement", "pages_manage_posts", "instagram_basic"],
   supportsPkce: false,
   codeExchangeKind: "facebook-query",
   accountEndpoint: "https://graph.facebook.com/me",

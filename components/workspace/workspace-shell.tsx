@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, LayoutDashboard, LogOut, Plus, UserRound, UsersRound } from "lucide-react";
+import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, LayoutDashboard, Link2, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Radar, UserRound, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -11,7 +11,7 @@ import { Link } from "@/lib/i18n/routing";
 import { BRAND_ASSETS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type Locale } from "@/lib/constants";
 
 type WorkspaceOrganization = { id: string; name: string };
-type WorkspaceSection = "overview" | "calendar" | "approvals" | "analytics" | "brands" | "team" | "profile";
+type WorkspaceSection = "overview" | "calendar" | "approvals" | "analytics" | "competitors" | "brands" | "connections" | "team" | "profile";
 type NavigationGroupId = "workspace" | "planning" | "management";
 
 type WorkspaceShellProps = {
@@ -41,20 +41,23 @@ export function WorkspaceShell({
   const tWorkspace = useTranslations("workspace");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
   const [collapsedGroups, setCollapsedGroups] = useState<Partial<Record<NavigationGroupId, boolean>>>({});
+  const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
   const languageLabel = nextLocale === "en" ? tNavigation("english") : tNavigation("portuguese");
   const sections = [
     { id: "overview" as const, href: WORKSPACE_SECTION_IDS.overview, icon: LayoutDashboard, label: tNavigation("overview") },
     { id: "calendar" as const, href: WORKSPACE_SECTION_IDS.calendar, icon: CalendarDays, label: tNavigation("calendar") },
     { id: "approvals" as const, href: WORKSPACE_SECTION_IDS.approvals, icon: ClipboardCheck, label: tNavigation("approvals") },
     { id: "analytics" as const, href: WORKSPACE_SECTION_IDS.analytics, icon: BarChart3, label: tNavigation("analytics") },
+    { id: "competitors" as const, href: WORKSPACE_SECTION_IDS.competitors, icon: Radar, label: tNavigation("competitors") },
     { id: "brands" as const, href: WORKSPACE_SECTION_IDS.brands, icon: Building2, label: tNavigation("brands") },
+    { id: "connections" as const, href: WORKSPACE_SECTION_IDS.connections, icon: Link2, label: tNavigation("connections") },
     { id: "team" as const, href: WORKSPACE_SECTION_IDS.team, icon: UsersRound, label: tNavigation("team") },
     { id: "profile" as const, href: WORKSPACE_SECTION_IDS.profile, icon: UserRound, label: tNavigation("profile") },
   ];
   const navigationGroups = [
     { id: "workspace" as const, icon: LayoutDashboard, sections: [sections[0]] },
-    { id: "planning" as const, icon: CalendarDays, sections: [sections[1], sections[2], sections[3]] },
-    { id: "management" as const, icon: Building2, sections: [sections[4], sections[5]] },
+    { id: "planning" as const, icon: CalendarDays, sections: [sections[1], sections[2], sections[3], sections[4]] },
+    { id: "management" as const, icon: Building2, sections: [sections[5], sections[6], sections[7]] },
   ];
   const currentSection = sections.find((section) => section.id === activeSection) ?? sections[0];
   const currentGroup = navigationGroups.find(({ sections: groupSections }) => groupSections.some((section) => section.id === activeSection))
@@ -63,7 +66,7 @@ export function WorkspaceShell({
   useEffect(() => {
     function syncActiveSection() {
       const sectionId = window.location.hash.slice(1);
-      setActiveSection(sectionId === WORKSPACE_SECTION_IDS.calendar ? "calendar" : sectionId === WORKSPACE_SECTION_IDS.approvals ? "approvals" : sectionId === WORKSPACE_SECTION_IDS.analytics ? "analytics" : sectionId === WORKSPACE_SECTION_IDS.brands ? "brands" : sectionId === WORKSPACE_SECTION_IDS.team ? "team" : sectionId === WORKSPACE_SECTION_IDS.profile ? "profile" : "overview");
+      setActiveSection(sectionId === WORKSPACE_SECTION_IDS.calendar ? "calendar" : sectionId === WORKSPACE_SECTION_IDS.approvals ? "approvals" : sectionId === WORKSPACE_SECTION_IDS.analytics ? "analytics" : sectionId === WORKSPACE_SECTION_IDS.competitors ? "competitors" : sectionId === WORKSPACE_SECTION_IDS.brands ? "brands" : sectionId === WORKSPACE_SECTION_IDS.connections ? "connections" : sectionId === WORKSPACE_SECTION_IDS.team ? "team" : sectionId === WORKSPACE_SECTION_IDS.profile ? "profile" : "overview");
     }
 
     window.addEventListener("hashchange", syncActiveSection);
@@ -73,36 +76,20 @@ export function WorkspaceShell({
 
   return (
     <div className="workspaceShell">
-      <div className="workspaceLayout">
-        <aside className="workspaceSidebar">
-          <nav className="workspaceAppRail" aria-label={tNavigation("workspaceShortcuts")}>
-            <Link className="workspaceAppRail__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")}>
-              <Image src={BRAND_ASSETS.icon32} width={36} height={36} alt="" priority />
-            </Link>
-            {navigationGroups.map(({ id, icon: Icon, sections: groupSections }) => {
-              const selected = groupSections.some((section) => section.id === activeSection) || (id === "management" && activeSection === "profile");
-              return (
-                <a
-                  className={selected ? "workspaceAppRail__link is-active" : "workspaceAppRail__link"}
-                  href={`#${groupSections[0].href}`}
-                  key={id}
-                  aria-label={tNavigation(id)}
-                  aria-current={selected ? "location" : undefined}
-                  title={tNavigation(id)}
-                >
-                  <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-                </a>
-              );
-            })}
-            <span className="workspaceAppRail__spacer" />
-          </nav>
-
+      <div className={`workspaceLayout${isNavigationCollapsed ? " is-navigation-collapsed" : ""}`}>
+        <aside className={`workspaceSidebar${isNavigationCollapsed ? " is-collapsed" : ""}`}>
           <nav className="workspaceNavigation" aria-label={tNavigation("workspaceNavigation")}>
-            <Link className="workspaceNavigation__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")}>
-              <BrandLogo />
-            </Link>
-            <Button className="workspaceNavigation__create" type="button" disabled={!canCreateContent} title={!canCreateContent ? tNavigation("createContentUnavailable") : undefined} onClick={() => { setActiveSection("calendar"); window.location.hash = WORKSPACE_SECTION_IDS.calendar; window.dispatchEvent(new Event(WORKSPACE_UI_EVENTS.createContent)); }}>
-              <Plus aria-hidden="true" size={17} />{tNavigation("createContent")}
+            <div className="workspaceNavigation__header">
+              <Link className="workspaceNavigation__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")} title={tWorkspace("title")}>
+                <BrandLogo />
+                <Image className="workspaceNavigation__brandIcon" src={BRAND_ASSETS.icon32} width={36} height={36} alt="" priority />
+              </Link>
+              <Button appearance="quiet" className="workspaceNavigation__collapse" type="button" aria-label={tNavigation(isNavigationCollapsed ? "expandNavigation" : "collapseNavigation")} aria-expanded={!isNavigationCollapsed} title={tNavigation(isNavigationCollapsed ? "expandNavigation" : "collapseNavigation")} onClick={() => setIsNavigationCollapsed((collapsed) => !collapsed)}>
+                {isNavigationCollapsed ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}
+              </Button>
+            </div>
+            <Button className="workspaceNavigation__create" type="button" aria-label={tNavigation("createContent")} disabled={!canCreateContent} title={!canCreateContent ? tNavigation("createContentUnavailable") : tNavigation("createContent")} onClick={() => { setActiveSection("calendar"); window.location.hash = WORKSPACE_SECTION_IDS.calendar; window.dispatchEvent(new Event(WORKSPACE_UI_EVENTS.createContent)); }}>
+              <Plus aria-hidden="true" size={17} /><span>{tNavigation("createContent")}</span>
             </Button>
             <div className="workspaceNavigation__groups">
               {navigationGroups.map(({ id, sections: groupSections }) => (
@@ -120,13 +107,15 @@ export function WorkspaceShell({
                       <ChevronDown aria-hidden="true" className={collapsedGroups[id] ? "workspaceNavigation__groupChevron is-collapsed" : "workspaceNavigation__groupChevron"} size={15} />
                     </Button>
                   </h2>
-                  <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`} hidden={collapsedGroups[id]}>
+                  <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`} hidden={collapsedGroups[id] && !isNavigationCollapsed}>
                     {groupSections.map(({ id: sectionId, href, icon: Icon, label }) => (
                       <a
                         className={activeSection === sectionId ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
                         href={`#${href}`}
                         key={sectionId}
+                        aria-label={label}
                         aria-current={activeSection === sectionId ? "location" : undefined}
+                        title={label}
                       >
                         <Icon aria-hidden="true" size={18} strokeWidth={1.8} />
                         <span>{label}</span>
@@ -141,13 +130,15 @@ export function WorkspaceShell({
               <a
                 className={activeSection === "profile" ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
                 href={`#${WORKSPACE_SECTION_IDS.profile}`}
+                aria-label={tNavigation("profile")}
                 aria-current={activeSection === "profile" ? "location" : undefined}
+                title={tNavigation("profile")}
               >
                 <UserRound aria-hidden="true" size={18} strokeWidth={1.8} />
                 <span>{tNavigation("profile")}</span>
               </a>
-              <Button appearance="quiet" type="button" onClick={onSignOut} disabled={busy}>
-                <LogOut aria-hidden="true" size={17} />{tWorkspace("signOut")}
+              <Button appearance="quiet" className="workspaceNavigation__signOut" type="button" aria-label={tWorkspace("signOut")} title={tWorkspace("signOut")} onClick={onSignOut} disabled={busy}>
+                <LogOut aria-hidden="true" size={17} /><span>{tWorkspace("signOut")}</span>
               </Button>
             </footer>
           </nav>

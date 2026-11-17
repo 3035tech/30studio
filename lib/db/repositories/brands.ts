@@ -1,7 +1,8 @@
 import "server-only";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
-import { brandKitVersions, brands } from "@/lib/db/schema";
+import { BRAND_ASSET_STATUS } from "@/lib/constants";
+import { brandAssets, brandKitVersions, brands } from "@/lib/db/schema";
 import type { BrandCreateInput, BrandUpdateInput } from "@/lib/validation/brands";
 
 const SLUG_SEPARATOR = "-";
@@ -18,7 +19,7 @@ export function slugifyBrandName(name: string) {
   return normalized || `${EMPTY_SLUG_PREFIX}-${crypto.randomUUID()}`;
 }
 
-export async function listBrands(organizationId: string) {
+export async function listBrands(organizationId: string, canManage = false) {
   const database = getDatabase();
   const brandRows = await database.query.brands.findMany({
     with: { socialProfiles: true },
@@ -27,6 +28,18 @@ export async function listBrands(organizationId: string) {
   });
 
   if (brandRows.length === 0) return [];
+
+  const logoRows = await database.select({ brandId: brandAssets.brandId, assetId: brandAssets.id, status: brandAssets.status })
+    .from(brandAssets)
+    .where(and(
+      eq(brandAssets.organizationId, organizationId),
+      inArray(brandAssets.brandId, brandRows.map((brand) => brand.id)),
+      eq(brandAssets.kind, "logo"),
+      inArray(brandAssets.status, canManage ? [BRAND_ASSET_STATUS.approved, BRAND_ASSET_STATUS.pendingReview] : [BRAND_ASSET_STATUS.approved]),
+    ))
+    .orderBy(desc(brandAssets.createdAt));
+  const logos = new Map<string, typeof logoRows[number]>();
+  for (const logo of logoRows) if (!logos.has(logo.brandId)) logos.set(logo.brandId, logo);
 
   const kitVersions = await database
     .select({ brandId: brandKitVersions.brandId, status: brandKitVersions.status, version: brandKitVersions.version })
@@ -38,7 +51,10 @@ export async function listBrands(organizationId: string) {
     if (!latestKitStatus.has(version.brandId)) latestKitStatus.set(version.brandId, version.status);
   }
 
-  return brandRows.map((brand) => ({ ...brand, brandKitStatus: latestKitStatus.get(brand.id) ?? null }));
+  return brandRows.map((brand) => {
+    const logo = logos.get(brand.id);
+    return { ...brand, logoAssetId: logo?.assetId ?? null, logoAssetStatus: logo?.status ?? null, brandKitStatus: latestKitStatus.get(brand.id) ?? null };
+  });
 }
 
 export async function createBrand(input: BrandCreateInput, organizationId: string, createdBy: string) {
@@ -51,6 +67,7 @@ export async function createBrand(input: BrandCreateInput, organizationId: strin
       name: input.name,
       description: input.description || null,
       industry: input.industry || null,
+      websiteUrl: input.websiteUrl || null,
       createdBy,
     })
     .onConflictDoNothing({ target: [brands.organizationId, brands.slug] })
@@ -66,6 +83,7 @@ export async function updateBrand(brandId: string, input: BrandUpdateInput, orga
       ...input,
       ...(input.description !== undefined ? { description: input.description || null } : {}),
       ...(input.industry !== undefined ? { industry: input.industry || null } : {}),
+      ...(input.websiteUrl !== undefined ? { websiteUrl: input.websiteUrl || null } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(brands.id, brandId), eq(brands.organizationId, organizationId), eq(brands.isActive, true)))

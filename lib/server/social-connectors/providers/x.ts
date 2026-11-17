@@ -7,7 +7,7 @@ export const x: ProviderConfig = {
   authorizationEndpoint: "https://x.com/i/oauth2/authorize",
   tokenEndpoint: "https://api.x.com/2/oauth2/token",
   tokenAuth: "basic",
-  scopes: ["users.read", "offline.access"],
+  scopes: ["users.read", "tweet.read", "offline.access"],
   supportsPkce: true,
   accountEndpoint: "https://api.x.com/2/users/me",
   accountFields: "name,username",
