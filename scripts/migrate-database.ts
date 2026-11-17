@@ -19,11 +19,19 @@ async function applyMigrations() {
     console.info("Database migrations applied successfully.");
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown migration error.";
-    const code = typeof error === "object" && error !== null && "code" in error
-      ? String(error.code)
-      : undefined;
+    const cause = error instanceof Error ? error.cause : undefined;
+    const causeMessage = cause instanceof Error ? cause.message : undefined;
+    const code = typeof cause === "object" && cause !== null && "code" in cause
+      ? String(cause.code)
+      : typeof error === "object" && error !== null && "code" in error
+        ? String(error.code)
+        : undefined;
 
-    console.error("Database migration failed.", { message, ...(code ? { code } : {}) });
+    console.error("Database migration failed.", {
+      message,
+      ...(causeMessage ? { cause: causeMessage } : {}),
+      ...(code ? { code } : {}),
+    });
     process.exitCode = 1;
   } finally {
     await pool.end();
