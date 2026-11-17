@@ -295,7 +295,7 @@ export async function submitContentForApproval(organizationId: string, userId: s
       eq(contentItems.id, itemId),
       inArray(contentItems.status, CONTENT_EDITABLE_STATUSES),
     ));
-    return { kind: "created" as const, id: request.id };
+    return { kind: "created" as const, id: request.id, brandId: item.brandId, platform: item.platform };
   });
 }
 

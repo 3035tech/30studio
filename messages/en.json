@@ -56,6 +56,7 @@
     "english": "English",
     "portuguese": "Português"
   },
+  "systemFeedback": { "regionLabel": "System messages", "dismiss": "Dismiss message" },
   "notifications": {
     "title": "Important notifications",
     "open": "Open notifications. {count, plural, =0 {No active alerts} one {# active alert} other {# active alerts}}",
@@ -73,7 +74,22 @@
     "approvalPending": "Approval pending · {brand}",
     "connectionNeedsAttention": "Reconnect {platform} · {brand}",
     "worker": { "stale": "Publishing queue is inactive", "unknown": "Publishing queue status unavailable" },
-    "workerDetail": "Check the publishing service in analytics."
+    "workerDetail": "Check the publishing service in analytics.",
+    "historyTitle": "Recent activity",
+    "historyEmpty": "No events have been recorded yet.",
+    "historyError": "Could not load notification history.",
+    "updateError": "Could not update this notification.",
+    "markRead": "Mark as read",
+    "markUnread": "Mark as unread",
+    "unknownBrand": "Unknown brand",
+    "unknownContent": "Untitled content",
+    "event": {
+      "social_connected": { "title": "Social account connected", "detail": "{platform} connected to {brand}." },
+      "social_connection_failed": { "title": "Social connection failed", "detail": "Could not connect {platform} to {brand}. Review the account permissions and try again." },
+      "approval_requested": { "title": "Approval requested", "detail": "{content} from {brand} is waiting for review." },
+      "publication_failed": { "title": "Publication failed", "detail": "{content} from {brand} could not be published." },
+      "publication_indeterminate": { "title": "Publication status needs confirmation", "detail": "Confirm whether {content} from {brand} was published." }
+    }
   },
   "auth": {
     "title": "30studio",
@@ -1002,6 +1018,10 @@
     "permissions_required": "Meta did not grant a required permission. Check the permissions approved for your Meta app, allow access to the Facebook Page, and use a professional account for Instagram. Then try connecting again.",
     "already_connected": "This account is already connected to this brand.",
     "no_publishable_pages": "No Facebook Page with publishing access was found. Grant the required Page permissions and try again.",
+    "requirements": {
+      "facebook": "Before connecting: sign in with an account that can access the Page and grant pages_show_list, pages_read_engagement, and pages_manage_posts. The Page must allow content creation.",
+      "instagram": "Before connecting: use an Instagram professional account (Business or Creator) and grant instagram_business_basic and instagram_business_content_publishing through Meta login."
+    },
     "selectProfilePerPost": "Choose the destination account when you submit each post for approval.",
     "maximumTextCharacters": "Text or caption limit: {maximum} characters.",
     "health": {

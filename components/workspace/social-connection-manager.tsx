@@ -115,6 +115,8 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
               {busyPlatform === platform ? t("working") : !configurationReady ? t("loading") : configured.includes(platform) ? t("connect") : t("notConfigured")}
             </Button> : null}
           </div>
+          {platform === "facebook" ? <p className="socialConnectionManager__guidance">{t("requirements.facebook")}</p> : null}
+          {platform === "instagram" ? <p className="socialConnectionManager__guidance">{t("requirements.instagram")}</p> : null}
           <small className="socialConnectionManager__capability">{t(`capabilities.${publicationCapability.publication}`)}</small>
           {publicationCapability.maximumTextCharacters !== null ? <small className="socialConnectionManager__capability">{t("maximumTextCharacters", { maximum: publicationCapability.maximumTextCharacters })}</small> : null}
           {connectedCount > 1 ? <p className="socialConnectionManager__note">{t("selectProfilePerPost")}</p> : null}

@@ -14,6 +14,15 @@ export const DATABASE_CONNECTION = {
 export const WORKSPACE_UI_EVENTS = { createContent: "30studio:create-content", openCalendarItem: "30studio:open-calendar-item", openCalendarList: "30studio:open-calendar-list", openSocialConnections: "30studio:open-social-connections" } as const;
 export const WORKSPACE_API_PATHS = { settings: "/api/workspace/settings" } as const;
 export const WORKSPACE_LIMITS = { nameCharacters: 100 } as const;
+export const WORKSPACE_NOTIFICATION_TYPES = {
+  socialConnected: "social_connected",
+  socialConnectionFailed: "social_connection_failed",
+  approvalRequested: "approval_requested",
+  publicationFailed: "publication_failed",
+  publicationIndeterminate: "publication_indeterminate",
+} as const;
+export const WORKSPACE_NOTIFICATION_TYPE_VALUES = ["social_connected", "social_connection_failed", "approval_requested", "publication_failed", "publication_indeterminate"] as const;
+export const WORKSPACE_NOTIFICATION_LIMITS = { historyItems: 50 } as const;
 
 export const WORKSPACE_SECTION_IDS = {
   overview: "workspace-overview",
@@ -612,6 +621,7 @@ export const API_ERROR_CODES = {
   contentMediaGenerationUnavailable: "CONTENT_MEDIA_GENERATION_UNAVAILABLE",
   aiServiceUnavailable: "AI_SERVICE_UNAVAILABLE",
   teamMemberNotFound: "TEAM_MEMBER_NOT_FOUND",
+  workspaceNotificationNotFound: "WORKSPACE_NOTIFICATION_NOT_FOUND",
   teamOperationNotAllowed: "TEAM_OPERATION_NOT_ALLOWED",
   invitationNotFound: "INVITATION_NOT_FOUND",
   invitationDeliveryUnavailable: "INVITATION_DELIVERY_UNAVAILABLE",

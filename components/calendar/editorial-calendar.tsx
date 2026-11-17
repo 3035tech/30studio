@@ -16,6 +16,7 @@ import type { BrandListItem } from "@/lib/validation/brands";
 import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
 import { contentReviewResponseSchema } from "@/lib/validation/content-review";
 import { socialPublicationReconciliationResponseSchema, socialPublicationReconciliationRequestSchema } from "@/lib/validation/social-publication";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 type CalendarState = {
   requestKey: string;
@@ -49,6 +50,7 @@ function isContentEditable(status: ContentStatus) {
 }
 
 export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashboardFilters, onDashboardFiltersChange, onCanManageChange }: { organizationId: string; brands: readonly BrandListItem[]; dashboardFilters: DashboardFilters; onDashboardFiltersChange: (next: (current: DashboardFilters) => DashboardFilters) => void; onCanManageChange: (canManage: boolean) => void }) {
+  const showFeedback = useSystemFeedback();
   const t = useTranslations("calendar");
   const locale = useLocale() as Locale;
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -446,7 +448,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setFormOpen(false);
       setCampaignFormError("");
       setCampaignIdempotencyKey("");
-      setNotice(t("campaignCreated", { count: publications.length }));
+      showFeedback("success", t("campaignCreated", { count: publications.length }));
       const firstPublication = parsed.data.data.publications[0];
       const firstSchedule = publications[0];
       if (firstPublication && firstSchedule) {
@@ -504,7 +506,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setEditorDirty(false);
       setDiscardChangesPrompt(false);
       setContentReview(null);
-      setStatusNotice(t("contentSaved"));
+      showFeedback("success", t("contentSaved"));
       setRefreshIndex((current) => current + 1);
     } catch {
       setStatusNotice(t("contentSaveError"));

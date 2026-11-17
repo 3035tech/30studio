@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 import { LOCALES, PRODUCT, type Locale } from "@/lib/constants";
+import { SystemFeedbackProvider } from "@/components/ui/system-feedback";
 
 type LocaleLayoutProps = { children: ReactNode; params: Promise<{ locale: string }> };
 
@@ -31,5 +32,5 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   setRequestLocale(locale as Locale);
   const messages = await getMessages();
 
-  return <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>;
+  return <NextIntlClientProvider messages={messages}><SystemFeedbackProvider>{children}</SystemFeedbackProvider></NextIntlClientProvider>;
 }

@@ -56,6 +56,7 @@
     "english": "English",
     "portuguese": "Português"
   },
+  "systemFeedback": { "regionLabel": "Mensagens do sistema", "dismiss": "Dispensar mensagem" },
   "notifications": {
     "title": "Notificações importantes",
     "open": "Abrir notificações. {count, plural, =0 {Nenhum alerta ativo} one {# alerta ativo} other {# alertas ativos}}",
@@ -73,7 +74,22 @@
     "approvalPending": "Aprovação pendente · {brand}",
     "connectionNeedsAttention": "Reconecte {platform} · {brand}",
     "worker": { "stale": "Fila de publicação sem atividade", "unknown": "Estado da fila de publicação indisponível" },
-    "workerDetail": "Confira o serviço de publicação na área de analytics."
+    "workerDetail": "Confira o serviço de publicação na área de analytics.",
+    "historyTitle": "Atividade recente",
+    "historyEmpty": "Nenhum evento foi registrado ainda.",
+    "historyError": "Não foi possível carregar o histórico de notificações.",
+    "updateError": "Não foi possível atualizar esta notificação.",
+    "markRead": "Marcar como lida",
+    "markUnread": "Marcar como não lida",
+    "unknownBrand": "Marca desconhecida",
+    "unknownContent": "Conteúdo sem título",
+    "event": {
+      "social_connected": { "title": "Conta social conectada", "detail": "{platform} foi conectada a {brand}." },
+      "social_connection_failed": { "title": "Falha ao conectar conta social", "detail": "Não foi possível conectar {platform} a {brand}. Confira as permissões da conta e tente novamente." },
+      "approval_requested": { "title": "Aprovação solicitada", "detail": "{content} de {brand} aguarda revisão." },
+      "publication_failed": { "title": "Falha na publicação", "detail": "Não foi possível publicar {content} de {brand}." },
+      "publication_indeterminate": { "title": "Confirme o estado da publicação", "detail": "Confirme se {content} de {brand} foi publicado." }
+    }
   },
   "auth": {
     "title": "30studio",
@@ -1002,6 +1018,10 @@
     "permissions_required": "A Meta não concedeu uma permissão necessária. Confira as permissões aprovadas no app Meta, autorize o acesso à Página do Facebook e, para Instagram, use uma conta profissional. Depois, tente conectar novamente.",
     "already_connected": "Esta conta já está conectada a esta marca.",
     "no_publishable_pages": "Nenhuma Página do Facebook com permissão de publicação foi encontrada. Conceda as permissões necessárias e tente novamente.",
+    "requirements": {
+      "facebook": "Antes de conectar: entre com uma conta que tenha acesso à Página e autorize pages_show_list, pages_read_engagement e pages_manage_posts. A Página precisa permitir criação de conteúdo.",
+      "instagram": "Antes de conectar: use uma conta profissional do Instagram (Empresa ou Criador) e autorize instagram_business_basic e instagram_business_content_publishing no login da Meta."
+    },
     "selectProfilePerPost": "Escolha a conta de destino ao solicitar a aprovação de cada publicação.",
     "maximumTextCharacters": "Limite de texto ou legenda: {maximum} caracteres.",
     "health": {

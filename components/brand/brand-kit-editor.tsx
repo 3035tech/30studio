@@ -10,6 +10,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { TextAreaField, TextField } from "@/components/ui/field";
 import { BRAND_KIT_LIMITS, BRAND_KIT_UI_IDS, BRAND_KIT_VERSION_STATUS, BRAND_KIT_API_PATHS, getBrandKitApiPath, type Locale } from "@/lib/constants";
 import { brandKitContentSchema, brandKitVersionsResponseSchema, type BrandKitContent, type BrandKitFact, type BrandKitVersion } from "@/lib/validation/brand-kits";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 const EMPTY_BRAND_KIT: BrandKitContent = {
   audience: "",
@@ -42,6 +43,7 @@ function parseStringList(value: string) {
 }
 
 export function BrandKitEditor({ brandId, brandName, showHeader = true }: { brandId: string; brandName: string; showHeader?: boolean }) {
+  const showFeedback = useSystemFeedback();
   const t = useTranslations("brandKit");
   const tTable = useTranslations("brandKitTable");
   const tAssets = useTranslations("brandAssets");
@@ -127,11 +129,10 @@ export function BrandKitEditor({ brandId, brandName, showHeader = true }: { bran
       if (!response.ok || !result?.data?.id) throw new Error();
       await reload(result.data.id);
       setCanEdit(true);
-      setNotice(t("draftSaved"));
+      showFeedback("success", t("draftSaved"));
       setNoticeIsError(false);
     } catch {
-      setNotice(t("saveError"));
-      setNoticeIsError(true);
+      showFeedback("error", t("saveError"));
     } finally {
       setBusy(false);
     }
@@ -148,11 +149,10 @@ export function BrandKitEditor({ brandId, brandName, showHeader = true }: { bran
       });
       if (!response.ok) throw new Error();
       await reload(selectedVersion.id);
-      setNotice(t("versionApproved"));
+      showFeedback("success", t("versionApproved"));
       setNoticeIsError(false);
     } catch {
-      setNotice(t("approveError"));
-      setNoticeIsError(true);
+      showFeedback("error", t("approveError"));
     } finally {
       setBusy(false);
     }

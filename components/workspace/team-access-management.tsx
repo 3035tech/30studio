@@ -7,6 +7,7 @@ import { SelectField, TextField } from "@/components/ui/field";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { API_ERROR_CODES, AUTH_LIMITS, INVITATION_STATUS, TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_AUDIT_ACTIONS, TEAM_ROLES, TENANT_ROLE, type Locale, type TenantRole } from "@/lib/constants";
 import { teamAuditResponseSchema, teamInvitationsResponseSchema, type TeamAuditEvent, type TeamInvitation } from "@/lib/validation/team";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 const ACTION_TRANSLATION_KEYS: Record<(typeof TEAM_AUDIT_ACTIONS)[keyof typeof TEAM_AUDIT_ACTIONS], string> = {
   [TEAM_AUDIT_ACTIONS.memberRoleChanged]: "memberRoleChangedEvent",
@@ -19,6 +20,7 @@ const ACTION_TRANSLATION_KEYS: Record<(typeof TEAM_AUDIT_ACTIONS)[keyof typeof T
 };
 
 export function TeamAccessManagement({ organizationId, canManage, actorRole }: { organizationId: string; canManage: boolean; actorRole: TenantRole }) {
+  const showFeedback = useSystemFeedback();
   const t = useTranslations("team");
   const tRoles = useTranslations("roles");
   const tStatus = useTranslations("invitationStatus");
@@ -33,8 +35,6 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
   const [reloadCount, setReloadCount] = useState(0);
   const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const [cancelInvitationId, setCancelInvitationId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [messageIsError, setMessageIsError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -63,8 +63,6 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
     const form = new FormData(formElement);
     const email = String(form.get("email") ?? "").trim().toLowerCase();
     const role = String(form.get("role") ?? TENANT_ROLE.editor) as TenantRole;
-    setMessage("");
-    setMessageIsError(false);
     try {
       const response = await fetch(TEAM_API_PATHS.invitations, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -77,12 +75,11 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
         throw new Error();
       }
       formElement.reset();
-      setMessage(t("inviteSent"));
+      showFeedback("success", t("inviteSent"));
       setPending(true);
       setReloadCount((count) => count + 1);
     } catch (error) {
-      setMessageIsError(true);
-      setMessage(error instanceof Error && error.message === API_ERROR_CODES.invitationDeliveryUnavailable ? t("emailUnavailable") : error instanceof Error && error.message === API_ERROR_CODES.invitationAlreadyExists ? t("duplicateInvite") : t("inviteError"));
+      showFeedback("error", error instanceof Error && error.message === API_ERROR_CODES.invitationDeliveryUnavailable ? t("emailUnavailable") : error instanceof Error && error.message === API_ERROR_CODES.invitationAlreadyExists ? t("duplicateInvite") : t("inviteError"));
       setPending(true);
       setReloadCount((count) => count + 1);
     }
@@ -90,19 +87,17 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
 
   async function invitationAction(invitation: TeamInvitation, action: "resend" | "cancel") {
     setBusyInvitationId(invitation.id);
-    setMessage("");
     try {
       const response = await fetch(`${TEAM_API_PATHS.invitations}/${encodeURIComponent(invitation.id)}`, {
         method: action === "resend" ? "POST" : "DELETE", credentials: "same-origin",
       });
       if (!response.ok) throw new Error();
-      setMessage(action === "resend" ? t("invitationResent") : t("invitationCancelled"));
+      showFeedback("success", action === "resend" ? t("invitationResent") : t("invitationCancelled"));
       setCancelInvitationId(null);
       setPending(true);
       setReloadCount((count) => count + 1);
     } catch {
-      setMessageIsError(true);
-      setMessage(t("invitationActionError"));
+      showFeedback("error", t("invitationActionError"));
       setPending(true);
       setReloadCount((count) => count + 1);
     } finally {
@@ -137,7 +132,6 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
   ];
 
   return <div className="teamAccess">
-    {message ? <p className={`entryMessage${messageIsError ? " entryMessage--error" : ""}`} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
     <div className="teamAccess__tabs" role="tablist" aria-label={t("accessSectionsLabel")} onKeyDown={(event) => {
       const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']"));
       const current = tabs.findIndex((tab) => tab === document.activeElement);

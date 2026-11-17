@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, isNotNull, lt, lte } from "drizzle-orm";
-import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_STATUS, CONTENT_STATUS, SOCIAL_PUBLICATION_JOB_STATUS, SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, SOCIAL_PUBLISHING_WORKER } from "../lib/constants";
+import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_STATUS, CONTENT_STATUS, SOCIAL_PUBLICATION_JOB_STATUS, SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, SOCIAL_PUBLISHING_WORKER, WORKSPACE_NOTIFICATION_TYPES } from "../lib/constants";
 import { getDatabase, closeDatabase } from "../lib/db/client";
 import { contentApprovalRequests, contentItems, contentMediaAssets, contentVariants, contentVersions, socialProfileCredentials, socialProfiles, socialPublicationAttempts, socialPublicationJobs, socialPublicationReconciliations } from "../lib/db/schema";
 import { getContentApprovalFingerprint } from "../lib/server/content-approval-fingerprint";
@@ -9,6 +9,7 @@ import { cleanupExpiredSocialPublicationImages, createInstagramPublicationImage,
 import { isPublishableInstagramImage } from "../lib/server/social-publisher/instagram-media";
 import { recordSocialPublishingWorkerHeartbeat } from "../lib/db/repositories/social-publication-health";
 import { logOperationalError } from "../lib/server/operational-logger";
+import { recordWorkspaceNotification } from "../lib/db/repositories/workspace-notifications";
 
 const pollMilliseconds = 5_000;
 const leaseBatchSize = 1;
@@ -115,6 +116,15 @@ async function finish(job: NonNullable<Awaited<ReturnType<typeof claimDueJob>>>,
         .where(and(eq(contentItems.organizationId, job.organizationId), eq(contentItems.id, job.contentItemId), eq(contentItems.status, CONTENT_STATUS.scheduled)));
     }
   });
+  if (state === SOCIAL_PUBLICATION_JOB_STATUS.failed || state === SOCIAL_PUBLICATION_JOB_STATUS.indeterminate) {
+    await recordWorkspaceNotification({
+      organizationId: job.organizationId,
+      eventType: state === SOCIAL_PUBLICATION_JOB_STATUS.failed ? WORKSPACE_NOTIFICATION_TYPES.publicationFailed : WORKSPACE_NOTIFICATION_TYPES.publicationIndeterminate,
+      dedupeKey: `publication:${job.id}:${job.attemptCount}:${state}`,
+      contentItemId: job.contentItemId,
+      brandId: job.brandId,
+    });
+  }
 }
 
 async function processIndeterminateJob(job: NonNullable<Awaited<ReturnType<typeof claimIndeterminateJob>>>) {

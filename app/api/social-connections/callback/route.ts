@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as oauth from "oauth4webapi";
-import { API_ERROR_CODES, HTTP_STATUS, SOCIAL_CONNECTION, TENANT_PERMISSIONS } from "@/lib/constants";
+import { API_ERROR_CODES, HTTP_STATUS, SOCIAL_CONNECTION, TENANT_PERMISSIONS, WORKSPACE_NOTIFICATION_TYPES } from "@/lib/constants";
 import { consumeSocialOAuthState, storeConnectedSocialProfile } from "@/lib/db/repositories/social-connections";
+import { recordWorkspaceNotification } from "@/lib/db/repositories/workspace-notifications";
 import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { requireTenant } from "@/lib/server/auth";
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
         ...(providerError && /^[A-Za-z0-9_.-]{1,64}$/u.test(providerError) ? { providerCode: providerError } : {}),
       });
       if (providerError === "access_denied") destination.searchParams.set("social_connection", "cancelled");
+      if (providerError !== "access_denied") await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.socialConnectionFailed, dedupeKey: `oauth:${oauthState.stateHash}:denied`, brandId: oauthState.brandId, platform: oauthState.platform });
       return redirectToWorkspace(destination);
     }
     if (!isSupportedSocialPlatform(oauthState.platform)) throw new ApiError(API_ERROR_CODES.socialOAuthInvalid, HTTP_STATUS.badRequest);
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
         const pages = await fetchFacebookPages(token);
         if (pages.length === 0) {
           destination.searchParams.set("social_connection", "no_publishable_pages");
+          await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.socialConnectionFailed, dedupeKey: `oauth:${oauthState.stateHash}:no-pages`, brandId: oauthState.brandId, platform: oauthState.platform });
           return redirectToWorkspace(destination);
         }
         let connected = false;
@@ -103,8 +106,10 @@ export async function GET(request: NextRequest) {
       if (error instanceof SocialProviderError && ["invalid_scope", "10", "200"].includes(error.providerCode ?? "")) {
         destination.searchParams.set("social_connection", "permissions_required");
       }
+      await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.socialConnectionFailed, dedupeKey: `oauth:${oauthState.stateHash}:failed`, brandId: oauthState.brandId, platform: oauthState.platform });
       return redirectToWorkspace(destination);
     }
+    await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.socialConnected, dedupeKey: `oauth:${oauthState.stateHash}:connected`, brandId: oauthState.brandId, platform: oauthState.platform });
     destination.searchParams.set("social_connection", "connected");
     destination.searchParams.set("platform", oauthState.platform);
     return redirectToWorkspace(destination);

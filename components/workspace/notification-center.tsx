@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCircle2, ChevronRight, CircleAlert, RefreshCw } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { analyticsResponseSchema } from "@/lib/validation/analytics";
 import { WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS } from "@/lib/constants";
+import { workspaceNotificationResponseSchema } from "@/lib/validation/workspace-notifications";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 type NotificationData = ReturnType<typeof analyticsResponseSchema.parse>["data"];
 type Notification = {
@@ -20,12 +22,17 @@ type Notification = {
   | { kind: "connection"; brandId: string }
   | { kind: "worker" }
 );
+type HistoryNotification = ReturnType<typeof workspaceNotificationResponseSchema.parse>["data"][number];
 
 export function NotificationCenter() {
   const t = useTranslations("notifications");
   const tPlatforms = useTranslations("platforms");
+  const formatter = useFormatter();
+  const showFeedback = useSystemFeedback();
   const [data, setData] = useState<NotificationData | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [history, setHistory] = useState<HistoryNotification[]>([]);
+  const [historyHasError, setHistoryHasError] = useState(false);
   const [open, setOpen] = useState(false);
   const [refreshCount, setRefreshCount] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -35,6 +42,18 @@ export function NotificationCenter() {
     const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
     const query = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
     const controller = new AbortController();
+    fetch("/api/workspace/notifications", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const parsed = workspaceNotificationResponseSchema.safeParse(await response.json());
+        if (!parsed.success) throw new Error();
+        setHistory(parsed.data.data);
+        setHistoryHasError(false);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setHistoryHasError(true);
+      });
     fetch(`/api/analytics/publications?${query.toString()}`, { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error();
@@ -82,6 +101,8 @@ export function NotificationCenter() {
   }, [data, t, tPlatforms]);
 
   const count = data ? data.attention.failedPublications + data.attention.indeterminatePublications + data.attention.pendingApprovals + data.attention.connectionsNeedReauth + (data.worker.status === "stale" || data.worker.status === "unknown" ? 1 : 0) : 0;
+  const unreadHistoryCount = history.filter((item) => !item.readAt && !(item.contentItemId && notifications.some((active) => (active.kind === "publication" || active.kind === "approval") && active.itemId === item.contentItemId))).length;
+  const badgeCount = count + unreadHistoryCount;
   const overflowLinks = data ? [
     { key: "publications", count: Math.max(0, data.attention.failedPublications + data.attention.indeterminatePublications - notifications.filter((item) => item.kind === "publication").length), href: `#${WORKSPACE_SECTION_IDS.calendar}`, message: "morePublications" as const },
     { key: "approvals", count: Math.max(0, data.attention.pendingApprovals - notifications.filter((item) => item.kind === "approval").length), href: `#${WORKSPACE_SECTION_IDS.approvals}`, message: "moreApprovals" as const },
@@ -89,9 +110,9 @@ export function NotificationCenter() {
   ].filter((item) => item.count > 0) : [];
 
   return <div className="notificationCenter" ref={rootRef}>
-    <Button appearance="quiet" className="notificationCenter__trigger" type="button" aria-label={t("open", { count })} aria-expanded={open} aria-controls="workspace-notifications-panel" onClick={() => setOpen((current) => !current)}>
+    <Button appearance="quiet" className="notificationCenter__trigger" type="button" aria-label={t("open", { count: badgeCount })} aria-expanded={open} aria-controls="workspace-notifications-panel" onClick={() => setOpen((current) => !current)}>
       <Bell aria-hidden="true" size={19} />
-      {count > 0 ? <span className="notificationCenter__badge" aria-hidden="true">{count > 99 ? "99+" : count}</span> : null}
+      {badgeCount > 0 ? <span className="notificationCenter__badge" aria-hidden="true">{badgeCount > 99 ? "99+" : badgeCount}</span> : null}
     </Button>
     <div className="notificationCenter__panel" id="workspace-notifications-panel" hidden={!open} role="region" aria-label={t("title")}>
       <div className="notificationCenter__heading"><h2>{t("title")}</h2><span>{data ? t("activeCount", { count }) : t("loading")}</span><Button appearance="quiet" className="notificationCenter__refresh" type="button" aria-label={t("refresh")} onClick={() => setRefreshCount((current) => current + 1)}><RefreshCw aria-hidden="true" size={16} /></Button></div>
@@ -125,6 +146,34 @@ export function NotificationCenter() {
         <p>{t("additionalAlerts")}</p>
         <ul>{overflowLinks.map((item) => <li key={item.key}><a href={item.href} onClick={() => setOpen(false)}>{t(item.message, { count: item.count })}</a></li>)}</ul>
       </div> : null}
+      <section className="notificationCenter__history" aria-label={t("historyTitle")}>
+        <h3>{t("historyTitle")}</h3>
+        {historyHasError ? <p className="notificationCenter__empty" role="status">{t("historyError")}</p> : null}
+        {!historyHasError && history.length === 0 ? <p className="notificationCenter__empty">{t("historyEmpty")}</p> : null}
+        {!historyHasError && history.length > 0 ? <ul className="notificationCenter__list">{history.map((item) => {
+          const brand = item.brandName ?? t("unknownBrand");
+          const platform = item.platform ? tPlatforms(item.platform) : "";
+          const title = t(`event.${item.eventType}.title`);
+          const detail = item.eventType === "approval_requested"
+            ? t("event.approval_requested.detail", { content: item.contentTitle ?? t("unknownContent"), brand })
+            : item.eventType.startsWith("publication_")
+              ? t(`event.${item.eventType}.detail`, { content: item.contentTitle ?? t("unknownContent"), brand })
+              : t(`event.${item.eventType}.detail`, { platform, brand });
+          const href = item.eventType.startsWith("social_") ? `#${WORKSPACE_SECTION_IDS.connections}` : item.eventType === "approval_requested" ? `#${WORKSPACE_SECTION_IDS.approvals}` : `#${WORKSPACE_SECTION_IDS.calendar}`;
+          return <li key={item.id} className={item.readAt ? "is-read" : "is-unread"}>
+            <a href={href} onClick={() => setOpen(false)}><span className={`notificationCenter__icon ${item.eventType.endsWith("failed") || item.eventType === "publication_indeterminate" ? "is-error" : ""}`}><Bell aria-hidden="true" size={16} /></span><span className="notificationCenter__copy"><strong>{title}</strong><small>{detail}</small><time dateTime={item.occurredAt}>{formatter.dateTime(new Date(item.occurredAt), { dateStyle: "medium", timeStyle: "short" })}</time></span></a>
+            <Button appearance="quiet" className="notificationCenter__read" type="button" aria-label={t(item.readAt ? "markUnread" : "markRead")} onClick={async () => {
+              const read = !item.readAt;
+              const previous = history;
+              setHistory((current) => current.map((entry) => entry.id === item.id ? { ...entry, readAt: read ? new Date().toISOString() : null } : entry));
+              try {
+                const response = await fetch(`/api/workspace/notifications/${item.id}`, { method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read }) });
+                if (!response.ok) throw new Error();
+              } catch { setHistory(previous); showFeedback("error", t("updateError")); }
+            }}>{item.readAt ? t("markUnread") : t("markRead")}</Button>
+          </li>;
+        })}</ul> : null}
+      </section>
     </div>
   </div>;
 }

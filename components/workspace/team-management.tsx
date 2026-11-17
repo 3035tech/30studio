@@ -10,6 +10,7 @@ import { ApprovalPolicySettings } from "@/components/workspace/approval-policy-s
 import type { BrandListItem } from "@/lib/validation/brands";
 import { TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_ROLES, TENANT_ROLE, TENANT_ROLES, WORKSPACE_SECTION_IDS, type Locale, type TenantRole } from "@/lib/constants";
 import { teamListResponseSchema, type TeamMember } from "@/lib/validation/team";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 type TeamData = {
   organizationId: string | null;
@@ -26,6 +27,7 @@ type TeamLoadState = { organizationId: string | null; pending: boolean; hasError
 const INITIAL_LOAD_STATE: TeamLoadState = { organizationId: null, pending: true, hasError: false };
 
 export function TeamManagement({ organizationId, brands }: { organizationId: string | null; brands: BrandListItem[] }) {
+  const showFeedback = useSystemFeedback();
   const t = useTranslations("team");
   const tRoles = useTranslations("roles");
   const formatter = useFormatter();
@@ -36,8 +38,6 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const [message, setMessage] = useState("");
-  const [messageIsError, setMessageIsError] = useState(false);
   const [activeTab, setActiveTab] = useState<"members" | "access" | "approval">("members");
   const currentTeamData = teamData.organizationId === organizationId ? teamData : INITIAL_TEAM_DATA;
   const currentLoadState = organizationId === null
@@ -73,8 +73,6 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
     const role = selectedRoles[memberId];
     if (!role) return;
     setBusyMemberId(memberId);
-    setMessage("");
-    setMessageIsError(false);
 
     try {
       const response = await fetch(`${TEAM_API_PATHS.collection}/${memberId}`, {
@@ -94,10 +92,9 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
         delete next[memberId];
         return next;
       });
-      setMessage(t("roleUpdated"));
+      showFeedback("success", t("roleUpdated"));
     } catch {
-      setMessage(t("updateError"));
-      setMessageIsError(true);
+      showFeedback("error", t("updateError"));
     } finally {
       setBusyMemberId(null);
     }
@@ -105,8 +102,6 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
 
   async function removeMember(memberId: string) {
     setBusyMemberId(memberId);
-    setMessage("");
-    setMessageIsError(false);
 
     try {
       const response = await fetch(`${TEAM_API_PATHS.collection}/${memberId}`, { method: "DELETE", credentials: "same-origin" });
@@ -117,10 +112,9 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
         members: current.members.filter((member) => member.id !== memberId),
       }));
       setRemovingMemberId(null);
-      setMessage(t("memberRemoved"));
+      showFeedback("success", t("memberRemoved"));
     } catch {
-      setMessage(t("removeError"));
-      setMessageIsError(true);
+      showFeedback("error", t("removeError"));
     } finally {
       setBusyMemberId(null);
     }
@@ -167,7 +161,6 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
           <p className="entryDescription">{t("description")}</p>
         </div>
       </div>
-      {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
       {currentLoadState.pending ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : null}
       {!currentLoadState.pending && currentLoadState.hasError ? (
         <div className="workspaceEmpty teamSection__error" role="alert">

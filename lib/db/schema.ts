@@ -1,6 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import { boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { BRAND_ASSET_KINDS, BRAND_ASSET_REVIEW_DECISIONS, BRAND_ASSET_STATUSES, BRAND_ASSET_STATUS, BRAND_KIT_VERSION_STATUSES, BRAND_KIT_VERSION_STATUS, COMPETITOR_FETCH_RUN_STATUSES, COMPETITOR_OBSERVATION_ANALYSIS_STATUSES, COMPETITOR_OBSERVATION_DATA_QUALITIES, COMPETITOR_RETRIEVAL_METHODS, COMPETITOR_SOURCE_STATUSES, COMPETITOR_TOPIC_KEYS, CONTENT_APPROVAL_DECISIONS, CONTENT_APPROVAL_POLICY, CONTENT_APPROVAL_STATUSES, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_STATUSES, CONTENT_STATUS, SOCIAL_ANALYTICS_COLLECTION_STATUSES, SOCIAL_CONNECTION_EVENT_TYPES, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_RECONCILIATION_OUTCOMES, SOCIAL_PUBLICATION_RECONCILIATION_SOURCES, TEAM_AUDIT_ACTION_VALUES } from "@/lib/constants";
+import { BRAND_ASSET_KINDS, BRAND_ASSET_REVIEW_DECISIONS, BRAND_ASSET_STATUSES, BRAND_ASSET_STATUS, BRAND_KIT_VERSION_STATUSES, BRAND_KIT_VERSION_STATUS, COMPETITOR_FETCH_RUN_STATUSES, COMPETITOR_OBSERVATION_ANALYSIS_STATUSES, COMPETITOR_OBSERVATION_DATA_QUALITIES, COMPETITOR_RETRIEVAL_METHODS, COMPETITOR_SOURCE_STATUSES, COMPETITOR_TOPIC_KEYS, CONTENT_APPROVAL_DECISIONS, CONTENT_APPROVAL_POLICY, CONTENT_APPROVAL_STATUSES, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_STATUSES, CONTENT_STATUS, SOCIAL_ANALYTICS_COLLECTION_STATUSES, SOCIAL_CONNECTION_EVENT_TYPES, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUSES, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_RECONCILIATION_OUTCOMES, SOCIAL_PUBLICATION_RECONCILIATION_SOURCES, TEAM_AUDIT_ACTION_VALUES, WORKSPACE_NOTIFICATION_TYPE_VALUES } from "@/lib/constants";
 import { organization, user } from "@/lib/db/auth-schema";
 import type { SocialCapabilitySnapshot } from "@/lib/constants";
 import type { BrandKitContent } from "@/lib/validation/brand-kits";
@@ -11,6 +11,7 @@ export const socialPlatform = pgEnum("social_platform", SOCIAL_PLATFORMS);
 export const socialProfileStatus = pgEnum("social_profile_status", SOCIAL_PROFILE_STATUSES);
 export const socialConnectionEventType = pgEnum("social_connection_event_type", SOCIAL_CONNECTION_EVENT_TYPES);
 export const teamAuditAction = pgEnum("team_audit_action", TEAM_AUDIT_ACTION_VALUES);
+export const workspaceNotificationType = pgEnum("workspace_notification_type", WORKSPACE_NOTIFICATION_TYPE_VALUES);
 export const brandKitVersionStatus = pgEnum("brand_kit_version_status", BRAND_KIT_VERSION_STATUSES);
 export const brandAssetStatus = pgEnum("brand_asset_status", BRAND_ASSET_STATUSES);
 export const brandAssetKind = pgEnum("brand_asset_kind", BRAND_ASSET_KINDS);
@@ -206,6 +207,44 @@ export const teamAuditEvents = pgTable(
   (table) => [
     index("team_audit_events_org_occurred_idx").on(table.organizationId, table.occurredAt),
     index("team_audit_events_org_target_idx").on(table.organizationId, table.targetUserId),
+  ],
+);
+
+export const workspaceNotifications = pgTable(
+  "workspace_notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    recipientUserId: text("recipient_user_id").references(() => user.id, { onDelete: "cascade" }),
+    brandId: uuid("brand_id"),
+    contentItemId: uuid("content_item_id"),
+    platform: socialPlatform("platform"),
+    eventType: workspaceNotificationType("event_type").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "workspace_notifications_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
+    foreignKey({ name: "workspace_notifications_org_item_brand_fk", columns: [table.organizationId, table.contentItemId, table.brandId], foreignColumns: [contentItems.organizationId, contentItems.id, contentItems.brandId] }).onDelete("cascade"),
+    unique("workspace_notifications_org_id_unique").on(table.organizationId, table.id),
+    uniqueIndex("workspace_notifications_org_dedupe_unique").on(table.organizationId, table.dedupeKey),
+    index("workspace_notifications_org_time_idx").on(table.organizationId, table.occurredAt),
+    index("workspace_notifications_user_time_idx").on(table.organizationId, table.recipientUserId, table.occurredAt),
+  ],
+);
+
+export const workspaceNotificationReads = pgTable(
+  "workspace_notification_reads",
+  {
+    organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    notificationId: uuid("notification_id").notNull(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ name: "workspace_notification_reads_org_notification_fk", columns: [table.organizationId, table.notificationId], foreignColumns: [workspaceNotifications.organizationId, workspaceNotifications.id] }).onDelete("cascade"),
+    unique("workspace_notification_reads_org_notification_user_unique").on(table.organizationId, table.notificationId, table.userId),
+    index("workspace_notification_reads_org_user_idx").on(table.organizationId, table.userId, table.readAt),
   ],
 );
 

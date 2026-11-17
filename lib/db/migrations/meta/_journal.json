@@ -288,6 +288,13 @@
       "when": 1794914575632,
       "tag": "0040_add_x_competitor_source",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794958092923,
+      "tag": "0041_silent_selene",
+      "breakpoints": true
     }
   ]
 }

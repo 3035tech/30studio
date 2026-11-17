@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { API_ERROR_CODES, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_STATUS, HTTP_STATUS, TENANT_PERMISSIONS } from "@/lib/constants";
+import { API_ERROR_CODES, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_STATUS, HTTP_STATUS, TENANT_PERMISSIONS, WORKSPACE_NOTIFICATION_TYPES } from "@/lib/constants";
 import { decideContentApproval, getContentApprovalState, submitContentForApproval } from "@/lib/db/repositories/content-approvals";
+import { recordWorkspaceNotification } from "@/lib/db/repositories/workspace-notifications";
 import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       if (result.kind === "publisher_media_unsupported") throw new ApiError(API_ERROR_CODES.contentApprovalPublisherMediaUnsupported, HTTP_STATUS.conflict);
       if (result.kind === "publisher_text_limit") throw new ApiError(API_ERROR_CODES.contentApprovalPublisherTextLimit, HTTP_STATUS.unprocessable);
       if (result.kind === "conflict") throw new ApiError(API_ERROR_CODES.contentApprovalConflict, HTTP_STATUS.conflict);
+      if (result.kind === "created") await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.approvalRequested, dedupeKey: `approval:${result.id}`, brandId: result.brandId, contentItemId: itemId, platform: result.platform });
       return NextResponse.json({ data: { kind: result.kind, requestId: result.id, itemStatus: "in_review" } }, { status: result.kind === "created" ? HTTP_STATUS.created : HTTP_STATUS.ok, headers: { "Cache-Control": "no-store" } });
     }
 

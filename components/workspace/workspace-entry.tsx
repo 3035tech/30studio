@@ -22,6 +22,7 @@ import { AnalyticsWorkspace } from "@/components/workspace/analytics-workspace";
 import { CompetitorIntelligence } from "@/components/workspace/competitor-intelligence";
 import { AccountProfile } from "@/components/workspace/account-profile";
 import { uploadBrandAssetFile } from "@/components/brand/upload-brand-asset";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 type AuthMode = "sign_in" | "sign_up" | "request_reset";
 type BrandState = { organizationId: string | null; items: BrandListItem[]; pending: boolean; error: boolean; canManage: boolean | null };
@@ -39,6 +40,7 @@ function makeSlug(value: string) {
 }
 
 export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId }: { socialConnectionResult: string | null; socialConnectionBrandId: string | null }) {
+  const showFeedback = useSystemFeedback();
   const tAuth = useTranslations("auth");
   const tWorkspace = useTranslations("workspace");
   const tPortfolio = useTranslations("portfolio");
@@ -80,6 +82,14 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
   const organizationOptions = useMemo(() => organizations ?? [], [organizations]);
   const isAuthenticated = Boolean(session?.user);
   const activeOrganizationId = activeOrganization?.id ?? null;
+
+  useEffect(() => {
+    if (!socialConnectionResult) return;
+    const knownResults = ["connected", "failed", "cancelled", "permissions_required", "already_connected", "no_publishable_pages"] as const;
+    if (!knownResults.some((result) => result === socialConnectionResult)) return;
+    const tone = socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" || socialConnectionResult === "no_publishable_pages" ? "error" : socialConnectionResult === "connected" ? "success" : "info";
+    showFeedback(tone, tSocialConnections(socialConnectionResult));
+  }, [showFeedback, socialConnectionResult, tSocialConnections]);
   const currentBrands = brands.organizationId === activeOrganizationId
     ? brands
     : { organizationId: activeOrganizationId, items: [], pending: Boolean(activeOrganizationId), error: false, canManage: null };
@@ -317,10 +327,9 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       setCreateBrandOpen(false);
       await reloadBrands(activeOrganization.id);
       setBrandSetupPrompt(createdBrandResult.data);
-      setMessage(logoUploadFailed ? tPortfolio("brandAddedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandAddedLogoPending") : tWorkspace("brandAdded"));
+      showFeedback("success", logoUploadFailed ? tPortfolio("brandAddedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandAddedLogoPending") : tWorkspace("brandAdded"));
     } catch {
-      setMessage(tWorkspace("brandError"));
-      setMessageIsError(true);
+      showFeedback("error", tWorkspace("brandError"));
     } finally {
       setBusy(false);
     }
@@ -400,10 +409,9 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       }
       await reloadBrands(activeOrganizationId);
       setEditingBrandId(null);
-      setMessage(logoUploadFailed ? tPortfolio("brandUpdatedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandUpdatedLogoPending") : tPortfolio("brandUpdated"));
+      showFeedback("success", logoUploadFailed ? tPortfolio("brandUpdatedLogoFailed") : logoFile instanceof File && logoFile.size > 0 ? tPortfolio("brandUpdatedLogoPending") : tPortfolio("brandUpdated"));
     } catch {
-      setMessage(tPortfolio("updateError"));
-      setMessageIsError(true);
+      showFeedback("error", tPortfolio("updateError"));
     } finally {
       setBusy(false);
     }
@@ -420,10 +428,9 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       if (!response.ok) throw new Error();
       await reloadBrands(activeOrganizationId);
       setArchivingBrandId(null);
-      setMessage(tPortfolio("brandArchived"));
+      showFeedback("success", tPortfolio("brandArchived"));
     } catch {
-      setMessage(tPortfolio("archiveError"));
-      setMessageIsError(true);
+      showFeedback("error", tPortfolio("archiveError"));
     } finally {
       setBusy(false);
     }
@@ -505,14 +512,6 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
       onSignOut={() => void handleSignOut()}
     >
       {message ? <p className={messageIsError ? "entryMessage entryMessage--error" : "entryMessage"} role={messageIsError ? "alert" : "status"}>{message}</p> : null}
-      {socialConnectionResult === "connected" || socialConnectionResult === "failed" || socialConnectionResult === "cancelled" || socialConnectionResult === "permissions_required" || socialConnectionResult === "already_connected" || socialConnectionResult === "no_publishable_pages" ? (
-        <p
-          className={socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" ? "entryMessage entryMessage--error" : "entryMessage"}
-          role={socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" ? "alert" : "status"}
-        >
-          {tSocialConnections(socialConnectionResult)}
-        </p>
-      ) : null}
       <section className="workspaceOverview" id={WORKSPACE_SECTION_IDS.overview} aria-labelledby="workspace-overview-title">
         <div className="workspaceOverview__intro">
           <p className="entryKicker">{activeOrganization?.name ?? tWorkspace("title")}</p>
