@@ -100,7 +100,20 @@ async function seedSystemOwner() {
 
 void seedSystemOwner()
   .catch((error: unknown) => {
-    console.error("Could not seed the initial 30studio workspace owner.", error instanceof Error ? error.name : "UnknownError");
+    const cause = error instanceof Error ? error.cause : undefined;
+    const causeMessage = cause instanceof Error ? cause.message : undefined;
+    const code = typeof cause === "object" && cause !== null && "code" in cause
+      ? String(cause.code)
+      : typeof error === "object" && error !== null && "code" in error
+        ? String(error.code)
+        : undefined;
+
+    console.error("Could not seed the initial 30studio workspace owner.", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      ...(!causeMessage && error instanceof Error ? { message: error.message } : {}),
+      ...(causeMessage ? { cause: causeMessage } : {}),
+      ...(code ? { code } : {}),
+    });
     process.exitCode = 1;
   })
   .finally(async () => {
