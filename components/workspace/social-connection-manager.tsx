@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { SOCIAL_PLATFORMS, type Locale, type SocialPlatform, type SocialProfileStatus } from "@/lib/constants";
-import { socialConnectionConfigurationResponseSchema, socialConnectionListResponseSchema } from "@/lib/validation/social-connections";
+import { socialConnectionAuthorizationResponseSchema, socialConnectionConfigurationResponseSchema, socialConnectionListResponseSchema } from "@/lib/validation/social-connections";
 
 type Connection = { id: string; platform: SocialPlatform; displayName: string; handle: string | null; status: SocialProfileStatus; connectedAt: string | null; connectedByName: string | null; grantedScopes: string[]; missingScopes: string[]; tokenExpiresAt: string | null; refreshTokenExpiresAt: string | null; credentialsUpdatedAt: string | null };
 
@@ -97,9 +97,10 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ platform, locale }),
       });
-      const result = await response.json();
-      if (!response.ok || typeof result.data?.authorizationUrl !== "string") throw new Error();
-      window.location.assign(result.data.authorizationUrl);
+      if (!response.ok) throw new Error();
+      const result = socialConnectionAuthorizationResponseSchema.safeParse(await response.json());
+      if (!result.success) throw new Error();
+      window.location.assign(result.data.data.authorizationUrl);
     } catch { setError(true); setBusyPlatform(null); }
   }
 

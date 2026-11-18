@@ -9,6 +9,11 @@ export const socialConnectionSchema = z.object({
   credentialsUpdatedAt: z.iso.datetime({ offset: true }).nullable(),
 });
 export const socialConnectionListResponseSchema = z.object({ data: z.array(socialConnectionSchema) });
+export const socialConnectionAuthorizationResponseSchema = z.object({
+  data: z.object({
+    authorizationUrl: z.url().refine((value) => new URL(value).protocol === "https:"),
+  }),
+});
 export const socialConnectionConfigurationResponseSchema = z.object({
   data: z.array(z.object({
     platform: z.enum(SOCIAL_PLATFORMS), configured: z.boolean(),
