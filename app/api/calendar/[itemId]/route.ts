@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const item = await updateCalendarIdea(tenant.organizationId, itemId, parsed.data);
     if (!item) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
+    if ("kind" in item && item.kind === "period_conflict") throw new ApiError(API_ERROR_CODES.campaignScheduleOutsidePeriod, HTTP_STATUS.unprocessable);
     return NextResponse.json({ data: item }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return apiErrorResponse(error, request);

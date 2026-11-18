@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getCalendarDateInTimeZone } from "@/lib/calendar";
 import { APPROVAL_POLICY_LIMITS, BRAND_ASSET_LIMITS, CALENDAR, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_ACTIONS, CONTENT_APPROVAL_DECISIONS, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_GENERATION_MODES, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_MEDIA_TEMPLATE, CONTENT_STATUSES, COPY_GENERATION, DEFAULT_LOCALE, LOCALES, SOCIAL_CAPABILITY_CATALOG_VERSION, SOCIAL_CAPABILITY_SNAPSHOT_SCHEMA_VERSION, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLISHING_CAPABILITIES } from "@/lib/constants";
 
 const validTimeZone = z.string().trim().min(1).max(64).refine((timeZone) => {
@@ -11,6 +12,10 @@ const validTimeZone = z.string().trim().min(1).max(64).refine((timeZone) => {
 });
 
 const isoDateTime = z.iso.datetime({ offset: true });
+
+function localDateAtTimeZone(value: string, timeZone: string): string | null {
+  return getCalendarDateInTimeZone(new Date(value), timeZone);
+}
 
 export const calendarQuerySchema = z.object({
   start: isoDateTime,
@@ -44,16 +49,75 @@ export const calendarCampaignCreateSchema = z.object({
   idempotencyKey: z.uuid(),
   title: z.string().trim().min(1).max(CONTENT_LIMITS.titleCharacters),
   brief: z.string().trim().min(1).max(CONTENT_LIMITS.campaignBriefCharacters),
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
   publications: z.array(campaignPublicationSchema).min(1).max(CONTENT_LIMITS.maximumCampaignPublications),
-}).strict().refine((campaign) => new Set(campaign.publications.map((publication) => publication.platform)).size === campaign.publications.length);
+}).strict().superRefine((campaign, context) => {
+  const start = Date.parse(`${campaign.startDate}T00:00:00Z`);
+  const end = Date.parse(`${campaign.endDate}T00:00:00Z`);
+  if (end < start || end - start > CONTENT_LIMITS.maximumCampaignDurationDays * CALENDAR.millisecondsPerDay) {
+    context.addIssue({ code: "custom", path: ["endDate"], message: "Campaign period is invalid." });
+  }
+  campaign.publications.forEach((publication, index) => {
+    const localDate = localDateAtTimeZone(publication.plannedAt, publication.timeZone);
+    if (localDate && (localDate < campaign.startDate || localDate > campaign.endDate)) {
+      context.addIssue({ code: "custom", path: ["publications", index, "plannedAt"], message: "Publication must be scheduled within the campaign period." });
+    }
+  });
+});
 
 export const calendarCampaignCreateResponseSchema = z.object({
   data: z.object({
     campaignId: z.uuid(),
-    publications: z.array(z.object({ id: z.uuid(), platform: z.enum(SOCIAL_PLATFORMS) })),
+    publications: z.array(z.object({ id: z.uuid(), platform: z.enum(SOCIAL_PLATFORMS), plannedAt: z.iso.datetime() })),
     replayed: z.boolean(),
   }),
 });
+
+export const calendarCampaignPublicationAppendSchema = z.object({
+  idempotencyKey: z.uuid(),
+  platform: z.enum(SOCIAL_PLATFORMS),
+  plannedAt: isoDateTime,
+  timeZone: validTimeZone,
+}).strict();
+
+export const calendarCampaignPeriodUpdateSchema = z.object({
+  startDate: z.iso.date(),
+  endDate: z.iso.date(),
+}).strict().superRefine(({ startDate, endDate }, context) => {
+  const start = Date.parse(`${startDate}T00:00:00Z`);
+  const end = Date.parse(`${endDate}T00:00:00Z`);
+  if (end < start || end - start > CONTENT_LIMITS.maximumCampaignDurationDays * CALENDAR.millisecondsPerDay) {
+    context.addIssue({ code: "custom", path: ["endDate"], message: "Campaign period is invalid." });
+  }
+});
+
+export const calendarCampaignPeriodUpdateResponseSchema = z.object({
+  data: z.object({ startDate: z.iso.date(), endDate: z.iso.date() }).strict(),
+}).strict();
+
+export const calendarCampaignPublicationAppendResponseSchema = z.object({
+  data: z.object({ id: z.uuid(), platform: z.enum(SOCIAL_PLATFORMS), plannedAt: z.iso.datetime(), replayed: z.boolean() }).strict(),
+}).strict();
+
+export const calendarCampaignScheduleResponseSchema = z.object({
+  data: z.object({
+    campaignId: z.uuid(),
+    title: z.string(),
+    startDate: z.iso.date().nullable(),
+    endDate: z.iso.date().nullable(),
+    publications: z.array(z.object({
+      id: z.uuid(),
+      platform: z.enum(SOCIAL_PLATFORMS),
+      title: z.string(),
+      plannedAt: z.iso.datetime(),
+      timeZone: z.string(),
+      status: z.enum(CONTENT_STATUSES),
+      publicationStatus: z.enum(SOCIAL_PUBLICATION_JOB_STATUSES).nullable(),
+      createdAt: z.iso.datetime(),
+    }).strict()),
+  }).strict(),
+}).strict();
 
 export const calendarItemUpdateSchema = calendarItemCreateSchema;
 
@@ -234,6 +298,8 @@ export const calendarItemSchema = z.object({
   brandName: z.string(),
   campaignId: z.uuid().nullable(),
   campaignTitle: z.string().nullable(),
+  campaignStartDate: z.iso.date().nullable(),
+  campaignEndDate: z.iso.date().nullable(),
   platform: z.enum(SOCIAL_PLATFORMS),
   title: z.string(),
   status: z.enum(CONTENT_STATUSES),
@@ -262,6 +328,8 @@ export const calendarResponseSchema = z.object({
 
 export type CalendarItemCreateInput = z.infer<typeof calendarItemCreateSchema>;
 export type CalendarCampaignCreateInput = z.infer<typeof calendarCampaignCreateSchema>;
+export type CalendarCampaignPublicationAppendInput = z.infer<typeof calendarCampaignPublicationAppendSchema>;
+export type CalendarCampaignPeriodUpdateInput = z.infer<typeof calendarCampaignPeriodUpdateSchema>;
 export type CalendarItemUpdateInput = z.infer<typeof calendarItemUpdateSchema>;
 export type CalendarContentVersionSaveInput = z.infer<typeof calendarContentVersionSaveSchema>;
 export type CalendarItem = z.infer<typeof calendarItemSchema>;

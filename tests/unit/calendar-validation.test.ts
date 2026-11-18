@@ -91,12 +91,14 @@ test("generated channel copy requires three distinct bounded options", () => {
   assert.equal(calendarCopyDraftResponseSchema.safeParse({ ...validResponse, data: { ...validResponse.data, variantOptions: ["x".repeat(COPY_GENERATION.maximumVariantOptionCharacters + 1), "Two.", "Three."] } }).success, false);
 });
 
-test("campaign planning accepts independent channel schedules and rejects duplicate networks", () => {
+test("campaign planning accepts a date range with repeated posts on the same network", () => {
   const validCampaign = {
     brandId: "11111111-1111-4111-8111-111111111111",
     idempotencyKey: "22222222-2222-4222-8222-222222222222",
     title: "Enrollment campaign",
     brief: "Invite local families to try the new classes.",
+    startDate: "2026-11-15",
+    endDate: "2026-11-30",
     publications: [
       { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-15T12:00:00.000Z", timeZone: "UTC" },
       { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-17T15:30:00.000Z", timeZone: "America/Sao_Paulo" },
@@ -105,7 +107,9 @@ test("campaign planning accepts independent channel schedules and rejects duplic
   assert.equal(calendarCampaignCreateSchema.safeParse(validCampaign).success, true);
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, idempotencyKey: "invalid" }).success, false);
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [] }).success, false);
-  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [validCampaign.publications[0], validCampaign.publications[0]] }).success, false);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [validCampaign.publications[0], validCampaign.publications[0]] }).success, true);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, publications: [{ ...validCampaign.publications[0], plannedAt: "2026-12-01T12:00:00.000Z" }] }).success, false);
+  assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, startDate: "2026-12-01" }).success, false);
   assert.equal(calendarCampaignCreateSchema.safeParse({ ...validCampaign, organizationId: "another-tenant" }).success, false);
 });
 
@@ -114,6 +118,8 @@ test("campaign idempotency fingerprint normalizes publication ordering", () => {
     brandId: "11111111-1111-4111-8111-111111111111",
     title: "Enrollment campaign",
     brief: "Invite local families to try the new classes.",
+    startDate: "2026-11-15",
+    endDate: "2026-11-30",
     publications: [
       { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-15T12:00:00.000Z", timeZone: "UTC" },
       { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-17T15:30:00.000Z", timeZone: "America/Sao_Paulo" },

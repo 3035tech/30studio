@@ -27,6 +27,11 @@ export function CalendarItemsView({
 }: Props) {
   const t = useTranslations("calendar");
   const locale = useLocale() as Locale;
+  function campaignPeriod(item: CalendarItem) {
+    if (!item.campaignStartDate || !item.campaignEndDate) return t("campaign");
+    const formatDate = (value: string) => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+    return t("campaignPeriodTag", { start: formatDate(item.campaignStartDate), end: formatDate(item.campaignEndDate) });
+  }
   const monthDays = getCalendarMonthDays(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
   const weekdayLabels = monthDays.slice(0, CALENDAR.daysPerWeek).map((date) => new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date));
   const today = toLocalDateInputValue(new Date());
@@ -52,7 +57,7 @@ export function CalendarItemsView({
             <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
           </Button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
           {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}
-          {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
+          {item.campaignId ? <span className="editorialCalendar__campaignLabel">{campaignPeriod(item)}</span> : null}
         </li>)}</ul>
       </section>)}
     </div>;
@@ -78,7 +83,7 @@ export function CalendarItemsView({
                 <Button appearance="quiet" type="button" className="editorialCalendar__itemButton" disabled={!canOpenCalendarItem(item)} onClick={() => onSelectCalendarItem(item)} aria-label={item.publicationStatus === SOCIAL_PUBLICATION_JOB_STATUS.indeterminate ? t("reconcilePublication") : t(item.status === CONTENT_STATUS.inReview ? "reviewContent" : "editContent", { title: item.title })}>
                   <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
                   <strong>{item.title}</strong>
-                  {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
+                  {item.campaignId ? <span className="editorialCalendar__campaignLabel">{campaignPeriod(item)}</span> : null}
                   <span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
                   <span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
                   {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}

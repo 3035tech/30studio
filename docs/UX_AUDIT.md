@@ -96,6 +96,21 @@ The live browser became unavailable during the latest audit pass, so these are d
 - The asset table retains its complete sortable columns and page controls; the responsive treatment improves orientation without hiding metadata.
 - CSS and source checks passed; actual viewport rendering remains unverified in a browser.
 
+## Content media workflow pass — 2026-11-18
+
+- Split the media panel into two focused tabs: create media (upload, AI generation, and optional carousel copy) and version media (review the saved assets and explicitly build a carousel from selected uploads). Existing assets open in the library tab after loading; newly generated or uploaded assets take the user directly to that library.
+- The tab set supports arrow, Home, and End keyboard navigation and exposes selected state and panel relationships to assistive technology. Labels are localized in Portuguese and English.
+- TypeScript, ESLint, the optimized production build, and `git diff --check` passed. No browser visual review was available, so rendering still needs confirmation in Chrome.
+- The empty version library now offers a direct action back to media creation for users with manage permission, while read-only users see only the empty-state explanation.
+
+## Campaign period and post planning — 2026-11-18
+
+- Campaigns now own an inclusive start/end date range, while each scheduled publication remains an individual child post with its own channel and local date/time. The planner supports multiple posts on the same network and constrains their dates to the campaign period; the confirmation summary lists every scheduled post.
+- The database stores the campaign period, API validation enforces period boundaries and a bounded duration, and older campaigns derive their displayed period from their existing posts. The calendar shows the campaign window alongside each child post.
+- Existing campaign records are preserved: new date columns are nullable for compatibility, new campaign requests require both dates, and existing deployments can roll back the application without dropping stored data. ESLint, TypeScript, the Webpack production build, locale-key alignment, and `git diff --check` passed; Drizzle reports no additional schema changes. Database migration and integration tests were not run, and Chrome review remains pending.
+- Follow-up: campaign posts can no longer be moved beyond the stored period when editing the schedule. The date picker reflects the same bounds, and legacy campaigns use their existing posts to infer them. An out-of-range save gets a localized explanation. Integration assertions cover both schedule-update paths; lint, TypeScript, production build, locale alignment, and diff checks passed, but the tests were not run.
+- Campaign lifecycle follow-up: a user can add a post to an existing campaign from a campaign post, choose its network/date/time, and keep it inside the campaign period. Owners and editors can adjust the period; the server locks the campaign, checks every post's local date, and rejects a range that excludes any post. Period changes serialize with post additions and edits so the invariant holds during concurrent requests. The campaign disclosure lists planned posts in chronological order with network, local time, editorial status, and publication result; selecting a row opens that post in the editor. If the current post has unsaved changes, users can stay, save and switch, or discard and switch. Editing a campaign period now previews any posts outside the draft range, highlights them in the list, and disables saving until they are brought back into range. Lint, TypeScript, production build, locale alignment, and diff checks passed; browser review and live database checks remain pending.
+
 ## Workspace naming pass — 2026-11-16
 
 - Added workspace name settings under the profile area. The owner can update the display name; the stable slug is shown as read-only and remains unchanged, preserving links and integrations. Other roles see the current name and a clear permission explanation.
@@ -295,3 +310,20 @@ The live browser became unavailable during the latest audit pass, so these are d
 - The approval readiness checklist now appears near the top of the editor, before the long copy and media sections, so authors see blockers early.
 - Previous content versions and approval decisions use the existing disclosure control and start collapsed. This keeps the current post workflow visible while preserving access to audit history.
 - Chrome is unavailable for visual review; source-level checks remain pending for this pass.
+
+## Workspace navigation clipping — 2026-11-18
+
+- A user screenshot showed the desktop navigation labels clipped to a narrow strip while most of the sidebar remained blank. The sidebar still used a two-column grid from the older navigation layout, but its current markup has a single navigation child; the child was therefore constrained to the 58px first column.
+- The desktop sidebar now uses a single block container so the navigation fills its full 248px layout column. Tablet/mobile rules already switch the sidebar to a full-width layout and remain unchanged.
+- ESLint, production build, and `git diff --check` passed. The Chrome access host is unavailable, so the deployed page still needs visual confirmation after rollout.
+
+## Sentence-case section labels — 2026-11-18
+
+- Replaced all-caps overlines with sentence case in the portfolio, calendar, approval queue, team, analytics, and competitor research screens in English and Brazilian Portuguese. Removed global letter spacing and uppercase transformation so dynamic section labels follow the same restrained type style.
+- ESLint, the production build via Webpack, locale-key alignment, and `git diff --check` passed. The default Turbopack build could not bind a port in the local sandbox; browser visual comparison is also unavailable in this session.
+
+## Account profile hierarchy — 2026-11-18
+
+- Reorganized the account tab into a compact email summary and a bounded password form, with the summary and security form side by side on desktop and stacked on narrow screens. The recovery action now sits beside the password action rather than taking another full row.
+- Added concise localized guidance explaining the sign-in email and that changing a password signs out other sessions, matching the existing `revokeOtherSessions` behavior.
+- Lint, locale-key alignment, production build via Webpack, and `git diff --check` passed. Chrome visual verification remains unavailable in this session.

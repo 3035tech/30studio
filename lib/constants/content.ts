@@ -1,5 +1,5 @@
 import { WORKSPACE_SECTION_IDS } from './core';
-import { SOCIAL_PLATFORMS, type SocialPlatform } from './social';
+import type { SocialPlatform } from './social';
 
 export const CONTENT_STATUSES = ["idea", "draft", "in_review", "approved", "scheduled", "published", "failed", "cancelled"] as const;
 
@@ -19,7 +19,8 @@ export const CONTENT_STATUS = {
 export const CONTENT_LIMITS = {
   titleCharacters: 180,
   campaignBriefCharacters: 5_000,
-  maximumCampaignPublications: SOCIAL_PLATFORMS.length,
+  maximumCampaignPublications: 30,
+  maximumCampaignDurationDays: 365,
   canonicalCopyCharacters: 5_000,
   variantCopyCharacters: 5_000,
   maximumCalendarItems: 300,
@@ -188,14 +189,22 @@ export const CONTENT_MEDIA_API_PATHS = {
   review: (itemId: string, mediaId: string) => `/api/calendar/${encodeURIComponent(itemId)}/media/${encodeURIComponent(mediaId)}/review`,
 } as const;
 
-export const CAMPAIGN_API_PATHS = { collection: "/api/campaigns" } as const;
+export const CAMPAIGN_API_PATHS = {
+  collection: "/api/campaigns",
+  detail: (campaignId: string) => `/api/campaigns/${encodeURIComponent(campaignId)}`,
+  publications: (campaignId: string) => `/api/campaigns/${encodeURIComponent(campaignId)}/publications`,
+} as const;
 
 export const CAMPAIGN_FORM_FIELDS = {
   platforms: "platforms",
   publicationDatePrefix: "publication-date-",
   publicationTimePrefix: "publication-time-",
-  publicationDate: (platform: SocialPlatform) => `publication-date-${platform}`,
-  publicationTime: (platform: SocialPlatform) => `publication-time-${platform}`,
+  publicationPlatform: (index: number) => `campaign-publication-${index}-platform`,
+  publicationDate: (index: number) => `campaign-publication-${index}-date`,
+  publicationTime: (index: number) => `campaign-publication-${index}-time`,
+  publicationRemove: (index: number) => `campaign-publication-${index}-remove`,
+  startDate: "calendar-campaign-start-date",
+  endDate: "calendar-campaign-end-date",
   platformCheckboxId: (platform: SocialPlatform) => `calendar-platform-${platform}`,
 } as const;
 

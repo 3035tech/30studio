@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, CONTENT_STATUS, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUS, SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
-import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentCarouselGeneration, enqueueContentMediaGeneration, failContentMediaJob, getCalendarContentReviewContext, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
+import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentCarouselGeneration, enqueueContentMediaGeneration, failContentMediaJob, getCalendarContentReviewContext, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia, updateCalendarIdea } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { decideContentApproval, getContentApprovalState, submitContentForApproval } from "@/lib/db/repositories/content-approvals";
 import { saveContentApprovalPolicy } from "@/lib/db/repositories/content-approval-policies";
@@ -138,6 +138,8 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     idempotencyKey: crypto.randomUUID(),
     title: "Enrollment campaign",
     brief: "Invite families to try the new classes.",
+    startDate: "2026-11-20",
+    endDate: "2026-11-30",
     publications: [
       { platform: SOCIAL_PLATFORMS[0], plannedAt: "2026-11-20T15:00:00.000Z", timeZone: "America/Sao_Paulo" },
       { platform: SOCIAL_PLATFORMS[1], plannedAt: "2026-11-22T18:30:00.000Z", timeZone: "America/Sao_Paulo" },
@@ -151,6 +153,25 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.equal(campaignItems.length, 2);
   assert.deepEqual(campaignItems.map((calendarItem) => calendarItem.plannedAt.toISOString()), ["2026-11-20T15:00:00.000Z", "2026-11-22T18:30:00.000Z"]);
   assert.equal(campaignItems.every((calendarItem) => calendarItem.campaignTitle === "Enrollment campaign"), true);
+  const outsidePeriodUpdate = await updateCalendarIdea(ids.organizationA, campaignItems[0]!.id, {
+    brandId: brandA.id,
+    platform: campaignItems[0]!.platform,
+    title: "Enrollment campaign",
+    plannedAt: "2026-12-01T15:00:00.000Z",
+    timeZone: "America/Sao_Paulo",
+  });
+  assert.equal(outsidePeriodUpdate && "kind" in outsidePeriodUpdate ? outsidePeriodUpdate.kind : null, "period_conflict");
+  const outsidePeriodVersion = await createCalendarContentVersion(ids.organizationA, ids.user, campaignItems[0]!.id, {
+    brandId: brandA.id,
+    platform: campaignItems[0]!.platform,
+    title: "Enrollment campaign",
+    plannedAt: "2026-12-01T15:00:00.000Z",
+    timeZone: "America/Sao_Paulo",
+    expectedVersionNumber: 0,
+    canonicalCopy: "Enrollment starts soon.",
+    variantCopy: "Enrollment starts soon.",
+  });
+  assert.equal(outsidePeriodVersion?.kind, "period_conflict");
   const campaignReplay = await createCalendarCampaign(ids.organizationA, ids.user, campaignInput);
   assert.equal(campaignReplay?.kind, "replayed");
   assert.equal(campaignReplay?.campaignId, campaign.campaignId);
@@ -162,6 +183,8 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
     idempotencyKey: crypto.randomUUID(),
     title: "Cross-tenant campaign",
     brief: "Must not be stored.",
+    startDate: "2026-11-18",
+    endDate: "2026-11-30",
     publications: [{ platform: SOCIAL_PLATFORMS[0], plannedAt: plannedAt.toISOString(), timeZone: "America/Sao_Paulo" }],
   }), null);
 

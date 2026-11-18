@@ -309,6 +309,13 @@
       "when": 1795000967070,
       "tag": "0043_simple_the_hunter",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795004574567,
+      "tag": "0044_silly_expediter",
+      "breakpoints": true
     }
   ]
 }

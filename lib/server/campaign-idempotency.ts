@@ -5,7 +5,9 @@ import type { CalendarCampaignCreateInput } from "@/lib/validation/calendar";
 export function getCampaignRequestFingerprint(input: Omit<CalendarCampaignCreateInput, "idempotencyKey">) {
   const canonicalRequest = {
     ...input,
-    publications: [...input.publications].sort((left, right) => left.platform.localeCompare(right.platform)),
+    publications: [...input.publications].sort((left, right) => left.platform.localeCompare(right.platform)
+      || left.plannedAt.localeCompare(right.plannedAt)
+      || left.timeZone.localeCompare(right.timeZone)),
   };
   return createHash("sha256").update(JSON.stringify(canonicalRequest)).digest("hex");
 }

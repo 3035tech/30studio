@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PasswordField } from "@/components/ui/field";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
@@ -87,15 +88,23 @@ export function AccountProfile({ email }: { email: string }) {
       </div>
       <div className="accountProfile__panel" id="profile-panel-account" role="tabpanel" aria-labelledby="profile-tab-account" tabIndex={0} hidden={activeTab !== "account"}>
         {activeTab === "account" ? <>
-        <div className="accountProfile__identity"><span>{t("email")}</span><strong>{email}</strong></div>
-        <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
-          <h2>{t("changePassword")}</h2>
-          <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
-          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
-          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} error={passwordMismatch ? tAuth("passwordMismatch") : undefined} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
-          <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
-          <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>
-        </form>
+        <div className="accountProfile__accountGrid">
+          <div className="accountProfile__identity">
+            <div className="accountProfile__identityLabel"><Mail aria-hidden="true" size={18} /><span>{t("email")}</span></div>
+            <strong>{email}</strong>
+            <p>{t("emailHelp")}</p>
+          </div>
+          <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
+            <div className="accountProfile__formHeading"><h2>{t("changePassword")}</h2><p>{t("passwordChangeHelp")}</p></div>
+            <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
+            <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
+            <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} error={passwordMismatch ? tAuth("passwordMismatch") : undefined} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
+            <div className="accountProfile__actions">
+              <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
+              <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>
+            </div>
+          </form>
+        </div>
         </> : null}
       </div>
       <div className="accountProfile__panel" id="profile-panel-workspace" role="tabpanel" aria-labelledby="profile-tab-workspace" tabIndex={0} hidden={activeTab !== "workspace"}>

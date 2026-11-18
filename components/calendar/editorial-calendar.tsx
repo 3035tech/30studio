@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, WandSparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, Trash2, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
@@ -13,33 +13,22 @@ import { CheckboxField, SelectField, TextAreaField, TextField } from "@/componen
 import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
 import { CalendarItemsView } from "@/components/calendar/calendar-items-view";
-import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
-import { getCalendarMonthBounds, toLocalDateInputValue } from "@/lib/calendar";
+import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
+import { getCalendarDateInTimeZone, getCalendarMonthBounds, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem, type CalendarSocialCapability } from "@/lib/validation/calendar";
+import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCampaignPeriodUpdateSchema, calendarCampaignScheduleResponseSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, contentApprovalActionResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
 import { contentReviewResponseSchema } from "@/lib/validation/content-review";
 import { socialPublicationReconciliationResponseSchema, socialPublicationReconciliationRequestSchema } from "@/lib/validation/social-publication";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { countSocialCopyCharacters, exceedsSocialCopyLimit } from "@/lib/social-copy";
+import { useCalendarCollection } from "@/components/calendar/use-calendar-collection";
 
-type CalendarState = {
-  requestKey: string;
-  items: CalendarItem[];
-  capabilities: CalendarSocialCapability[];
-  truncated: boolean;
-  canManage: boolean;
-  canReview: boolean;
-  error: boolean;
-};
-
-const INITIAL_STATE: CalendarState = { requestKey: "", items: [], capabilities: [], truncated: false, canManage: false, canReview: false, error: false };
 const EMPTY_BRANDS: readonly BrandListItem[] = [];
-const EMPTY_ITEMS: CalendarItem[] = [];
 type GeneratedCopy = z.infer<typeof calendarCopyDraftResponseSchema>["data"] & {
   itemId: string;
   selectedVariantIndex: number | null;
 };
-type CampaignSchedule = { date: string; time: string };
+type CampaignPublicationDraft = { id: string; platform: SocialPlatform; date: string; time: string };
 type CampaignNextStep = { itemId: string; brandId: string; platform: SocialPlatform; plannedAt: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -71,11 +60,16 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
     error: boolean;
   } | null>(null);
   const [contentRefreshIndex, setContentRefreshIndex] = useState(0);
+  const [campaignScheduleRefreshIndex, setCampaignScheduleRefreshIndex] = useState(0);
+  const [campaignScheduleState, setCampaignScheduleState] = useState<{ campaignId: string; data: ReturnType<typeof calendarCampaignScheduleResponseSchema.parse>["data"] | null; error: boolean } | null>(null);
+  const [campaignPeriodDraft, setCampaignPeriodDraft] = useState<{ campaignId: string; startDate: string; endDate: string } | null>(null);
+  const [campaignPeriodError, setCampaignPeriodError] = useState("");
   const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
   const [approvalNote, setApprovalNote] = useState("");
   const [selectedSocialProfileId, setSelectedSocialProfileId] = useState("");
   const [editorDirty, setEditorDirty] = useState(false);
   const [discardChangesPrompt, setDiscardChangesPrompt] = useState(false);
+  const [pendingCampaignPost, setPendingCampaignPost] = useState<CalendarItem | null>(null);
   const [approvalMessage, setApprovalMessage] = useState("");
   const [publicationReconciliationMessage, setPublicationReconciliationMessage] = useState("");
   const [reconciliationOutcome, setReconciliationOutcome] = useState<z.infer<typeof socialPublicationReconciliationRequestSchema>["outcome"]>("published");
@@ -84,23 +78,27 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
   const [confirmedNoPost, setConfirmedNoPost] = useState(false);
   const [contentReview, setContentReview] = useState<ReturnType<typeof contentReviewResponseSchema.parse>["data"] | null>(null);
   const [reviewingContent, setReviewingContent] = useState(false);
-  const [state, setState] = useState(INITIAL_STATE);
   const [formOpen, setFormOpen] = useState(false);
   const [createStep, setCreateStep] = useState<"details" | "schedule">("details");
   const [campaignFormError, setCampaignFormError] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
   const [campaignTitle, setCampaignTitle] = useState("");
   const [campaignBrandId, setCampaignBrandId] = useState("");
   const [campaignBrief, setCampaignBrief] = useState("");
-  const [campaignSchedules, setCampaignSchedules] = useState<Partial<Record<SocialPlatform, CampaignSchedule>>>({});
+  const [campaignStartDate, setCampaignStartDate] = useState("");
+  const [campaignEndDate, setCampaignEndDate] = useState("");
+  const [campaignPublications, setCampaignPublications] = useState<CampaignPublicationDraft[]>([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<SocialPlatform[]>([SOCIAL_PLATFORMS[0]]);
   const [campaignIdempotencyKey, setCampaignIdempotencyKey] = useState("");
+  const [appendCampaignPlatform, setAppendCampaignPlatform] = useState<SocialPlatform>(SOCIAL_PLATFORMS[0]);
+  const [appendCampaignDate, setAppendCampaignDate] = useState("");
+  const [appendCampaignTime, setAppendCampaignTime] = useState<string>(CALENDAR.defaultPlannedTime);
+  const [appendCampaignKey, setAppendCampaignKey] = useState("");
+  const [appendCampaignError, setAppendCampaignError] = useState("");
   const [previewPlatform, setPreviewPlatform] = useState<SocialPlatform | null>(null);
   const [busy, setBusy] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [notice, setNotice] = useState("");
   const [campaignNextStep, setCampaignNextStep] = useState<CampaignNextStep | null>(null);
-  const [refreshIndex, setRefreshIndex] = useState(0);
   const [dashboardOpenItemId, setDashboardOpenItemId] = useState<string | null>(null);
   const dashboardNavigationRef = useRef(false);
 
@@ -110,41 +108,18 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
   }
 
   const bounds = getCalendarMonthBounds(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
-  const requestKey = [organizationId, getMonthKey(month), brandFilter, platformFilter, statusFilter, publicationFilter, refreshIndex].join(":");
   const start = bounds.start.toISOString();
   const end = bounds.end.toISOString();
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const query = new URLSearchParams({
-      [CALENDAR_QUERY_PARAMETERS.start]: start,
-      [CALENDAR_QUERY_PARAMETERS.end]: end,
-    });
-    if (brandFilter) query.set(CALENDAR_QUERY_PARAMETERS.brandId, brandFilter);
-    if (platformFilter) query.set(CALENDAR_QUERY_PARAMETERS.platform, platformFilter);
-    if (statusFilter) query.set(CALENDAR_QUERY_PARAMETERS.status, statusFilter);
-    if (publicationFilter) query.set(CALENDAR_QUERY_PARAMETERS.publicationStatus, publicationFilter);
-
-    const load = async () => {
-      try {
-        const response = await fetch(`${CALENDAR_API_PATHS.collection}?${query.toString()}`, {
-          credentials: "same-origin",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload: unknown = await response.json().catch(() => null);
-        if (!response.ok) throw new Error("Calendar request failed.");
-        const parsed = calendarResponseSchema.safeParse(payload);
-        if (!parsed.success) throw new Error("Calendar response was invalid.");
-        setState({ requestKey, items: parsed.data.data, capabilities: parsed.data.capabilities, truncated: parsed.data.truncated, canManage: parsed.data.canManage, canReview: parsed.data.canReview, error: false });
-      } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setState({ requestKey, items: [], capabilities: [], truncated: false, canManage: false, canReview: false, error: true });
-      }
-    };
-    void load();
-    return () => controller.abort();
-  }, [brandFilter, end, organizationId, platformFilter, publicationFilter, requestKey, start, statusFilter]);
+  const { state, visibleItems, pending, hasError, refresh: refreshCalendar } = useCalendarCollection({
+    organizationId,
+    monthKey: getMonthKey(month),
+    start,
+    end,
+    brandId: brandFilter,
+    platform: platformFilter,
+    status: statusFilter,
+    publicationStatus: publicationFilter,
+  });
 
   useEffect(() => {
     if (!selectedItem) return;
@@ -173,9 +148,31 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
     return () => controller.abort();
   }, [contentRefreshIndex, selectedItem]);
 
-  const visibleItems = state.requestKey === requestKey ? state.items : EMPTY_ITEMS;
-  const pending = state.requestKey !== requestKey;
-  const hasError = !pending && state.error;
+  useEffect(() => {
+    const campaignId = selectedItem?.campaignId;
+    if (!campaignId) return;
+    const controller = new AbortController();
+    const loadCampaignSchedule = async () => {
+      try {
+        const response = await fetch(CAMPAIGN_API_PATHS.publications(campaignId), {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload: unknown = await response.json().catch(() => null);
+        if (!response.ok) throw new Error("Campaign schedule request failed.");
+        const parsed = calendarCampaignScheduleResponseSchema.safeParse(payload);
+        if (!parsed.success) throw new Error("Campaign schedule response was invalid.");
+        setCampaignScheduleState({ campaignId, data: parsed.data.data, error: false });
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setCampaignScheduleState({ campaignId, data: null, error: true });
+      }
+    };
+    void loadCampaignSchedule();
+    return () => controller.abort();
+  }, [campaignScheduleRefreshIndex, selectedItem?.campaignId]);
+
   const selectedCopy = selectedItem && contentVersionState?.itemId === selectedItem.id && contentVersionState.data
     ? generatedCopy?.itemId === selectedItem.id
       ? generatedCopy
@@ -188,6 +185,19 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       }
     : null;
   const selectedCanEdit = Boolean(selectedItem && state.canManage && isContentEditable(selectedItem.status));
+  const selectedCampaignSchedule = selectedItem?.campaignId && campaignScheduleState?.campaignId === selectedItem.campaignId ? campaignScheduleState.data : null;
+  const selectedCampaignPeriod = selectedCampaignSchedule ? {
+    campaignId: selectedCampaignSchedule.campaignId,
+    startDate: campaignPeriodDraft?.campaignId === selectedCampaignSchedule.campaignId ? campaignPeriodDraft.startDate : selectedCampaignSchedule.startDate ?? "",
+    endDate: campaignPeriodDraft?.campaignId === selectedCampaignSchedule.campaignId ? campaignPeriodDraft.endDate : selectedCampaignSchedule.endDate ?? "",
+  } : null;
+  const outOfPeriodCampaignPosts = selectedCampaignSchedule && selectedCampaignPeriod
+    ? selectedCampaignSchedule.publications.filter((publication) => {
+      const localDate = getCalendarDateInTimeZone(new Date(publication.plannedAt), publication.timeZone);
+      return !localDate || localDate < selectedCampaignPeriod.startDate || localDate > selectedCampaignPeriod.endDate;
+    })
+    : [];
+  const outOfPeriodCampaignPostIds = new Set(outOfPeriodCampaignPosts.map((publication) => publication.id));
   const selectedPlatform = previewPlatform ?? selectedItem?.platform ?? null;
   const selectedPlatformTextLimit = selectedPlatform
     ? state.capabilities.find((capability) => capability.platform === selectedPlatform)?.maximumTextCharacters ?? null
@@ -227,23 +237,6 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       || (state.canReview && item.status === CONTENT_STATUS.inReview);
   }, [state.canManage, state.canReview]);
 
-  useEffect(() => {
-    const now = Date.now();
-    const activePublication = visibleItems.some((item) => item.publicationStatus === "processing" || (item.publicationStatus === "queued" && Date.parse(item.plannedAt) <= now));
-    if (activePublication) {
-      const interval = window.setInterval(() => setRefreshIndex((current) => current + 1), SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS);
-      return () => window.clearInterval(interval);
-    }
-    const nextQueuedPublicationAt = visibleItems.reduce<number | null>((nextAt, item) => {
-      const plannedAt = Date.parse(item.plannedAt);
-      return item.publicationStatus === "queued" && plannedAt > now && (nextAt === null || plannedAt < nextAt) ? plannedAt : nextAt;
-    }, null);
-    if (nextQueuedPublicationAt !== null) {
-      const timeout = window.setTimeout(() => setRefreshIndex((current) => current + 1), Math.max(1_000, nextQueuedPublicationAt - now));
-      return () => window.clearTimeout(timeout);
-    }
-  }, [visibleItems]);
-
   function changeMonth(monthDelta: number) {
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + monthDelta, 1));
     setFormOpen(false);
@@ -252,6 +245,12 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
 
   function selectCalendarItem(item: CalendarItem) {
     setSelectedItem(item);
+    setPendingCampaignPost(null);
+    setAppendCampaignPlatform(item.platform);
+    setAppendCampaignDate(toLocalDateInputValue(new Date(item.plannedAt)));
+    setAppendCampaignTime(CALENDAR.defaultPlannedTime);
+    setAppendCampaignKey("");
+    setAppendCampaignError("");
     setContentVersionState(null);
     setGeneratedCopy(null);
     setApprovalNote("");
@@ -321,12 +320,15 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
 
   const openCampaignForm = useCallback((date: Date) => {
     const dateValue = toLocalDateInputValue(date);
-    setSelectedDate(dateValue);
+    const defaultEndDate = new Date(`${dateValue}T12:00:00`);
+    defaultEndDate.setDate(defaultEndDate.getDate() + 14);
     setSelectedPlatforms(platformFilter ? [platformFilter] : [SOCIAL_PLATFORMS[0]]);
     setCampaignTitle("");
     setCampaignBrandId(brands.find((brand) => brand.isActive)?.id ?? "");
     setCampaignBrief("");
-    setCampaignSchedules({});
+    setCampaignStartDate(dateValue);
+    setCampaignEndDate(toLocalDateInputValue(defaultEndDate));
+    setCampaignPublications([]);
     setCreateStep("details");
     setCampaignIdempotencyKey(crypto.randomUUID());
     setFormOpen(true);
@@ -379,15 +381,8 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       : SOCIAL_PLATFORMS.filter((availablePlatform) => current.includes(availablePlatform) || availablePlatform === platform));
   }
 
-  function updateCampaignSchedule(platform: SocialPlatform, update: Partial<CampaignSchedule>) {
-    setCampaignSchedules((current) => ({
-      ...current,
-      [platform]: {
-        date: current[platform]?.date ?? selectedDate,
-        time: current[platform]?.time ?? CALENDAR.defaultPlannedTime,
-        ...update,
-      },
-    }));
+  function updateCampaignPublication(id: string, update: Partial<CampaignPublicationDraft>) {
+    setCampaignPublications((current) => current.map((publication) => publication.id === id ? { ...publication, ...update } : publication));
   }
 
   function continueCampaignSetup() {
@@ -397,6 +392,22 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setCampaignFormError(t("selectAtLeastOneChannel"));
       return;
     }
+    if (!campaignStartDate || !campaignEndDate || campaignEndDate < campaignStartDate) {
+      setCampaignFormError(t("invalidCampaignPeriod"));
+      return;
+    }
+    setCampaignPublications((current) => {
+      const supported = current.filter((publication) => selectedPlatforms.includes(publication.platform)).map((publication) => ({
+        ...publication,
+        date: publication.date < campaignStartDate ? campaignStartDate : publication.date > campaignEndDate ? campaignEndDate : publication.date,
+      }));
+      for (const platform of selectedPlatforms) {
+        if (!supported.some((publication) => publication.platform === platform)) {
+          supported.push({ id: crypto.randomUUID(), platform, date: campaignStartDate, time: CALENDAR.defaultPlannedTime });
+        }
+      }
+      return supported;
+    });
     setCampaignFormError("");
     setCreateStep("schedule");
   }
@@ -404,10 +415,10 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const publications = selectedPlatforms.map((platform) => {
-      const schedule = campaignSchedules[platform] ?? { date: selectedDate, time: CALENDAR.defaultPlannedTime };
-      return { platform, schedule, localDateTime: new Date(`${schedule.date}T${schedule.time}`) };
-    });
+    const publications = campaignPublications.map((publication) => ({
+      ...publication,
+      localDateTime: new Date(`${publication.date}T${publication.time}`),
+    }));
     if (publications.length === 0 || publications.some((publication) => Number.isNaN(publication.localDateTime.getTime())) || !timeZone) {
       setCampaignFormError(t("createError"));
       return;
@@ -417,6 +428,8 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       idempotencyKey: campaignIdempotencyKey,
       title: campaignTitle,
       brief: campaignBrief,
+      startDate: campaignStartDate,
+      endDate: campaignEndDate,
       publications: publications.map(({ platform, localDateTime }) => ({ platform, plannedAt: localDateTime.toISOString(), timeZone })),
     });
     if (!request.success) {
@@ -446,17 +459,16 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setCampaignIdempotencyKey("");
       showFeedback("success", t("campaignCreated", { count: publications.length }));
       const firstPublication = parsed.data.data.publications[0];
-      const firstSchedule = publications[0];
-      if (firstPublication && firstSchedule) {
+      if (firstPublication) {
         setCampaignNextStep({
           itemId: firstPublication.id,
           brandId: campaignBrandId,
           platform: firstPublication.platform,
-          plannedAt: firstSchedule.localDateTime.toISOString(),
+          plannedAt: firstPublication.plannedAt,
         });
       }
       setCreateStep("details");
-      setRefreshIndex((current) => current + 1);
+      refreshCalendar();
     } catch {
       setCampaignFormError(t("createError"));
     } finally {
@@ -497,15 +509,122 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
         setContentRefreshIndex((current) => current + 1);
         return;
       }
+      if (response.status === 422) {
+        const errorPayload: unknown = await response.json().catch(() => null);
+        const parsedError = z.object({ code: z.string() }).safeParse(errorPayload);
+        if (parsedError.success && parsedError.data.code === API_ERROR_CODES.campaignScheduleOutsidePeriod) {
+          setStatusNotice(t("campaignPostOutsidePeriod"));
+          return;
+        }
+      }
       if (!response.ok) throw new Error("Calendar content could not be saved.");
-      setSelectedItem(null);
-      setEditorDirty(false);
-      setDiscardChangesPrompt(false);
       setContentReview(null);
+      const nextCampaignPost = pendingCampaignPost;
+      if (nextCampaignPost) {
+        selectCalendarItem(nextCampaignPost);
+      } else {
+        setSelectedItem(null);
+        setEditorDirty(false);
+        setDiscardChangesPrompt(false);
+      }
       showFeedback("success", t("contentSaved"));
-      setRefreshIndex((current) => current + 1);
+      refreshCalendar();
     } catch {
       setStatusNotice(t("contentSaveError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function appendCampaignPost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedItem?.campaignId) return;
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const plannedAt = new Date(`${appendCampaignDate}T${appendCampaignTime}`);
+    if (Number.isNaN(plannedAt.getTime()) || !timeZone) {
+      setAppendCampaignError(t("campaignAddPostError"));
+      return;
+    }
+    const idempotencyKey = appendCampaignKey || crypto.randomUUID();
+    setAppendCampaignKey(idempotencyKey);
+    setBusy(true);
+    setAppendCampaignError("");
+    try {
+      const response = await fetch(CAMPAIGN_API_PATHS.publications(selectedItem.campaignId), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idempotencyKey, platform: appendCampaignPlatform, plannedAt: plannedAt.toISOString(), timeZone }),
+      });
+      if (response.status === 422) {
+        const payload: unknown = await response.json().catch(() => null);
+        const parsed = z.object({ code: z.string() }).safeParse(payload);
+        if (parsed.success && parsed.data.code === API_ERROR_CODES.campaignScheduleOutsidePeriod) {
+          setAppendCampaignError(t("campaignPostOutsidePeriod"));
+          return;
+        }
+      }
+      if (response.status === 409) {
+        const payload: unknown = await response.json().catch(() => null);
+        const parsed = z.object({ code: z.string() }).safeParse(payload);
+        if (parsed.success && parsed.data.code === API_ERROR_CODES.campaignPublicationLimitReached) {
+          setAppendCampaignError(t("campaignPublicationLimitReached"));
+          return;
+        }
+      }
+      if (!response.ok) throw new Error("Campaign publication could not be added.");
+      setAppendCampaignKey("");
+      setAppendCampaignDate("");
+      setAppendCampaignTime(CALENDAR.defaultPlannedTime);
+      showFeedback("success", t("campaignAddPostSuccess"));
+      setCampaignScheduleRefreshIndex((current) => current + 1);
+      refreshCalendar();
+    } catch {
+      setAppendCampaignError(t("campaignAddPostError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCampaignPeriod(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const campaignId = selectedItem?.campaignId;
+    if (!campaignId || !selectedCampaignPeriod) return;
+    const request = calendarCampaignPeriodUpdateSchema.safeParse(selectedCampaignPeriod);
+    if (!request.success) {
+      setCampaignPeriodError(t("invalidCampaignPeriod"));
+      return;
+    }
+    setBusy(true);
+    setCampaignPeriodError("");
+    try {
+      const response = await fetch(CAMPAIGN_API_PATHS.detail(campaignId), {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request.data),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (response.status === 409) {
+        const parsed = z.object({ code: z.string() }).safeParse(payload);
+        if (parsed.success && parsed.data.code === API_ERROR_CODES.campaignPeriodConflict) {
+          setCampaignPeriodError(t("campaignPeriodConflict"));
+          return;
+        }
+      }
+      if (!response.ok) throw new Error("Campaign period could not be updated.");
+      setCampaignPeriodDraft(null);
+      setSelectedItem((current) => current?.campaignId === campaignId
+        ? { ...current, campaignStartDate: request.data.startDate, campaignEndDate: request.data.endDate }
+        : current);
+      setCampaignScheduleState((current) => current?.campaignId === campaignId && current.data
+        ? { ...current, data: { ...current.data, startDate: request.data.startDate, endDate: request.data.endDate } }
+        : current);
+      setCampaignScheduleRefreshIndex((current) => current + 1);
+      refreshCalendar();
+      showFeedback("success", t("campaignPeriodUpdated"));
+    } catch {
+      setCampaignPeriodError(t("campaignPeriodUpdateError"));
     } finally {
       setBusy(false);
     }
@@ -563,7 +682,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
               : t("approvalConflict");
         setApprovalMessage(knownMessage);
         setContentRefreshIndex((current) => current + 1);
-        setRefreshIndex((current) => current + 1);
+        refreshCalendar();
         return;
       }
       if (!response.ok || !parsed.success) throw new Error("Content approval action failed.");
@@ -571,7 +690,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setApprovalNote("");
       setApprovalMessage(action === CONTENT_APPROVAL_ACTION.submit ? t("approvalSubmitted") : parsed.data.data.kind === "partial" ? t("approvalProgress", { approved: parsed.data.data.approvedCount ?? 0, required: parsed.data.data.requiredApprovals ?? 0 }) : t("approvalDecisionSaved"));
       setContentRefreshIndex((current) => current + 1);
-      setRefreshIndex((current) => current + 1);
+      refreshCalendar();
     } catch {
       setApprovalMessage(t("approvalActionError"));
     } finally {
@@ -608,7 +727,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
         setStatusNotice(t("publicationReconciliationConflict"));
         setSelectedItem(null);
         setContentVersionState(null);
-        setRefreshIndex((current) => current + 1);
+        refreshCalendar();
         return;
       }
       if (!response.ok || !parsed.success) throw new Error("Publication reconciliation failed.");
@@ -616,7 +735,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       setStatusNotice(t(noticeKey));
       setSelectedItem(null);
       setContentVersionState(null);
-      setRefreshIndex((current) => current + 1);
+      refreshCalendar();
     } catch {
       setPublicationReconciliationMessage(t("publicationReconciliationError"));
     } finally {
@@ -688,6 +807,12 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                   {brands.filter((brand) => brand.isActive).map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
                 </SelectField>
                 <TextAreaField id={CALENDAR_UI_IDS.campaignBrief} name="brief" label={t("campaignBrief")} value={campaignBrief} onChange={(event) => setCampaignBrief(event.target.value)} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
+                <fieldset className="editorialCalendar__campaignPeriod">
+                  <legend>{t("campaignPeriod")}</legend>
+                  <DateField id={CAMPAIGN_FORM_FIELDS.startDate} label={t("campaignStartDate")} value={campaignStartDate} onValueChange={(value) => { setCampaignStartDate(value); if (campaignEndDate && value > campaignEndDate) setCampaignEndDate(value); }} required />
+                  <DateField id={CAMPAIGN_FORM_FIELDS.endDate} label={t("campaignEndDate")} value={campaignEndDate} min={campaignStartDate} onValueChange={setCampaignEndDate} required />
+                  <p>{t("campaignPeriodHelp")}</p>
+                </fieldset>
                 <fieldset className="editorialCalendar__platformPicker">
                   <legend>{t("selectChannels")}</legend>
                   <div>{SOCIAL_PLATFORMS.map((platform) => {
@@ -703,20 +828,28 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
               </> : <>
                 <section className="editorialCalendar__wizardStep" aria-labelledby="campaign-schedule-step-title">
                   <div><h3 id="campaign-schedule-step-title">{t("scheduleStepTitle")}</h3><p>{t("scheduleStepDescription")}</p></div>
+                  <div className="editorialCalendar__campaignPeriodSummary">
+                    <strong>{t("campaignPeriod")}</strong>
+                    <span>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${campaignStartDate}T12:00:00Z`))} – {new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${campaignEndDate}T12:00:00Z`))}</span>
+                  </div>
                   <div className="editorialCalendar__publicationSchedules">
-                    {selectedPlatforms.map((platform) => <fieldset className="editorialCalendar__publicationSchedule" key={platform}>
-                      <legend>{t("channelSchedule", { platform: t(`platforms.${platform}`) })}</legend>
-                      <DateField id={CAMPAIGN_FORM_FIELDS.publicationDate(platform)} label={t("date")} value={campaignSchedules[platform]?.date ?? selectedDate} onValueChange={(date) => updateCampaignSchedule(platform, { date })} required />
-                      <TimeField id={CAMPAIGN_FORM_FIELDS.publicationTime(platform)} label={t("time")} value={campaignSchedules[platform]?.time ?? CALENDAR.defaultPlannedTime} onValueChange={(time) => updateCampaignSchedule(platform, { time })} required />
+                    {campaignPublications.map((publication, index) => <fieldset className="editorialCalendar__publicationSchedule" key={publication.id}>
+                      <legend>{t("campaignPostNumber", { number: index + 1 })}</legend>
+                      <SelectField id={CAMPAIGN_FORM_FIELDS.publicationPlatform(index)} label={t("channel")} value={publication.platform} onChange={(event) => updateCampaignPublication(publication.id, { platform: SOCIAL_PLATFORMS.find((platform) => platform === event.target.value) ?? publication.platform })} required>
+                        {selectedPlatforms.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
+                      </SelectField>
+                      <DateField id={CAMPAIGN_FORM_FIELDS.publicationDate(index)} label={t("date")} value={publication.date} min={campaignStartDate} max={campaignEndDate} onValueChange={(date) => updateCampaignPublication(publication.id, { date })} required />
+                      <TimeField id={CAMPAIGN_FORM_FIELDS.publicationTime(index)} label={t("time")} value={publication.time} onValueChange={(time) => updateCampaignPublication(publication.id, { time })} required />
+                      <Button appearance="quiet" className="editorialCalendar__removePublication" type="button" aria-label={t("removeCampaignPost", { number: index + 1 })} disabled={campaignPublications.length <= 1} onClick={() => setCampaignPublications((current) => current.filter((item) => item.id !== publication.id))}><Trash2 aria-hidden="true" size={16} />{t("removePost")}</Button>
                     </fieldset>)}
                   </div>
+                  <Button appearance="quiet" type="button" className="editorialCalendar__addPublication" disabled={campaignPublications.length >= CONTENT_LIMITS.maximumCampaignPublications} onClick={() => setCampaignPublications((current) => [...current, { id: crypto.randomUUID(), platform: selectedPlatforms[0] ?? SOCIAL_PLATFORMS[0], date: campaignStartDate, time: CALENDAR.defaultPlannedTime }])}><Plus aria-hidden="true" size={17} />{t("addCampaignPost")}</Button>
                   <section className="editorialCalendar__campaignSummary" aria-label={t("campaignSummary")}>
                     <h3>{t("campaignSummary")}</h3>
                     <p><strong>{campaignTitle}</strong><span>{brands.find((brand) => brand.id === campaignBrandId)?.name ?? ""}</span></p>
-                    <ul>{selectedPlatforms.map((platform) => {
-                      const schedule = campaignSchedules[platform] ?? { date: selectedDate, time: CALENDAR.defaultPlannedTime };
-                      const scheduledDate = new Date(`${schedule.date}T${schedule.time}`);
-                      return <li key={platform}><strong>{t(`platforms.${platform}`)}</strong><span>{Number.isNaN(scheduledDate.getTime()) ? t("scheduleIncomplete") : new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(scheduledDate)}</span></li>;
+                    <ul>{campaignPublications.map((publication, index) => {
+                      const scheduledDate = new Date(`${publication.date}T${publication.time}`);
+                      return <li key={publication.id}><strong>{t("campaignPostSummary", { number: index + 1, platform: t(`platforms.${publication.platform}`) })}</strong><span>{Number.isNaN(scheduledDate.getTime()) ? t("scheduleIncomplete") : new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(scheduledDate)}</span></li>;
                     })}</ul>
                     <small>{t("localTime")}</small>
                   </section>
@@ -772,7 +905,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
         setCampaignNextStep(null);
       }}>{t("editFirstCampaignPost")}</Button></div> : null}</div> : null}
       {pending ? <p className="workspaceEmpty" role="status">{t("loading")}</p> : null}
-      {hasError ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("loadError")}</span><Button appearance="quiet" type="button" onClick={() => setRefreshIndex((current) => current + 1)}>{t("retry")}</Button></div> : null}
+      {hasError ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("loadError")}</span><Button appearance="quiet" type="button" onClick={refreshCalendar}>{t("retry")}</Button></div> : null}
       {viewMode === CALENDAR_VIEW_MODE.month && !pending && !hasError && visibleItems.length === 0 ? <p className="editorialCalendar__emptyMonth">{t("emptyMonth")}</p> : null}
       {!pending && state.truncated ? <p className="editorialCalendar__notice" role="status">{t("truncated")}</p> : null}
 
@@ -792,8 +925,82 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy && !generatingCopy) { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } } }}>
         {selectedItem ? <DialogContent aria-labelledby={CALENDAR_UI_IDS.editTitle} aria-describedby={CALENDAR_UI_IDS.editDescription}>
           <DialogHeader><DialogTitle id={CALENDAR_UI_IDS.editTitle}>{selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed" ? t("reconciliationTitle") : selectedCanReview ? t("reviewTitle") : t("editTitle")}</DialogTitle><DialogDescription id={CALENDAR_UI_IDS.editDescription}>{selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed" ? t("reconciliationDescription") : selectedCanReview ? t("reviewDescription") : t("editDescription")}</DialogDescription></DialogHeader>
+          {selectedItem.campaignId ? <Disclosure title={t("campaignScheduleTitle")} className="editorialCalendar__campaignAppend">
+            {campaignScheduleState?.campaignId !== selectedItem.campaignId ? <p role="status">{t("loadingContent")}</p> : campaignScheduleState.error || !campaignScheduleState.data ? <div role="alert"><p>{t("campaignScheduleLoadError")}</p><Button appearance="quiet" type="button" onClick={() => setCampaignScheduleRefreshIndex((current) => current + 1)}>{t("retry")}</Button></div> : <section aria-label={t("campaignScheduleTitle")}>
+              <h3>{campaignScheduleState.data.title}</h3>
+              {campaignScheduleState.data.startDate && campaignScheduleState.data.endDate ? <p>{t("campaignPeriodTag", {
+                start: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${campaignScheduleState.data.startDate}T12:00:00Z`)),
+                end: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${campaignScheduleState.data.endDate}T12:00:00Z`)),
+              })}</p> : null}
+              {state.canManage && selectedCampaignPeriod ? <form className="editorialCalendar__campaignPeriodForm" onSubmit={(event) => void saveCampaignPeriod(event)}>
+                <div className="editorialCalendar__campaignPeriodFields">
+                  <DateField id="calendar-campaign-period-start" label={t("campaignStartDate")} value={selectedCampaignPeriod.startDate} disabled={busy || editorDirty} required onValueChange={(value) => { setCampaignPeriodDraft({ campaignId: selectedCampaignPeriod.campaignId, startDate: value, endDate: selectedCampaignPeriod.endDate }); setCampaignPeriodError(""); }} />
+                  <DateField id="calendar-campaign-period-end" label={t("campaignEndDate")} value={selectedCampaignPeriod.endDate} min={selectedCampaignPeriod.startDate} disabled={busy || editorDirty} required onValueChange={(value) => { setCampaignPeriodDraft({ campaignId: selectedCampaignPeriod.campaignId, startDate: selectedCampaignPeriod.startDate, endDate: value }); setCampaignPeriodError(""); }} />
+                </div>
+                {editorDirty ? <p>{t("savePostBeforeCampaignPeriod")}</p> : null}
+                {campaignPeriodError ? <p className="editorialCalendar__notice" role="alert">{campaignPeriodError}</p> : null}
+                {outOfPeriodCampaignPosts.length > 0 ? <p className="editorialCalendar__notice" role="status">{t("campaignPeriodPreviewConflict", { count: outOfPeriodCampaignPosts.length })}</p> : null}
+                <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy || editorDirty || outOfPeriodCampaignPosts.length > 0 || selectedCampaignPeriod.endDate < selectedCampaignPeriod.startDate || (selectedCampaignPeriod.startDate === selectedCampaignSchedule?.startDate && selectedCampaignPeriod.endDate === selectedCampaignSchedule?.endDate)}>{busy ? t("saving") : t("saveCampaignPeriod")}</Button></div>
+              </form> : null}
+              <ol className="editorialCalendar__campaignPosts">{campaignScheduleState.data.publications.map((publication) => <li key={publication.id}>
+                <Button appearance="quiet" className={`editorialCalendar__campaignPostLink${outOfPeriodCampaignPostIds.has(publication.id) ? " is-outside-period" : ""}`} type="button" aria-current={publication.id === selectedItem.id ? "true" : undefined} disabled={publication.id === selectedItem.id || busy || generatingCopy} onClick={() => {
+                  const nextPost = {
+                    ...selectedItem,
+                    id: publication.id,
+                    title: publication.title,
+                    platform: publication.platform,
+                    status: publication.status,
+                    publicationStatus: publication.publicationStatus,
+                    plannedAt: publication.plannedAt,
+                    timeZone: publication.timeZone,
+                    createdAt: publication.createdAt,
+                  };
+                  if (editorDirty) {
+                    setPendingCampaignPost(nextPost);
+                    setDiscardChangesPrompt(true);
+                  } else {
+                    selectCalendarItem(nextPost);
+                  }
+                }}>
+                  <span><SocialPlatformIcon platform={publication.platform} aria-hidden="true" />{t(`platforms.${publication.platform}`)}</span>
+                  <span>{publication.title}</span>
+                  <time dateTime={publication.plannedAt}>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: publication.timeZone }).format(new Date(publication.plannedAt))}</time>
+                  <span className="editorialCalendar__campaignPostStatuses"><span className="editorialCalendar__status">{t(`statuses.${publication.status}`)}</span>{publication.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${publication.publicationStatus}`)}</span> : null}</span>
+                  {outOfPeriodCampaignPostIds.has(publication.id) ? <span className="editorialCalendar__campaignPostWarning">{t("outsideCampaignPeriod")}</span> : null}
+                  {publication.id === selectedItem.id ? <span className="editorialCalendar__campaignPostCurrent">{t("currentCampaignPost")}</span> : null}
+                </Button>
+              </li>)}</ol>
+            </section>}
+            {selectedCanEdit ? <>
+            <h3>{t("campaignAddPostTitle")}</h3>
+            <p>{t("campaignAddPostDescription", { start: selectedItem.campaignStartDate ?? "", end: selectedItem.campaignEndDate ?? "" })}</p>
+            {appendCampaignError ? <p className="editorialCalendar__notice" role="alert">{appendCampaignError}</p> : null}
+            <form className="editorialCalendar__editForm" onSubmit={(event) => void appendCampaignPost(event)}>
+              <SelectField id="calendar-campaign-add-platform" label={t("channel")} value={appendCampaignPlatform} onChange={(event) => { const value = SOCIAL_PLATFORMS.find((platform) => platform === event.target.value); if (value) setAppendCampaignPlatform(value); }} disabled={busy} required>
+                {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
+              </SelectField>
+              <DateField id="calendar-campaign-add-date" label={t("date")} value={appendCampaignDate} min={selectedItem.campaignStartDate ?? undefined} max={selectedItem.campaignEndDate ?? undefined} onValueChange={setAppendCampaignDate} disabled={busy} required />
+              <TimeField id="calendar-campaign-add-time" label={t("time")} value={appendCampaignTime} onValueChange={setAppendCampaignTime} disabled={busy} required />
+              <div className="editorialCalendar__formActions"><Button type="submit" disabled={busy}>{busy ? t("saving") : t("campaignAddPost")}</Button></div>
+            </form>
+            </> : null}
+          </Disclosure> : null}
           {editorDirty ? <p className="editorialCalendar__notice" role="status">{t("unsavedChanges")}</p> : null}
-          {discardChangesPrompt ? <section className="editorialCalendar__notice" role="alert"><p>{t("discardChangesPrompt")}</p><div className="editorialCalendar__formActions"><Button appearance="quiet" type="button" onClick={() => setDiscardChangesPrompt(false)}>{t("keepEditing")}</Button><Button appearance="danger" type="button" onClick={() => { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); setEditorDirty(false); setDiscardChangesPrompt(false); }}>{t("discardChanges")}</Button></div></section> : null}
+          {discardChangesPrompt ? <section className="editorialCalendar__notice" role="alert"><p>{pendingCampaignPost ? t("campaignPostSwitchPrompt") : t("discardChangesPrompt")}</p><div className="editorialCalendar__formActions editorialCalendar__switchActions"><Button appearance="quiet" type="button" disabled={busy} onClick={() => { setDiscardChangesPrompt(false); setPendingCampaignPost(null); }}>{t("keepEditing")}</Button>{pendingCampaignPost ? <Button appearance="quiet" type="button" disabled={busy} onClick={() => {
+            const form = document.getElementById(`calendar-edit-content-${selectedItem.id}`);
+            if (form instanceof HTMLFormElement) form.requestSubmit();
+          }}>{t("saveAndSwitchPost")}</Button> : null}<Button appearance="danger" type="button" disabled={busy} onClick={() => {
+            if (pendingCampaignPost) {
+              selectCalendarItem(pendingCampaignPost);
+              return;
+            }
+            setSelectedItem(null);
+            setContentVersionState(null);
+            setGeneratedCopy(null);
+            setApprovalNote("");
+            setEditorDirty(false);
+            setDiscardChangesPrompt(false);
+          }}>{pendingCampaignPost ? t("discardAndSwitchPost") : t("discardChanges")}</Button></div></section> : null}
           {selectedItem.publicationStatus === "indeterminate" ? <p className="editorialCalendar__notice" role="alert">{t("publicationOutcomeUnknown")}</p> : null}
           {selectedItem.publicationStatus === "failed" ? <p className="editorialCalendar__notice" role="status">{t("publicationKnownFailed")}</p> : null}
           {selectedItem.publicationStatus === "processing" ? <p className="editorialCalendar__notice" role="status">{t("publicationInProgress")}</p> : null}
@@ -812,7 +1019,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
             {publicationReconciliationMessage ? <p className="editorialCalendar__notice" role="status">{publicationReconciliationMessage}</p> : null}
             <div className="editorialCalendar__formActions"><Button type="button" disabled={busy || reconciliationEvidence.trim().length < SOCIAL_PUBLICATION_RECONCILIATION_LIMITS.minimumEvidenceCharacters || (reconciliationOutcome === "published" && !externalPostId.trim()) || (reconciliationOutcome === "retry" && !confirmedNoPost)} onClick={() => void applyPublicationReconciliation()}>{busy ? t("saving") : t(reconciliationOutcome === "retry" ? "confirmAndRetryPublication" : "resolvePublication")}</Button></div>
           </section> : null}
-          {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form className="editorialCalendar__editForm" onSubmit={(event) => selectedCanEdit ? void saveContentVersion(event) : event.preventDefault()} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
+          {contentVersionState?.itemId !== selectedItem.id ? <p className="workspaceEmpty" role="status">{t("loadingContent")}</p> : contentVersionState.error ? <div className="workspaceEmpty editorialCalendar__error" role="alert"><span>{t("contentLoadError")}</span><Button appearance="quiet" type="button" onClick={() => { setContentVersionState(null); setContentRefreshIndex((current) => current + 1); }}>{t("retry")}</Button></div> : contentVersionState.data ? <form id={`calendar-edit-content-${selectedItem.id}`} className="editorialCalendar__editForm" onSubmit={(event) => selectedCanEdit ? void saveContentVersion(event) : event.preventDefault()} key={`${selectedItem.id}-${contentVersionState.data.current?.versionNumber ?? 0}`}>
             <TextField id="calendar-edit-idea-title" name="title" label={t("ideaTitle")} defaultValue={selectedItem.title} maxLength={CONTENT_LIMITS.titleCharacters} readOnly={!selectedCanEdit} required onChange={() => setEditorDirty(true)} />
             <SelectField id="calendar-edit-idea-brand" name={CALENDAR_FORM_FIELDS.brandId} label={t("brand")} defaultValue={selectedItem.brandId} disabled={Boolean(selectedItem.campaignId) || !selectedCanEdit} onChange={() => setEditorDirty(true)} required>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
@@ -820,7 +1027,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
             <SelectField id="calendar-edit-idea-platform" name={CALENDAR_FORM_FIELDS.platform} label={t("channel")} defaultValue={selectedItem.platform} onChange={(event) => { setPreviewPlatform(SOCIAL_PLATFORMS.find((platform) => platform === event.target.value) ?? selectedItem.platform); setEditorDirty(true); }} disabled={Boolean(selectedItem.campaignId) || !selectedCanEdit} required>
               {SOCIAL_PLATFORMS.map((platform) => <option key={platform} value={platform}>{t(`platforms.${platform}`)}</option>)}
             </SelectField>
-            <DateField id="calendar-edit-idea-date" name="date" label={t("date")} defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} disabled={!selectedCanEdit} required onValueChange={() => setEditorDirty(true)} />
+            <DateField id="calendar-edit-idea-date" name="date" label={t("date")} defaultValue={toLocalDateInputValue(new Date(selectedItem.plannedAt))} min={selectedItem.campaignStartDate ?? undefined} max={selectedItem.campaignEndDate ?? undefined} disabled={!selectedCanEdit} required onValueChange={() => setEditorDirty(true)} />
             <TimeField id="calendar-edit-idea-time" name="time" label={t("time")} defaultValue={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(selectedItem.plannedAt))} disabled={!selectedCanEdit} required onValueChange={() => setEditorDirty(true)} />
             <div className="editorialCalendar__generationAction">
               <Button appearance="quiet" type="button" disabled={!selectedCanEdit || busy || generatingCopy} onClick={(event) => void generateCopyDraft(event)}>

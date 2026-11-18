@@ -62,6 +62,8 @@ export const campaigns = pgTable(
     brandId: uuid("brand_id").notNull(),
     title: text("title").notNull(),
     brief: text("brief").notNull(),
+    startDate: date("start_date", { mode: "string" }),
+    endDate: date("end_date", { mode: "string" }),
     idempotencyKey: uuid("idempotency_key"),
     requestFingerprint: text("request_fingerprint"),
     createdBy: text("created_by").notNull().references(() => user.id, { onDelete: "restrict" }),
@@ -69,6 +71,7 @@ export const campaigns = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (table) => [
+    check("campaigns_period_check", sql`${table.startDate} is null or ${table.endDate} is null or ${table.endDate} >= ${table.startDate}`),
     foreignKey({ name: "campaigns_org_brand_fk", columns: [table.organizationId, table.brandId], foreignColumns: [brands.organizationId, brands.id] }).onDelete("cascade"),
     unique("campaigns_org_id_brand_unique").on(table.organizationId, table.id, table.brandId),
     uniqueIndex("campaigns_org_creator_idempotency_unique").on(table.organizationId, table.createdBy, table.idempotencyKey),
