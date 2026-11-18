@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { CONTENT_APPROVAL_POLICY, CONTENT_APPROVAL_POLICY_API_PATHS } from "@/lib/constants";
 import type { BrandListItem } from "@/lib/validation/brands";
 
@@ -13,38 +14,39 @@ const APPROVAL_OPTIONS = Array.from({ length: CONTENT_APPROVAL_POLICY.maximumReq
 
 export function ApprovalPolicySettings({ brands }: { brands: BrandListItem[] }) {
   const t = useTranslations("approvalPolicy");
+  const showFeedback = useSystemFeedback();
   const [policy, setPolicy] = useState(INITIAL_POLICY);
   const [scope, setScope] = useState("");
   const [value, setValue] = useState(String(INITIAL_POLICY.defaultRequiredApprovals));
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [hasLoadError, setHasLoadError] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { credentials: "same-origin", cache: "no-store", signal: controller.signal })
-      .then(async (response) => { if (!response.ok) throw new Error(); const result = await response.json() as { data: PolicyData }; setPolicy(result.data); setValue(String(result.data.defaultRequiredApprovals)); })
-      .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setMessage(t("loadError")); });
+      .then(async (response) => { if (!response.ok) throw new Error(); const result = await response.json() as { data: PolicyData }; setPolicy(result.data); setValue(String(result.data.defaultRequiredApprovals)); setHasLoadError(false); })
+      .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setHasLoadError(true); });
     return () => controller.abort();
   }, [t]);
 
   async function save(brandId: string | null) {
-    setBusy(true); setMessage("");
+    setBusy(true);
     try {
       const response = await fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brandId, requiredApprovals: Number(value) }) });
       if (!response.ok) throw new Error();
       const result = await response.json() as { data: PolicyData };
-      setPolicy(result.data); setMessage(t("saved"));
-    } catch { setMessage(t("saveError")); } finally { setBusy(false); }
+      setPolicy(result.data); showFeedback("success", t("saved"));
+    } catch { showFeedback("error", t("saveError")); } finally { setBusy(false); }
   }
 
   async function reset(brandId: string) {
-    setBusy(true); setMessage("");
+    setBusy(true);
     try {
       const response = await fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { method: "DELETE", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brandId }) });
       if (!response.ok) throw new Error();
       const result = await response.json() as { data: PolicyData };
-      setPolicy(result.data); setMessage(t("saved"));
-    } catch { setMessage(t("saveError")); } finally { setBusy(false); }
+      setPolicy(result.data); showFeedback("success", t("saved"));
+    } catch { showFeedback("error", t("saveError")); } finally { setBusy(false); }
   }
 
   const selectedBrandId = scope || null;
@@ -64,6 +66,6 @@ export function ApprovalPolicySettings({ brands }: { brands: BrandListItem[] }) 
       <Button type="button" disabled={busy} onClick={() => void save(selectedBrandId)}>{t("save")}</Button>
     </div>
     <ul>{policy.brandOverrides.map((override) => <li key={override.brandId} className="teamCollection__actions"><span>{t("overrideSummary", { brand: override.brandName, count: override.requiredApprovals })}</span><Button appearance="quiet" type="button" disabled={busy} onClick={() => void reset(override.brandId)}>{t("reset")}</Button></li>)}</ul>
-    {message ? <p role="status">{message}</p> : null}
+    {hasLoadError ? <p role="alert">{t("loadError")}</p> : null}
   </section>;
 }

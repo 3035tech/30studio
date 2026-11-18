@@ -215,3 +215,9 @@ The live browser became unavailable during the latest audit pass, so these are d
 - Extended the tenant-scoped notification history with successful publication events and approval outcomes (approved, rejected, or changes requested). Each event includes its brand and channel where available and links to the relevant calendar or approvals area.
 - Added a Drizzle migration that only appends enum values; existing notification rows and read states remain intact. Portuguese and English catalogs include matching copy, and rejected approvals receive error styling.
 - Source-level checks cover the new event contracts. This does not replace visual confirmation in Chrome or live rollout confirmation in Argo; both were unavailable during this pass.
+
+## Settings feedback consistency — 2026-11-17
+
+- Password change, password recovery request, workspace-name save, and approval-policy save/reset now use the shared success/error toast, matching the rest of the workspace mutation feedback.
+- Password validation stays beside the relevant field, and settings load failures stay in their screen with retry where available; those messages need local context and recovery actions.
+- Typecheck, focused lint, unit tests, and diff checks passed. Browser rendering of the toast remains unverified in Chrome.

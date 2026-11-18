@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { PasswordField } from "@/components/ui/field";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { authClient } from "@/lib/client/auth";
 import { AUTH_LIMITS, EMAIL_ROUTES, WORKSPACE_SECTION_IDS, type Locale } from "@/lib/constants";
 import { WorkspaceNameSettings } from "@/components/workspace/workspace-name-settings";
@@ -12,9 +13,8 @@ export function AccountProfile({ email }: { email: string }) {
   const locale = useLocale() as Locale;
   const t = useTranslations("accountProfile");
   const tAuth = useTranslations("auth");
+  const showFeedback = useSystemFeedback();
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
   const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [activeTab, setActiveTab] = useState<"account" | "workspace">("account");
 
@@ -34,7 +34,6 @@ export function AccountProfile({ email }: { email: string }) {
     const newPassword = String(form.get("newPassword") ?? "");
     const confirmation = String(form.get("confirmPassword") ?? "");
     setBusy(true);
-    setMessage("");
     if (newPassword !== confirmation) {
       setPasswordMismatch(true);
       setBusy(false);
@@ -45,11 +44,9 @@ export function AccountProfile({ email }: { email: string }) {
       const result = await authClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true });
       if (result.error) throw new Error();
       formElement.reset();
-      setMessage(t("passwordChanged"));
-      setIsError(false);
+      showFeedback("success", t("passwordChanged"));
     } catch {
-      setMessage(t("passwordChangeError"));
-      setIsError(true);
+      showFeedback("error", t("passwordChangeError"));
     } finally {
       setBusy(false);
     }
@@ -57,18 +54,15 @@ export function AccountProfile({ email }: { email: string }) {
 
   async function requestReset() {
     setBusy(true);
-    setMessage("");
     try {
       const result = await authClient.requestPasswordReset({
         email,
         redirectTo: `${window.location.origin}${EMAIL_ROUTES.passwordReset(locale)}`,
       });
       if (result.error) throw new Error();
-      setMessage(t("recoverySent"));
-      setIsError(false);
+      showFeedback("success", t("recoverySent"));
     } catch {
-      setMessage(tAuth("genericError"));
-      setIsError(true);
+      showFeedback("error", tAuth("genericError"));
     } finally {
       setBusy(false);
     }
@@ -97,9 +91,8 @@ export function AccountProfile({ email }: { email: string }) {
         <form className="entryForm accountProfile__form" onSubmit={(event) => void changePassword(event)}>
           <h2>{t("changePassword")}</h2>
           <PasswordField id="current-password" name="currentPassword" label={t("currentPassword")} autoComplete="current-password" required />
-          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} onInput={(event) => { setMessage(""); validatePasswordConfirmation(event.currentTarget.form); }} required />
-          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} error={passwordMismatch ? tAuth("passwordMismatch") : undefined} onInput={(event) => { setMessage(""); validatePasswordConfirmation(event.currentTarget.form); }} required />
-          {message ? <p className={isError ? "entryMessage entryMessage--error" : "entryMessage"} role={isError ? "alert" : "status"}>{message}</p> : null}
+          <PasswordField id="new-password" name="newPassword" label={tAuth("newPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} helpText={tAuth("passwordMinimum", { count: AUTH_LIMITS.passwordCharacters })} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
+          <PasswordField id="confirm-password" name="confirmPassword" label={tAuth("confirmPassword")} autoComplete="new-password" minLength={AUTH_LIMITS.passwordCharacters} error={passwordMismatch ? tAuth("passwordMismatch") : undefined} onInput={(event) => validatePasswordConfirmation(event.currentTarget.form)} required />
           <Button type="submit" disabled={busy}>{busy ? tAuth("working") : t("changePassword")}</Button>
           <Button appearance="quiet" type="button" disabled={busy} onClick={() => void requestReset()}>{t("sendRecovery")}</Button>
         </form>
