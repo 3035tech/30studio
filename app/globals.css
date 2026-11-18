@@ -396,12 +396,14 @@
 .editorialCalendar__listItem span { color: var(--studio-muted); font-size: var(--type-micro); }
 .editorialCalendar__listItem:disabled { cursor: default; }
 .studioDialog__overlay { position: fixed; z-index: 60; inset: 0; background: rgb(11 27 59 / 58%); backdrop-filter: blur(3px); }
-.studioDialog__content { position: fixed; z-index: 61; top: 50%; left: 50%; width: min(520px, calc(100vw - 32px)); max-height: min(90dvh, 760px); overflow-y: auto; transform: translate(-50%, -50%); padding: 24px; border: 1px solid var(--studio-border); border-radius: 14px; background: var(--studio-surface-raised); box-shadow: 0 24px 80px rgb(11 27 59 / 22%); }
+.studioDialog__content { --studio-dialog-padding: 24px; position: fixed; z-index: 61; top: 50%; left: 50%; width: min(520px, calc(100vw - 32px)); max-height: min(90dvh, 760px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)); overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: var(--studio-dialog-padding); transform: translate(-50%, -50%); padding: var(--studio-dialog-padding); border: 1px solid var(--studio-border); border-radius: 14px; background: var(--studio-surface-raised); box-shadow: 0 24px 80px rgb(11 27 59 / 22%); }
 .studioDialog__closeButton { position: absolute; z-index: 5; top: 10px; right: 10px; width: 40px; min-width: 40px; min-height: 40px; padding: 0; }
 .studioDialog__header { padding-inline-end: 42px; }
 .studioDialog__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--brand-line); }
 .studioDialog__footer > button { min-width: 104px; }
-.studioDialog__content.editorialCalendar__campaignDialog { width: min(880px, calc(100vw - 32px)); max-height: min(88dvh, 820px); display: flex; flex-direction: column; overflow: hidden; }
+.studioDialog__content:not(.editorialCalendar__campaignDialog) > .studioDialog__header { position: sticky; z-index: 4; top: calc(-1 * var(--studio-dialog-padding)); margin-top: calc(-1 * var(--studio-dialog-padding)); margin-bottom: 19px; padding: 8px 42px 10px 0; background: var(--studio-surface-raised); }
+.studioDialog__content:not(.editorialCalendar__campaignDialog) .studioDialog__footer { position: sticky; z-index: 4; bottom: calc(-1 * var(--studio-dialog-padding)); margin: 18px calc(-1 * var(--studio-dialog-padding)) calc(-1 * var(--studio-dialog-padding)); padding: 14px var(--studio-dialog-padding) var(--studio-dialog-padding); background: var(--studio-surface-raised); }
+.studioDialog__content.editorialCalendar__campaignDialog { width: min(880px, calc(100vw - 32px)); max-height: min(88dvh, 820px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)); display: flex; flex-direction: column; overflow: hidden; }
 .editorialCalendar__campaignDialog > .studioDialog__header { flex: 0 0 auto; }
 .editorialCalendar__campaignDialog .editorialCalendar__campaignForm { min-height: 0; margin: 0; padding: 0; overflow-y: auto; border: 0; border-radius: 0; background: transparent; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .editorialCalendar__campaignDialog .editorialCalendar__formActions { position: sticky; z-index: 2; bottom: 0; padding: 12px 0 4px; border-top: 1px solid var(--brand-line); background: var(--studio-surface-raised); }
@@ -889,7 +891,7 @@
   .editorialCalendar__listDay { padding: 13px; }
   .editorialCalendar__listDay li { grid-template-columns: 44px minmax(0, 1fr); gap: 8px; }
 .editorialCalendar__listDay li > .editorialCalendar__status, .editorialCalendar__listDay li > .editorialCalendar__publicationStatus { grid-column: 2; }
-  .studioDialog__content { padding: 19px; }
+  .studioDialog__content { --studio-dialog-padding: 19px; }
 }
 @media (max-width: 480px) {
   .notificationCenter { position: static; }

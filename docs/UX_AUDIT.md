@@ -272,3 +272,15 @@ The live browser became unavailable during the latest audit pass, so these are d
 - All shared Radix dialogs now include the same labeled close button in the top-right corner, reserve space in the header for it, and use a shared right-aligned footer pattern.
 - Replaced modal-specific cancel controls with the shared Cancel action and added it to the campaign scheduling step and date picker. The Brand Kit uses the same footer position with its clearer “Close” label. Existing dirty-editor handling remains connected to the dialog's close event.
 - Dialog heights now use the dynamic viewport. ESLint, TypeScript, and `git diff --check` passed; live keyboard and responsive visual checks remain pending in Chrome.
+
+## Long-dialog navigation — 2026-11-18
+
+- Shared dialog headers and action footers now stay visible while the dialog content scrolls, so the title and primary/cancel actions remain available on long forms and short screens. Scroll stays inside the dialog instead of chaining to the page behind it.
+- The campaign planner keeps its existing form-specific scrolling and pinned step actions. The shared spacing follows the dialog's desktop and mobile padding.
+- Source-level CSS review and `git diff --check` only; Chrome is unavailable, so sticky positioning and keyboard behavior need visual confirmation.
+
+## Dialog safe-area sizing — 2026-11-18
+
+- Standard dialogs and the campaign planner now cap their height against the visible viewport after accounting for top and bottom safe areas. This keeps their close control, scrollable content, and actions within reach on notched phones and short browser windows.
+- `window.alert`, `window.confirm`, and `window.prompt` are not used in the application UI; confirmation and feedback flows use the shared components.
+- Source-level review only. Chrome is unavailable, so iOS safe-area rendering remains unverified.
