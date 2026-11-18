@@ -332,7 +332,13 @@ export function PublicationAnalytics({ filters, organizationId, userId, onOpenCo
                       comments: formatMetric(post.comments, "comments"),
                       shares: formatMetric(post.shares, "shares"),
                     })}</small></div>
-                    <span className="publicationAnalytics__topPostTotal">{new Intl.NumberFormat(locale).format(post.interactions)} {t("engagement.interactions")}</span>
+                    <span className="publicationAnalytics__topPostTotal">
+                      {new Intl.NumberFormat(locale).format(post.interactions)} {t("engagement.interactions")}
+                      {post.previousCheckChange !== null && post.previousCheckAt ? <small>{t("engagement.changeSincePreviousCheck", {
+                        change: new Intl.NumberFormat(locale, { signDisplay: "always" }).format(post.previousCheckChange),
+                        date: new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(new Date(post.previousCheckAt)),
+                      })}</small> : null}
+                    </span>
                   </li>)}
                 </ol> : <p>{t("engagement.topPostsEmpty")}</p>}
               </div>

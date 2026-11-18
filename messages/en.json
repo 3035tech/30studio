@@ -980,6 +980,7 @@
       "postContext": "{brand} · scheduled {date}",
       "postMetricBreakdown": "Likes {likes} · comments {comments} · shares {shares}",
       "interactions": "interactions",
+      "changeSincePreviousCheck": "{change} since the previous check on {date}",
       "topPostsEmpty": "No successful post metrics are available for ranking yet.",
       "notCollected": "No engagement metrics have been collected for these published posts yet. Use “Refresh Meta metrics” to collect them.",
       "noPublishedPosts": "No eligible Facebook or Instagram publications were found in this period.",

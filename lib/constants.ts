@@ -338,7 +338,7 @@ export const COMPETITOR_WORKER = {
   minimumAlertStaleAfterHours: 6,
   maximumAlertStaleAfterHours: 336,
 } as const;
-export const SOCIAL_ANALYTICS_LIMITS = { refreshCandidateCount: 10, refreshConcurrency: 3, refreshCooldownMilliseconds: 60 * 60 * 1_000 } as const;
+export const SOCIAL_ANALYTICS_LIMITS = { refreshCandidateCount: 10, refreshConcurrency: 3, refreshCooldownMilliseconds: 60 * 60 * 1_000, maximumComparisonSnapshots: 240 } as const;
 export const SOCIAL_ANALYTICS_FRESHNESS_MILLISECONDS = 24 * 60 * 60 * 1_000;
 export const SOCIAL_ANALYTICS_DEFINITION_VERSION = "meta_post_counts_lifetime_v1" as const;
 export const SOCIAL_PUBLICATION_RECONCILIATION_LIMITS = { minimumEvidenceCharacters: 10, maximumEvidenceCharacters: 1_000, maximumExternalPostIdCharacters: 256, maximumManualRetriesPerJob: 1, automaticCheckIntervalMilliseconds: 60_000, maximumAutomaticChecksPerJob: 5 } as const;

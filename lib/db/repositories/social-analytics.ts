@@ -1,9 +1,10 @@
 import "server-only";
 import { and, count, desc, eq, gte, inArray, isNotNull, lte, notInArray } from "drizzle-orm";
-import { SOCIAL_ANALYTICS_COLLECTION_STATUSES, SOCIAL_ANALYTICS_DEFINITION_VERSION, SOCIAL_CONNECTION_EVENT, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUS, type SocialPlatform } from "@/lib/constants";
+import { SOCIAL_ANALYTICS_COLLECTION_STATUSES, SOCIAL_ANALYTICS_DEFINITION_VERSION, SOCIAL_ANALYTICS_FRESHNESS_MILLISECONDS, SOCIAL_ANALYTICS_LIMITS, SOCIAL_CONNECTION_EVENT, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUS, type SocialPlatform } from "@/lib/constants";
 import { getDatabase } from "@/lib/db/client";
 import { brands, contentItems, socialAnalyticsSnapshots, socialConnectionEvents, socialProfileCredentials, socialProfiles, socialPublicationJobs } from "@/lib/db/schema";
 import type { MetaPostMetrics } from "@/lib/server/social-analytics/meta";
+import { getInteractionsChange } from "@/lib/server/social-analytics/metrics";
 
 export async function listMetaAnalyticsCandidates(organizationId: string, input: { start: Date; end: Date; brandId?: string; platform?: SocialPlatform; maximum: number; cooldownSince: Date }) {
   if (input.platform && input.platform !== "facebook" && input.platform !== "instagram") return [];
@@ -90,6 +91,8 @@ export async function getLatestMetaAnalytics(organizationId: string, input: { st
     collectionStatus: socialAnalyticsSnapshots.collectionStatus,
     likes: socialAnalyticsSnapshots.likes, comments: socialAnalyticsSnapshots.comments, shares: socialAnalyticsSnapshots.shares,
     collectedAt: socialAnalyticsSnapshots.collectedAt,
+    definitionVersion: socialAnalyticsSnapshots.definitionVersion,
+    coverage: socialAnalyticsSnapshots.coverage,
   }).from(socialAnalyticsSnapshots)
     .innerJoin(socialPublicationJobs, and(
       eq(socialPublicationJobs.organizationId, socialAnalyticsSnapshots.organizationId),
@@ -118,6 +121,7 @@ export async function getLatestMetaAnalytics(organizationId: string, input: { st
   const topPostsByPlatform = new Map<MetaPlatform, Array<{
     jobId: string; title: string; brandName: string; scheduledAt: string;
     likes: number | null; comments: number | null; shares: number | null; interactions: number;
+    collectedAt: Date; definitionVersion: string; coverage: string;
   }>>(metaPlatforms.map((platform) => [platform, []]));
   const engagementByPlatform = new Map<MetaPlatform, {
     collectedPosts: number;
@@ -152,6 +156,9 @@ export async function getLatestMetaAnalytics(organizationId: string, input: { st
         comments: row.comments,
         shares: row.shares,
         interactions: (row.likes ?? 0) + (row.comments ?? 0) + (row.shares ?? 0),
+        collectedAt: row.collectedAt,
+        definitionVersion: row.definitionVersion,
+        coverage: row.coverage,
       });
     }
   }
@@ -172,6 +179,31 @@ export async function getLatestMetaAnalytics(organizationId: string, input: { st
       eq(socialProfiles.brandId, socialPublicationJobs.brandId),
     )).where(and(...publishedConditions)).groupBy(socialProfiles.platform);
   const publishedByPlatform = new Map(published.map((row) => [row.platform, Number(row.total)]));
+  const rankedTopPosts = new Map(metaPlatforms.map((platform) => [platform,
+    (topPostsByPlatform.get(platform) ?? []).sort((left, right) => right.interactions - left.interactions || right.scheduledAt.localeCompare(left.scheduledAt)).slice(0, 5),
+  ]));
+  const comparisonPosts = metaPlatforms.flatMap((platform) => rankedTopPosts.get(platform) ?? []);
+  const comparisonJobIds = comparisonPosts.map((post) => post.jobId);
+  const comparisonSnapshots = comparisonJobIds.length === 0 ? [] : await getDatabase().select({
+    jobId: socialAnalyticsSnapshots.publicationJobId,
+    likes: socialAnalyticsSnapshots.likes,
+    comments: socialAnalyticsSnapshots.comments,
+    shares: socialAnalyticsSnapshots.shares,
+    collectedAt: socialAnalyticsSnapshots.collectedAt,
+    definitionVersion: socialAnalyticsSnapshots.definitionVersion,
+    coverage: socialAnalyticsSnapshots.coverage,
+  }).from(socialAnalyticsSnapshots).where(and(
+    eq(socialAnalyticsSnapshots.organizationId, organizationId),
+    inArray(socialAnalyticsSnapshots.publicationJobId, comparisonJobIds),
+    eq(socialAnalyticsSnapshots.collectionStatus, "success"),
+    gte(socialAnalyticsSnapshots.collectedAt, new Date(Date.now() - SOCIAL_ANALYTICS_FRESHNESS_MILLISECONDS)),
+  )).orderBy(desc(socialAnalyticsSnapshots.collectedAt)).limit(SOCIAL_ANALYTICS_LIMITS.maximumComparisonSnapshots);
+  const snapshotsByJob = new Map<string, typeof comparisonSnapshots>();
+  for (const snapshot of comparisonSnapshots) {
+    const entries = snapshotsByJob.get(snapshot.jobId) ?? [];
+    entries.push(snapshot);
+    snapshotsByJob.set(snapshot.jobId, entries);
+  }
   return {
     platforms: SOCIAL_PLATFORMS.filter((platform): platform is MetaPlatform => platform === "facebook" || platform === "instagram").map((platform) => {
       const collected = engagementByPlatform.get(platform);
@@ -187,7 +219,24 @@ export async function getLatestMetaAnalytics(organizationId: string, input: { st
           shares: collected.metricsCount.shares ? collected.metrics.shares : null,
         },
         latestCollectedAt: collected.latestCollectedAt?.toISOString() ?? null,
-        topPosts: (topPostsByPlatform.get(platform) ?? []).sort((left, right) => right.interactions - left.interactions || right.scheduledAt.localeCompare(left.scheduledAt)).slice(0, 5),
+        topPosts: (rankedTopPosts.get(platform) ?? []).map((post) => {
+          const recentChecks = snapshotsByJob.get(post.jobId) ?? [];
+          const previousCheck = recentChecks.find((snapshot) => snapshot.collectedAt < post.collectedAt
+            && snapshot.definitionVersion === post.definitionVersion && snapshot.coverage === post.coverage);
+          const comparable = previousCheck ? getInteractionsChange(post, previousCheck) : null;
+          return {
+            jobId: post.jobId,
+            title: post.title,
+            brandName: post.brandName,
+            scheduledAt: post.scheduledAt,
+            likes: post.likes,
+            comments: post.comments,
+            shares: post.shares,
+            interactions: post.interactions,
+            previousCheckChange: comparable,
+            previousCheckAt: comparable === null ? null : previousCheck?.collectedAt.toISOString() ?? null,
+          };
+        }),
       };
     }),
   };

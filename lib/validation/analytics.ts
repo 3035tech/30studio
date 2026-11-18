@@ -66,6 +66,8 @@ export const analyticsResponseSchema = z.object({
           comments: analyticsCountSchema.nullable(),
           shares: analyticsCountSchema.nullable(),
           interactions: analyticsCountSchema,
+          previousCheckChange: z.number().int().nullable(),
+          previousCheckAt: z.iso.datetime({ offset: true }).nullable(),
         })),
       })),
     }),

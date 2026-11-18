@@ -29,6 +29,7 @@ Revisto em 2026-11-17 após conferência com rotas, workers, repositórios, migr
 - O editor de conteúdo agora mostra a contagem e o limite de caracteres do canal configurado, restringe a entrada e o endpoint de salvamento rejeita variantes acima do limite. A contagem considera pontos de código Unicode; a suíte unitária cobre esse caso.
 - A tela de conexões agora explica, sem expor valores, se faltam credenciais do provedor, versão da Meta Graph API ou chave de criptografia. Isso melhora o diagnóstico, mas não substitui o teste OAuth com uma conta Meta autorizada.
 - Analytics ainda não faz coleta automática e só consulta métricas de publicações do Facebook/Instagram pela Meta. Métricas de outras redes dependem de permissões e APIs oficiais; o worker agendado requer configuração e homologação separadas.
+- O ranking de analytics agora mostra a variação de interações entre as duas coletas recentes quando as mesmas métricas e a mesma cobertura estão disponíveis; a comparação usa somente snapshots do tenant ativo e um lote limitado.
 - A revisão visual no Chrome de produção não pôde ser concluída porque o host de automação do navegador estava indisponível; build e testes automatizados não comprovam o layout visual em desktop/mobile.
 - A limpeza diária de uploads e a validação de bucket privado, CORS, IAM, versionamento e recuperação ainda dependem dos valores e da identidade AWS de produção. Não configurar esses recursos com nomes ou permissões presumidos.
 

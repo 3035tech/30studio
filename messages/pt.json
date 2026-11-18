@@ -980,6 +980,7 @@
       "postContext": "{brand} · agendada para {date}",
       "postMetricBreakdown": "Curtidas {likes} · comentários {comments} · compartilhamentos {shares}",
       "interactions": "interações",
+      "changeSincePreviousCheck": "{change} desde a coleta anterior em {date}",
       "topPostsEmpty": "Ainda não há métricas coletadas com sucesso para montar o ranking.",
       "notCollected": "As métricas de engajamento dessas publicações ainda não foram coletadas. Use “Atualizar métricas da Meta” para coletá-las.",
       "noPublishedPosts": "Não há publicações elegíveis do Facebook ou Instagram neste período.",
