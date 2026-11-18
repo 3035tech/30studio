@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CALENDAR, CONTENT_STATUS, COPY_GENERATION, SOCIAL_PLATFORMS } from "@/lib/constants";
-import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarCopyDraftResponseSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema, contentMediaGenerationRequestSchema, contentMediaReviewSchema } from "@/lib/validation/calendar";
+import { calendarCampaignCreateSchema, calendarContentVersionSaveSchema, calendarCopyDraftResponseSchema, calendarItemCreateSchema, calendarItemUpdateSchema, calendarQuerySchema, calendarResponseSchema, contentMediaGenerationRequestSchema, contentMediaReviewSchema } from "@/lib/validation/calendar";
 import { getCampaignRequestFingerprint } from "@/lib/server/campaign-idempotency";
 
 test("calendar ideas validate tenant-owned fields and normalize their title", () => {
@@ -14,6 +14,23 @@ test("calendar ideas validate tenant-owned fields and normalize their title", ()
   });
   assert.equal(result.success, true);
   if (result.success) assert.equal(result.data.title, "Product launch");
+});
+
+test("calendar response validates publishing capabilities for every supported network", () => {
+  const result = calendarResponseSchema.safeParse({
+    data: [],
+    capabilities: SOCIAL_PLATFORMS.map((platform) => ({
+      platform,
+      publication: platform === "instagram" ? "single_image" : ["linkedin", "facebook", "threads"].includes(platform) ? "text" : "connection_only",
+      maximumTextCharacters: platform === "threads" ? 500 : null,
+    })),
+    truncated: false,
+    canManage: true,
+    canReview: false,
+  });
+  assert.equal(result.success, true);
+  assert.equal(calendarResponseSchema.safeParse({ data: [], capabilities: [], truncated: false, canManage: true, canReview: false }).success, false);
+  assert.equal(calendarResponseSchema.safeParse({ data: [], capabilities: [{ platform: "unknown", publication: "text", maximumTextCharacters: null }], truncated: false, canManage: true, canReview: false }).success, false);
 });
 
 test("calendar ideas reject invalid time zones and client-selected tenant scope", () => {

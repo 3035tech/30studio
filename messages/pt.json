@@ -326,6 +326,11 @@
     "campaignBrief": "Ideia central e contexto",
     "selectChannels": "Redes sociais incluídas",
     "channelPreparationNote": "Selecionar redes cria publicações planejadas na agenda. Isso não conecta contas nem publica nas redes.",
+    "channelCapability": {
+      "connection_only": "Somente planejamento",
+      "text": "Publicação de texto compatível",
+      "single_image": "Publicação de imagem única compatível"
+    },
     "channelSchedule": "Agenda de {platform}",
     "createCampaign": "Criar campanha e publicações",
     "createStepStatus": "Etapa {step} de {total}",

@@ -326,6 +326,11 @@
     "campaignBrief": "Core idea and context",
     "selectChannels": "Social networks included",
     "channelPreparationNote": "Selecting networks creates planned posts in the calendar. It does not connect accounts or publish to social platforms.",
+    "channelCapability": {
+      "connection_only": "Planning only",
+      "text": "Text publishing supported",
+      "single_image": "Single-image publishing supported"
+    },
     "channelSchedule": "{platform} schedule",
     "createCampaign": "Create campaign and posts",
     "createStepStatus": "Step {step} of {total}",

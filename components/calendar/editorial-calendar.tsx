@@ -14,7 +14,7 @@ import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
 import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
-import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem } from "@/lib/validation/calendar";
+import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem, type CalendarSocialCapability } from "@/lib/validation/calendar";
 import { contentReviewResponseSchema } from "@/lib/validation/content-review";
 import { socialPublicationReconciliationResponseSchema, socialPublicationReconciliationRequestSchema } from "@/lib/validation/social-publication";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
@@ -22,13 +22,14 @@ import { useSystemFeedback } from "@/components/ui/system-feedback";
 type CalendarState = {
   requestKey: string;
   items: CalendarItem[];
+  capabilities: CalendarSocialCapability[];
   truncated: boolean;
   canManage: boolean;
   canReview: boolean;
   error: boolean;
 };
 
-const INITIAL_STATE: CalendarState = { requestKey: "", items: [], truncated: false, canManage: false, canReview: false, error: false };
+const INITIAL_STATE: CalendarState = { requestKey: "", items: [], capabilities: [], truncated: false, canManage: false, canReview: false, error: false };
 const EMPTY_BRANDS: readonly BrandListItem[] = [];
 const EMPTY_ITEMS: CalendarItem[] = [];
 type GeneratedCopy = z.infer<typeof calendarCopyDraftResponseSchema>["data"] & {
@@ -133,10 +134,10 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
         if (!response.ok) throw new Error("Calendar request failed.");
         const parsed = calendarResponseSchema.safeParse(payload);
         if (!parsed.success) throw new Error("Calendar response was invalid.");
-        setState({ requestKey, items: parsed.data.data, truncated: parsed.data.truncated, canManage: parsed.data.canManage, canReview: parsed.data.canReview, error: false });
+        setState({ requestKey, items: parsed.data.data, capabilities: parsed.data.capabilities, truncated: parsed.data.truncated, canManage: parsed.data.canManage, canReview: parsed.data.canReview, error: false });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setState({ requestKey, items: [], truncated: false, canManage: false, canReview: false, error: true });
+        setState({ requestKey, items: [], capabilities: [], truncated: false, canManage: false, canReview: false, error: true });
       }
     };
     void load();
@@ -702,7 +703,10 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                 <TextAreaField id={CALENDAR_UI_IDS.campaignBrief} name="brief" label={t("campaignBrief")} value={campaignBrief} onChange={(event) => setCampaignBrief(event.target.value)} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
                 <fieldset className="editorialCalendar__platformPicker">
                   <legend>{t("selectChannels")}</legend>
-                  <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} leadingIcon={<SocialPlatformIcon platform={platform} size={20} />} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
+                  <div>{SOCIAL_PLATFORMS.map((platform) => {
+                    const capability = state.capabilities.find((entry) => entry.platform === platform);
+                    return <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} description={t(`channelCapability.${capability?.publication ?? "connection_only"}`)} leadingIcon={<SocialPlatformIcon platform={platform} size={20} />} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />;
+                  })}</div>
                   <p className="editorialCalendar__channelNote">{t("channelPreparationNote")}</p>
                 </fieldset>
                 <div className="editorialCalendar__formActions">

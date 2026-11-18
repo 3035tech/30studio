@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
 import { hasTenantPermission } from "@/lib/server/permissions";
+import { getSocialPublisherCapabilities } from "@/lib/server/social-publisher/registry";
 import { calendarItemCreateSchema, calendarQuerySchema } from "@/lib/validation/calendar";
 
 export const runtime = "nodejs";
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
         plannedAt: item.plannedAt.toISOString(),
         createdAt: item.createdAt.toISOString(),
       })),
+      capabilities: getSocialPublisherCapabilities(),
       truncated: result.truncated,
       canManage: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentManage),
       canReview: hasTenantPermission(tenant.role, TENANT_PERMISSIONS.contentApprove),

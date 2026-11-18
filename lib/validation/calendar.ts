@@ -212,8 +212,18 @@ export const calendarItemSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+export const calendarSocialCapabilitySchema = z.object({
+  platform: z.enum(SOCIAL_PLATFORMS),
+  publication: z.enum(SOCIAL_PUBLISHING_CAPABILITIES),
+  maximumTextCharacters: z.number().int().positive().nullable(),
+}).strict();
+
 export const calendarResponseSchema = z.object({
   data: z.array(calendarItemSchema),
+  capabilities: z.array(calendarSocialCapabilitySchema)
+    .length(SOCIAL_PLATFORMS.length)
+    .refine((capabilities) => new Set(capabilities.map((capability) => capability.platform)).size === SOCIAL_PLATFORMS.length
+      && SOCIAL_PLATFORMS.every((platform) => capabilities.some((capability) => capability.platform === platform))),
   truncated: z.boolean(),
   canManage: z.boolean(),
   canReview: z.boolean(),
@@ -224,3 +234,4 @@ export type CalendarCampaignCreateInput = z.infer<typeof calendarCampaignCreateS
 export type CalendarItemUpdateInput = z.infer<typeof calendarItemUpdateSchema>;
 export type CalendarContentVersionSaveInput = z.infer<typeof calendarContentVersionSaveSchema>;
 export type CalendarItem = z.infer<typeof calendarItemSchema>;
+export type CalendarSocialCapability = z.infer<typeof calendarSocialCapabilitySchema>;

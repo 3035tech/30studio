@@ -224,15 +224,19 @@ type CheckboxFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "ty
   id: string;
   label: string;
   leadingIcon?: ReactNode;
+  description?: string;
 };
 
-export function CheckboxField({ label, id, className = "", leadingIcon, onInvalid, onInput, ...props }: CheckboxFieldProps) {
+export function CheckboxField({ label, id, className = "", leadingIcon, description, onInvalid, onInput, ...props }: CheckboxFieldProps) {
   const validation = useFieldValidation();
   return (
     <label className={`inline-flex min-h-10 items-center gap-2.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-studio-dark transition hover:border-studio-primary/50 has-[:checked]:border-studio-primary has-[:checked]:bg-studio-primary/5 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-studio-primary ${className}`.trim()} htmlFor={id}>
       <input id={id} className="size-4 accent-studio-primary" type="checkbox" onInvalid={(event) => { validation.onInvalid(event); onInvalid?.(event); }} onInput={(event) => { validation.onInput(event); onInput?.(event); }} {...props} />
       {leadingIcon ? <span className="inline-grid size-5 shrink-0 place-items-center" aria-hidden="true">{leadingIcon}</span> : null}
-      <span>{label}</span>
+      <span className={description ? "grid gap-0.5" : undefined}>
+        <span>{label}</span>
+        {description ? <span className="text-xs font-normal leading-tight text-studio-muted">{description}</span> : null}
+      </span>
     </label>
   );
 }
