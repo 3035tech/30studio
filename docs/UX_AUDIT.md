@@ -1,7 +1,15 @@
 # 30studio UX audit
 
-Date: 2026-11-14
+Audit started: 2026-11-14
+Updated: 2026-11-18
 Scope: authenticated local Docker workspace, desktop browser, Portuguese and English catalogs, workspace overview, monthly/list calendar, brand creation entry point, team management and campaign planning form. No brands, invitations, or publications were created.
+
+## Current status — 2026-11-18
+
+- The latest `main` commit is `1874762` (`feat(workspace): improve campaign workflows`). Its GitHub Actions run [44346740507](https://github.com/3035tech/30studio/actions/runs/44346740507) completed successfully.
+- The campaign workflow now supports a date range with multiple child publications. When editing the range, posts that would fall outside it are highlighted and saving stays disabled until the posts are rescheduled. Server-side validation remains authoritative.
+- The sidebar clipping was traced to the old 58px grid track and the single current navigation child. The sidebar and menu now have explicit full-width layouts with responsive arrangements.
+- **Still to verify in the running app:** reload the deployed build, inspect the sidebar at desktop and mobile widths, and check the campaign conflict preview and keyboard navigation. The Chrome access host was unavailable during this review, so source checks and CI are not visual proof.
 
 ## Navigation and information architecture
 
@@ -314,8 +322,8 @@ The live browser became unavailable during the latest audit pass, so these are d
 ## Workspace navigation clipping — 2026-11-18
 
 - A user screenshot showed the desktop navigation labels clipped to a narrow strip while most of the sidebar remained blank. The sidebar still used a two-column grid from the older navigation layout, but its current markup has a single navigation child; the child was therefore constrained to the 58px first column.
-- The desktop sidebar now uses a single block container so the navigation fills its full 248px layout column. Tablet/mobile rules already switch the sidebar to a full-width layout and remain unchanged.
-- ESLint, production build, and `git diff --check` passed. The Chrome access host is unavailable, so the deployed page still needs visual confirmation after rollout.
+- The desktop sidebar now uses a single block container so the navigation fills its full 248px layout column. The menu has its own full-width flex container on desktop and explicit grid layouts at narrower breakpoints.
+- TypeScript, ESLint, and `git diff --check` passed before commit; the pushed commit's [GitHub Actions run](https://github.com/3035tech/30studio/actions/runs/44346740507) succeeded. The Chrome access host is unavailable, so the deployed page still needs visual confirmation after rollout.
 
 ## Sentence-case section labels — 2026-11-18
 
