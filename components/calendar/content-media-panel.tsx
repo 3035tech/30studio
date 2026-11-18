@@ -7,6 +7,7 @@ import { ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
 import { TextAreaField } from "@/components/ui/field";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { CONTENT_LIMITS, CONTENT_MEDIA_API_PATHS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_EXPORTS, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, type SocialPlatform } from "@/lib/constants";
 import { contentMediaGenerationResponseSchema, contentMediaResponseSchema } from "@/lib/validation/calendar";
 
@@ -39,10 +40,10 @@ function splitIntoCarouselPages(copy: string) {
 
 export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCopy, platform }: { itemId: string; versionId: string | null; versionNumber: number | null; variantCopy: string; platform: SocialPlatform }) {
   const t = useTranslations("contentMedia");
+  const showFeedback = useSystemFeedback();
   const [state, setState] = useState(INITIAL_STATE);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [busyId, setBusyId] = useState("");
-  const [notice, setNotice] = useState("");
   const [reviewNote, setReviewNote] = useState("");
   const [pageCopies, setPageCopies] = useState(() => splitIntoCarouselPages(variantCopy));
   const exportSize = CONTENT_MEDIA_EXPORTS[platform];
@@ -86,7 +87,6 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
   async function generateImage(mode: typeof CONTENT_MEDIA_GENERATION_MODE[keyof typeof CONTENT_MEDIA_GENERATION_MODE]) {
     if (!versionId || busyId) return;
     setBusyId(mode);
-    setNotice("");
     try {
       const response = await fetch(CONTENT_MEDIA_API_PATHS.collection(itemId), {
         method: "POST",
@@ -95,19 +95,19 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
         body: JSON.stringify({ contentVersionId: versionId, idempotencyKey: crypto.randomUUID(), mode, ...(mode === CONTENT_MEDIA_GENERATION_MODE.carousel ? { pageCopies } : {}) }),
       });
       if (response.status === 503) {
-        setNotice(t("generationUnavailable"));
+        showFeedback("error", t("generationUnavailable"));
         return;
       }
       if (response.status === 409) {
-        setNotice(t("generationLimit"));
+        showFeedback("error", t("generationLimit"));
         return;
       }
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok || !contentMediaGenerationResponseSchema.safeParse(payload).success) throw new Error("Image generation request failed.");
-      setNotice(mode === CONTENT_MEDIA_GENERATION_MODE.carousel ? t("carouselQueued") : t("jobQueued"));
+      showFeedback("success", t(mode === CONTENT_MEDIA_GENERATION_MODE.carousel ? "carouselQueued" : "jobQueued"));
       setRefreshIndex((current) => current + 1);
     } catch {
-      setNotice(t("generationError"));
+      showFeedback("error", t("generationError"));
     } finally {
       setBusyId("");
     }
@@ -115,7 +115,6 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
 
   async function reviewImage(mediaId: string, decision: typeof CONTENT_MEDIA_REVIEW_DECISIONS[number]) {
     setBusyId(mediaId);
-    setNotice("");
     try {
       const response = await fetch(CONTENT_MEDIA_API_PATHS.review(itemId, mediaId), {
         method: "POST",
@@ -124,11 +123,11 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
         body: JSON.stringify({ decision, note: reviewNote.trim() || null }),
       });
       if (!response.ok) throw new Error("Image review failed.");
-      setNotice(decision === CONTENT_MEDIA_STATUS.approved ? t("approved") : t("rejected"));
+      showFeedback(decision === CONTENT_MEDIA_STATUS.approved ? "success" : "info", t(decision === CONTENT_MEDIA_STATUS.approved ? "approved" : "rejected"));
       setReviewNote("");
       setRefreshIndex((current) => current + 1);
     } catch {
-      setNotice(t("reviewError"));
+      showFeedback("error", t("reviewError"));
     } finally {
       setBusyId("");
     }
@@ -159,7 +158,6 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
         </Button>
       </div> : null}
       <p className="contentMediaPanel__privacy">{t("privacy")}</p>
-      {notice ? <p className="contentMediaPanel__notice" role="status">{notice}</p> : null}
       {pending ? <p className="contentMediaPanel__empty" role="status">{t("loading")}</p> : null}
       {state.error ? <p className="contentMediaPanel__notice" role="alert">{t("loadError")}</p> : null}
       {!versionId ? <p className="contentMediaPanel__empty">{t("saveCopyFirst")}</p> : null}

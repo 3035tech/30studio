@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
 import { CheckboxField, IntegerField, SelectField, TextField } from "@/components/ui/field";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { COMPETITOR_RETRIEVAL_METHODS, COMPETITOR_SOURCE_STATUS, COMPETITOR_WORKER, SOCIAL_PLATFORMS, type Locale } from "@/lib/constants";
 import { parseIntegerFormValue } from "@/lib/forms";
 import type { BrandListItem } from "@/lib/validation/brands";
@@ -19,11 +20,10 @@ const feedErrorTranslationKeys = ["invalid_source_url", "blocked_source_address"
 type ProfileLookupData = z.infer<typeof competitorProfileLookupResponseSchema>["data"];
 type ProfileLookupError = { brandId: string; key: "lookupConnectionRequired" | "lookupInstagramConnectionRequired" | "lookupFacebookConnectionRequired" | "lookupXConnectionRequired" | "lookupXDisabled" | "lookupNotFound" | "lookupInvalid" | "lookupUnavailable" };
 type ProfileLookupPreview = { brandId: string; data: ProfileLookupData };
-type Feedback = { text: string; tone: "success" | "error" };
-
 export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange, onOpenConnections }: { brands: BrandListItem[]; selectedBrandId: string; onBrandChange: (brandId: string) => void; onOpenConnections: (brandId: string) => void }) {
   const t = useTranslations("competitorResearch");
   const tPlatforms = useTranslations("platforms");
+  const showFeedback = useSystemFeedback();
   const locale = useLocale() as Locale;
   const activeBrands = brands.filter((brand) => brand.isActive);
   const brandId = activeBrands.some((brand) => brand.id === selectedBrandId) ? selectedBrandId : activeBrands[0]?.id ?? "";
@@ -43,7 +43,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
   const [lookupPlatform, setLookupPlatform] = useState<"youtube" | "instagram" | "facebook" | "x">("youtube");
   const [lookupError, setLookupError] = useState<ProfileLookupError | null>(null);
   const [profilePreview, setProfilePreview] = useState<ProfileLookupPreview | null>(null);
-  const [message, setMessage] = useState<Feedback | null>(null);
+  const [alertSettingsError, setAlertSettingsError] = useState(false);
   const requestKey = `${brandId}:${refreshKey}`;
   const loading = Boolean(brandId) && loadedKey !== requestKey;
   const error = errorKey === requestKey;
@@ -99,7 +99,6 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
     const preview = profilePreview?.brandId === brandId ? profilePreview.data : null;
     if (!brandId || !preview) return;
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(preview.platform === "instagram" ? `/api/brands/${brandId}/competitors/instagram` : preview.platform === "facebook" ? `/api/brands/${brandId}/competitors/facebook` : preview.platform === "x" ? `/api/brands/${brandId}/competitors/x` : `/api/brands/${brandId}/competitors`, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -119,15 +118,15 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
                 : code === "COMPETITOR_YOUTUBE_CONNECTION_REQUIRED" ? "lookupConnectionRequired"
                   : code === "COMPETITOR_PROFILE_NOT_FOUND" ? "lookupNotFound"
                     : code === "INVALID_REQUEST" ? "lookupInvalid" : "saveError";
-        setMessage({ text: t(key), tone: "error" });
+        showFeedback("error", t(key));
         return;
       }
       setIdentifier("");
       setProfilePreview(null);
-      setMessage({ text: t("sourceAdded"), tone: "success" });
+      showFeedback("success", t("sourceAdded"));
       setRefreshKey((value) => value + 1);
     } catch {
-      setMessage({ text: t("saveError"), tone: "error" });
+      showFeedback("error", t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -137,7 +136,6 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
     event.preventDefault();
     if (!brandId || !websiteName.trim() || !websiteUrl.trim()) return;
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(`/api/brands/${brandId}/competitors`, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -146,15 +144,15 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
         const code = typeof payload === "object" && payload !== null && !Array.isArray(payload) && "code" in payload && typeof payload.code === "string" ? payload.code : "";
-        setMessage({ text: t(code === "COMPETITOR_SOURCE_EXISTS" ? "sourceDuplicate" : code === "COMPETITOR_SOURCE_LIMIT_REACHED" ? "sourceLimit" : code === "INVALID_REQUEST" ? "websiteInvalid" : "saveError"), tone: "error" });
+        showFeedback("error", t(code === "COMPETITOR_SOURCE_EXISTS" ? "sourceDuplicate" : code === "COMPETITOR_SOURCE_LIMIT_REACHED" ? "sourceLimit" : code === "INVALID_REQUEST" ? "websiteInvalid" : "saveError"));
         return;
       }
       setWebsiteName("");
       setWebsiteUrl("");
-      setMessage({ text: t("sourceAdded"), tone: "success" });
+      showFeedback("success", t("sourceAdded"));
       setRefreshKey((value) => value + 1);
     } catch {
-      setMessage({ text: t("saveError"), tone: "error" });
+      showFeedback("error", t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -163,7 +161,6 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
   async function updateSource(sourceId: string, status: typeof COMPETITOR_SOURCE_STATUS[keyof typeof COMPETITOR_SOURCE_STATUS]) {
     if (!brandId) return;
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(`/api/brands/${brandId}/competitors/${sourceId}`, {
         method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
@@ -173,10 +170,10 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
       const feedbackKey = status === COMPETITOR_SOURCE_STATUS.archived ? "sourceArchived"
         : status === COMPETITOR_SOURCE_STATUS.paused ? "sourcePaused"
           : currentData?.sources.find((source) => source.id === sourceId)?.status === COMPETITOR_SOURCE_STATUS.archived ? "sourceRestored" : "sourceResumed";
-      setMessage({ text: t(feedbackKey), tone: "success" });
+      showFeedback("success", t(feedbackKey));
       setRefreshKey((value) => value + 1);
     } catch {
-      setMessage({ text: t("saveError"), tone: "error" });
+      showFeedback("error", t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -185,17 +182,16 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
   async function retryAnalysis(sourceId: string) {
     if (!brandId) return;
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(`/api/brands/${brandId}/competitors/${sourceId}/analysis`, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}",
       });
       const result = competitorAnalysisRetryResponseSchema.safeParse(await response.json());
       if (!response.ok || !result.success) throw new Error();
-      setMessage({ text: t("retryQueued", { count: result.data.data.retried }), tone: "success" });
+      showFeedback("success", t("retryQueued", { count: result.data.data.retried }));
       setRefreshKey((value) => value + 1);
     } catch {
-      setMessage({ text: t("saveError"), tone: "error" });
+      showFeedback("error", t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -204,16 +200,15 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
   async function retrySource(sourceId: string) {
     if (!brandId) return;
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(`/api/brands/${brandId}/competitors/${sourceId}/retry`, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}",
       });
-      if (response.status === 409) { setMessage({ text: t("retrySourceBusy"), tone: "error" }); return; }
+      if (response.status === 409) { showFeedback("error", t("retrySourceBusy")); return; }
       if (!response.ok) throw new Error();
-      setMessage({ text: t("retrySourceQueued"), tone: "success" });
+      showFeedback("success", t("retrySourceQueued"));
       setRefreshKey((value) => value + 1);
-    } catch { setMessage({ text: t("saveError"), tone: "error" }); }
+    } catch { showFeedback("error", t("saveError")); }
     finally { setSaving(false); }
   }
 
@@ -226,18 +221,18 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
       failureThreshold: parseIntegerFormValue(form.get("failureThreshold")),
       staleAfterHours: parseIntegerFormValue(form.get("staleAfterHours")),
     });
-    if (!parsed.success) { setMessage({ text: t("alertSettingsError"), tone: "error" }); return; }
+    if (!parsed.success) { setAlertSettingsError(true); return; }
+    setAlertSettingsError(false);
     setSaving(true);
-    setMessage(null);
     try {
       const response = await fetch(`/api/brands/${brandId}/competitors/alerts`, {
         method: "PATCH", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       });
       if (!response.ok) throw new Error();
-      setMessage({ text: t("alertSettingsSaved"), tone: "success" });
+      showFeedback("success", t("alertSettingsSaved"));
       setRefreshKey((value) => value + 1);
-    } catch { setMessage({ text: t("saveError"), tone: "error" }); }
+    } catch { showFeedback("error", t("saveError")); }
     finally { setSaving(false); }
   }
 
@@ -306,7 +301,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
         </form>
       </Disclosure>
     </section> : null}
-    {message ? <p className={message.tone === "error" ? "entryMessage entryMessage--error" : "entryMessage"} role={message.tone === "error" ? "alert" : "status"}>{message.text}</p> : null}
+    {alertSettingsError ? <p className="entryMessage entryMessage--error" role="alert">{t("alertSettingsError")}</p> : null}
     {loading ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : null}
     {error ? <p className="entryMessage entryMessage--error" role="alert">{t("loadError")}</p> : null}
     {!brandId || activeBrands.length === 0 ? <p className="workspaceEmpty">{t("noBrands")}</p> : null}

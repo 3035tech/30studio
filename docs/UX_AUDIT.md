@@ -221,3 +221,9 @@ The live browser became unavailable during the latest audit pass, so these are d
 - Password change, password recovery request, workspace-name save, and approval-policy save/reset now use the shared success/error toast, matching the rest of the workspace mutation feedback.
 - Password validation stays beside the relevant field, and settings load failures stay in their screen with retry where available; those messages need local context and recovery actions.
 - Typecheck, focused lint, unit tests, and diff checks passed. Browser rendering of the toast remains unverified in Chrome.
+
+## Asset, media, and research feedback — 2026-11-17
+
+- Brand asset uploads/previews/reviews, content image generation/reviews, and competitor-source mutations now use the shared feedback toast for success and errors. Intentional rejections use the informational tone.
+- Input validation, profile-lookup guidance, and load failures remain next to their forms or lists so recovery instructions stay actionable.
+- Focused checks passed. Chrome visual verification remains pending.

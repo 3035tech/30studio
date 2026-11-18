@@ -8,6 +8,7 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { DateField } from "@/components/ui/date-field";
 import { FileField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
+import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { BRAND_ASSET_ACTIONS, BRAND_ASSET_FORMATS_BY_MIME, BRAND_ASSET_KINDS, BRAND_ASSET_LIMITS, BRAND_ASSET_REVIEW_DECISION, BRAND_ASSET_STATUS, BRAND_ASSET_UI_IDS, getBrandAssetActionApiPath, getBrandAssetsApiPath, type BrandAssetKind } from "@/lib/constants";
 import { brandAssetDownloadResponseSchema, brandAssetsResponseSchema, brandAssetUploadSessionResponseSchema, type BrandAsset } from "@/lib/validation/brand-assets";
 
@@ -28,6 +29,7 @@ async function fetchBrandAssets(brandId: string, signal?: AbortSignal) {
 export function BrandAssetLibrary({ brandId }: { brandId: string }) {
   const t = useTranslations("brandAssets");
   const tTable = useTranslations("brandAssetTable");
+  const showFeedback = useSystemFeedback();
   const locale = useLocale();
   const libraryId = `${BRAND_ASSET_UI_IDS.libraryPrefix}${brandId}`;
   const [assets, setAssets] = useState<BrandAsset[]>([]);
@@ -44,7 +46,6 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
   const [pending, setPending] = useState(true);
   const [busy, setBusy] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [notice, setNotice] = useState("");
   const [preview, setPreview] = useState<{ asset: BrandAsset; url: string } | null>(null);
 
   const reload = useCallback(async (signal?: AbortSignal) => {
@@ -79,7 +80,6 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
     }
     setBusy(true);
     setHasError(false);
-    setNotice("");
     try {
       const bytes = await selectedFile.arrayBuffer();
       const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -122,9 +122,9 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       setRightsExpiresAt("");
       setAltText("");
       await reload();
-      setNotice(t("uploadComplete"));
+      showFeedback("success", t("uploadComplete"));
     } catch {
-      setHasError(true);
+      showFeedback("error", t("error"));
     } finally {
       setBusy(false);
     }
@@ -133,7 +133,6 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
   const reviewAsset = useCallback(async (asset: BrandAsset, decision: typeof BRAND_ASSET_REVIEW_DECISION[keyof typeof BRAND_ASSET_REVIEW_DECISION]) => {
     setBusy(true);
     setHasError(false);
-    setNotice("");
     try {
       const response = await fetch(getBrandAssetActionApiPath(brandId, asset.id, BRAND_ASSET_ACTIONS.review), {
         method: "POST",
@@ -144,13 +143,13 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       await readJson(response);
       await reload();
       setReviewNote("");
-      setNotice(t(decision === BRAND_ASSET_REVIEW_DECISION.approved ? "assetApproved" : "assetRejected"));
+      showFeedback(decision === BRAND_ASSET_REVIEW_DECISION.approved ? "success" : "info", t(decision === BRAND_ASSET_REVIEW_DECISION.approved ? "assetApproved" : "assetRejected"));
     } catch {
-      setHasError(true);
+      showFeedback("error", t("error"));
     } finally {
       setBusy(false);
     }
-  }, [brandId, reload, reviewNote, t]);
+  }, [brandId, reload, reviewNote, showFeedback, t]);
 
   const previewAsset = useCallback(async (asset: BrandAsset) => {
     setBusy(true);
@@ -159,11 +158,11 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       const result = brandAssetDownloadResponseSchema.parse(await readJson(response));
       setPreview({ asset, url: result.data.url });
     } catch {
-      setHasError(true);
+      showFeedback("error", t("error"));
     } finally {
       setBusy(false);
     }
-  }, [brandId]);
+  }, [brandId, showFeedback, t]);
 
   const columns = useMemo<DataTableColumn<BrandAsset>[]>(() => [
     { id: "fileName", label: tTable("file"), sortValue: (asset) => asset.fileName, render: (asset) => (
@@ -236,7 +235,6 @@ export function BrandAssetLibrary({ brandId }: { brandId: string }) {
       {canManage ? <div className="brandAssetLibrary__reviewNote"><TextAreaField id={`${BRAND_ASSET_UI_IDS.reviewNotePrefix}${brandId}`} label={t("reviewNote")} value={reviewNote} maxLength={BRAND_ASSET_LIMITS.maximumAltTextCharacters} disabled={busy} onChange={(event) => setReviewNote(event.target.value)} /></div> : null}
       {pending ? <p className="brandAssetLibrary__state" role="status">{t("loading")}</p> : null}
       {hasError ? <p className="brandAssetLibrary__state brandAssetLibrary__state--error" role="alert">{t("error")}</p> : null}
-      {notice ? <p className="brandAssetLibrary__state" role="status">{notice}</p> : null}
       {!pending && !hasError ? <DataTable
         id={libraryId}
         rows={assets}
