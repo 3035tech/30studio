@@ -105,6 +105,8 @@ export async function GET(request: NextRequest) {
       });
       if (error instanceof SocialProviderError && ["invalid_scope", "10", "200"].includes(error.providerCode ?? "")) {
         destination.searchParams.set("social_connection", "permissions_required");
+      } else if (error instanceof SocialProviderError && error.retryable) {
+        destination.searchParams.set("social_connection", "provider_unavailable");
       }
       await recordWorkspaceNotification({ organizationId: tenant.organizationId, eventType: WORKSPACE_NOTIFICATION_TYPES.socialConnectionFailed, dedupeKey: `oauth:${oauthState.stateHash}:failed`, brandId: oauthState.brandId, platform: oauthState.platform });
       return redirectToWorkspace(destination);

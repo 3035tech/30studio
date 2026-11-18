@@ -1029,6 +1029,7 @@
     "permissions_required": "A Meta não concedeu uma permissão necessária. Confira as permissões aprovadas no app Meta, autorize o acesso à Página do Facebook e, para Instagram, use uma conta profissional. Depois, tente conectar novamente.",
     "already_connected": "Esta conta já está conectada a esta marca.",
     "no_publishable_pages": "Nenhuma Página do Facebook com permissão de publicação foi encontrada. Conceda as permissões necessárias e tente novamente.",
+    "provider_unavailable": "A rede social está temporariamente indisponível ou limitou as tentativas. Aguarde um pouco e tente conectar novamente.",
     "requirements": {
       "facebook": "Antes de conectar: entre com uma conta que tenha acesso à Página e autorize pages_show_list, pages_read_engagement e pages_manage_posts. A Página precisa permitir criação de conteúdo.",
       "instagram": "Antes de conectar: use uma conta profissional do Instagram (Empresa ou Criador) e autorize instagram_business_basic e instagram_business_content_publishing no login da Meta."

@@ -85,7 +85,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
 
   useEffect(() => {
     if (!socialConnectionResult) return;
-    const knownResults = ["connected", "failed", "cancelled", "permissions_required", "already_connected", "no_publishable_pages"] as const;
+    const knownResults = ["connected", "failed", "cancelled", "permissions_required", "already_connected", "no_publishable_pages", "provider_unavailable"] as const;
     if (!knownResults.some((result) => result === socialConnectionResult)) return;
     const tone = socialConnectionResult === "failed" || socialConnectionResult === "permissions_required" || socialConnectionResult === "no_publishable_pages" ? "error" : socialConnectionResult === "connected" ? "success" : "info";
     showFeedback(tone, tSocialConnections(socialConnectionResult));
