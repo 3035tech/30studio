@@ -1,20 +1,17 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Image from "next/image";
-import { BarChart3, Building2, CalendarDays, ChevronDown, ChevronRight, ClipboardCheck, LayoutDashboard, Link2, LogOut, PanelLeftClose, PanelLeftOpen, Plus, Radar, UserRound, UsersRound } from "lucide-react";
+import { BarChart3, Building2, CalendarDays, ChevronRight, ClipboardCheck, LayoutDashboard, Link2, LogOut, Plus, Radar, UserRound, UsersRound } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { SelectField } from "@/components/ui/field";
 import { NotificationCenter } from "@/components/workspace/notification-center";
 import { Link } from "@/lib/i18n/routing";
-import { BRAND_ASSETS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type Locale } from "@/lib/constants";
+import { WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type Locale } from "@/lib/constants";
 
 type WorkspaceOrganization = { id: string; name: string };
 type WorkspaceSection = "overview" | "calendar" | "approvals" | "analytics" | "competitors" | "brands" | "connections" | "team" | "profile";
-type NavigationGroupId = "workspace" | "planning" | "management";
-
 type WorkspaceShellProps = {
   children: ReactNode;
   organizations: readonly WorkspaceOrganization[];
@@ -41,8 +38,6 @@ export function WorkspaceShell({
   const tNavigation = useTranslations("navigation");
   const tWorkspace = useTranslations("workspace");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
-  const [collapsedGroups, setCollapsedGroups] = useState<Partial<Record<NavigationGroupId, boolean>>>({});
-  const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
   const languageLabel = nextLocale === "en" ? tNavigation("english") : tNavigation("portuguese");
   const sections = [
     { id: "overview" as const, href: WORKSPACE_SECTION_IDS.overview, icon: LayoutDashboard, label: tNavigation("overview") },
@@ -77,17 +72,13 @@ export function WorkspaceShell({
 
   return (
     <div className="workspaceShell">
-      <div className={`workspaceLayout${isNavigationCollapsed ? " is-navigation-collapsed" : ""}`}>
-        <aside className={`workspaceSidebar${isNavigationCollapsed ? " is-collapsed" : ""}`}>
+      <div className="workspaceLayout">
+        <aside className="workspaceSidebar">
           <nav className="workspaceNavigation" aria-label={tNavigation("workspaceNavigation")}>
             <div className="workspaceNavigation__header">
               <Link className="workspaceNavigation__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")} title={tWorkspace("title")}>
                 <BrandLogo />
-                <Image className="workspaceNavigation__brandIcon" src={BRAND_ASSETS.icon32} width={36} height={36} alt="" priority />
               </Link>
-              <Button appearance="quiet" className="workspaceNavigation__collapse" type="button" aria-label={tNavigation(isNavigationCollapsed ? "expandNavigation" : "collapseNavigation")} aria-expanded={!isNavigationCollapsed} title={tNavigation(isNavigationCollapsed ? "expandNavigation" : "collapseNavigation")} onClick={() => setIsNavigationCollapsed((collapsed) => !collapsed)}>
-                {isNavigationCollapsed ? <PanelLeftOpen aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}
-              </Button>
             </div>
             <Button className="workspaceNavigation__create" type="button" aria-label={tNavigation("createContent")} disabled={!canCreateContent} title={!canCreateContent ? tNavigation("createContentUnavailable") : tNavigation("createContent")} onClick={() => { setActiveSection("calendar"); window.location.hash = WORKSPACE_SECTION_IDS.calendar; window.dispatchEvent(new Event(WORKSPACE_UI_EVENTS.createContent)); }}>
               <Plus aria-hidden="true" size={17} /><span>{tNavigation("createContent")}</span>
@@ -96,19 +87,9 @@ export function WorkspaceShell({
               {navigationGroups.map(({ id, sections: groupSections }) => (
                 <section className="workspaceNavigation__group" key={id} aria-labelledby={`workspace-navigation-${id}`}>
                   <h2 className="workspaceNavigation__groupTitle" id={`workspace-navigation-${id}`}>
-                    <Button
-                      appearance="quiet"
-                      className="workspaceNavigation__groupToggle"
-                      type="button"
-                      aria-expanded={!collapsedGroups[id]}
-                      aria-controls={`workspace-navigation-links-${id}`}
-                      onClick={() => setCollapsedGroups((current) => ({ ...current, [id]: !current[id] }))}
-                    >
-                      <span>{tNavigation(id)}</span>
-                      <ChevronDown aria-hidden="true" className={collapsedGroups[id] ? "workspaceNavigation__groupChevron is-collapsed" : "workspaceNavigation__groupChevron"} size={15} />
-                    </Button>
+                    {tNavigation(id)}
                   </h2>
-                  <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`} hidden={collapsedGroups[id] && !isNavigationCollapsed}>
+                  <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`}>
                     {groupSections.map(({ id: sectionId, href, icon: Icon, label }) => (
                       <a
                         className={activeSection === sectionId ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
