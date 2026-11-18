@@ -19,7 +19,7 @@ type SortState = { columnId: string; direction: "ascending" | "descending" };
 type CompactTableOptions = {
   summaryColumnId: string;
   detailColumnIds: readonly string[];
-  actionsColumnId: string;
+  actionsColumnId?: string;
 };
 
 type DataTableProps<Row> = {
@@ -128,7 +128,7 @@ export function DataTable<Row>({
         <ul className="dataTable__compactList">
           {pageRows.map((row) => {
             const summaryColumn = columns.find((column) => column.id === compact.summaryColumnId);
-            const actionsColumn = columns.find((column) => column.id === compact.actionsColumnId);
+            const actionsColumn = compact.actionsColumnId ? columns.find((column) => column.id === compact.actionsColumnId) : undefined;
             const detailColumns = compact.detailColumnIds.flatMap((columnId) => {
               const column = columns.find((candidate) => candidate.id === columnId);
               return column ? [{ column, value: column.render(row) }] : [];

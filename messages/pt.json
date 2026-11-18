@@ -1,4 +1,5 @@
 {
+  "dialog": { "close": "Fechar janela", "cancel": "Cancelar" },
   "fields": {
     "validation": {
       "required": "Preencha este campo.",
@@ -1043,6 +1044,7 @@
     "maximumTextCharacters": "Limite de texto ou legenda: {maximum} caracteres.",
     "health": {
       "title": "Saúde da conexão",
+      "detailsTitle": "Detalhes da conexão",
       "disabled": "Esta conexão está desativada.",
       "pending": "Esta conexão ainda não foi concluída.",
       "reauth": "Reconecte esta conta antes de publicar.",
@@ -1076,6 +1078,8 @@
     "eyebrow": "INTELIGÊNCIA COMPETITIVA",
     "title": "Atividade de concorrentes",
     "description": "Consulte perfis de concorrentes validados e acompanhe publicações observadas. Esta área reúne dados dos concorrentes; a marca de referência serve apenas para organizar a análise.",
+    "tabsLabel": "Seções de inteligência competitiva",
+    "tabs": { "overview": "Visão geral", "sources": "Fontes" },
     "analysisTitle": "Temas observados e ideias",
     "analysisDescription": "Os temas agrupam até os 100 itens coletados mais recentes. Cada item leva à fonte original; as pautas são sugestões, não afirmações verificadas nem resultados de engajamento.",
     "analysisPending": "Analisando {count} publicações de concorrentes…",
@@ -1146,7 +1150,7 @@
     "brand": "Marca",
     "brandContext": "Marca de referência",
     "addProfileTitle": "Adicionar concorrente",
-    "addProfileDescription": "Valide um perfil público antes de incluí-lo no monitoramento. Os resultados desta área mostram somente dados observados dos concorrentes.",
+    "addProfileDescription": "Valide um perfil público antes de incluí-lo no monitoramento. A coleta e a análise acontecem em segundo plano e podem levar alguns minutos para mostrar os primeiros resultados. As informações coletadas ficam salvas neste espaço de trabalho.",
     "network": "Rede social",
     "platformLookupUnavailable": "{platform} — validação ainda indisponível",
     "platformLookupXDisabled": "X — não habilitado pelo administrador",
@@ -1194,7 +1198,7 @@
     "loading": "Carregando fontes de concorrentes…",
     "loadError": "Não foi possível carregar as fontes de concorrentes. Tente novamente.",
     "saveError": "Não foi possível salvar esta fonte. Tente novamente.",
-    "sourceAdded": "Fonte adicionada. O worker fará a coleta na próxima execução.",
+    "sourceAdded": "Fonte adicionada. A coleta e a análise serão feitas em segundo plano; os resultados podem levar algum tempo para aparecer.",
     "sourceDuplicate": "Esta fonte já está no monitoramento desta marca.",
     "sourceLimit": "Esta marca atingiu o limite de 25 fontes. Arquive uma fonte para adicionar outra.",
     "sourcePaused": "Monitoramento pausado para esta fonte.",

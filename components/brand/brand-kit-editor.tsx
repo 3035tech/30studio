@@ -247,6 +247,7 @@ export function BrandKitEditor({ brandId, brandName, showHeader = true }: { bran
                 emptyMessage={t("noVersions")}
                 noMatchesMessage={tTable("noMatches")}
                 locale={locale}
+                compact={{ summaryColumnId: "version", detailColumnIds: ["status", "createdAt", "createdBy", "approvedAt"], actionsColumnId: "actions" }}
               />
             </section>
           </Disclosure>

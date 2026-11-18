@@ -44,10 +44,24 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
   const [lookupError, setLookupError] = useState<ProfileLookupError | null>(null);
   const [profilePreview, setProfilePreview] = useState<ProfileLookupPreview | null>(null);
   const [alertSettingsError, setAlertSettingsError] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "sources">("overview");
   const requestKey = `${brandId}:${refreshKey}`;
   const loading = Boolean(brandId) && loadedKey !== requestKey;
   const error = errorKey === requestKey;
   const currentData = loadedKey === requestKey ? data : null;
+
+  function handleTabKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const tabs = Array.from(event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % tabs.length
+      : event.key === "ArrowLeft" ? (currentIndex - 1 + tabs.length) % tabs.length
+        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    nextTab?.focus();
+    nextTab?.click();
+  }
 
   useEffect(() => {
     if (!brandId) return;
@@ -123,6 +137,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
       }
       setIdentifier("");
       setProfilePreview(null);
+      setActiveTab("sources");
       showFeedback("success", t("sourceAdded"));
       setRefreshKey((value) => value + 1);
     } catch {
@@ -149,6 +164,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
       }
       setWebsiteName("");
       setWebsiteUrl("");
+      setActiveTab("sources");
       showFeedback("success", t("sourceAdded"));
       setRefreshKey((value) => value + 1);
     } catch {
@@ -305,6 +321,22 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
     {loading ? <p className="workspaceEmpty" aria-live="polite">{t("loading")}</p> : null}
     {error ? <p className="entryMessage entryMessage--error" role="alert">{t("loadError")}</p> : null}
     {!brandId || activeBrands.length === 0 ? <p className="workspaceEmpty">{t("noBrands")}</p> : null}
+    {!loading && !error && currentData ? <>
+      <div className="publicationAnalytics__tabs" role="tablist" aria-label={t("tabsLabel")}>
+        {(["overview", "sources"] as const).map((tab) => <button
+          className={activeTab === tab ? "publicationAnalytics__tab is-selected" : "publicationAnalytics__tab"}
+          id={`competitor-tab-${tab}`}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab}
+          aria-controls={`competitor-panel-${tab}`}
+          tabIndex={activeTab === tab ? 0 : -1}
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          onKeyDown={handleTabKeyDown}
+        >{t(`tabs.${tab}`)}</button>)}
+      </div>
+      <div id="competitor-panel-overview" className="publicationAnalytics__tabPanel" role="tabpanel" tabIndex={0} aria-labelledby="competitor-tab-overview" hidden={activeTab !== "overview"}>
     {!loading && !error && currentData ? <section className="competitorIntelligence__analysis" aria-labelledby="competitor-analysis-title">
       <div><h3 id="competitor-analysis-title">{t("analysisTitle")}</h3><p>{t("analysisDescription")}</p></div>
       {pendingAnalysisCount > 0 ? <p className="competitorIntelligence__sourceMeta" role="status">{t("analysisPending", { count: pendingAnalysisCount })}</p> : null}
@@ -351,7 +383,7 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
         <span>{t("coverageUnavailable", { count: currentData.coverage.unavailable })}</span>
       </div>
       {currentData.alerts.length > 0 ? <ul className="competitorIntelligence__alerts" aria-label={t("alertsTitle")}>
-        {currentData.alerts.map((alert, index) => <li key={`${alert.sourceId}:${alert.type}:${index}`} role="alert"><span>{t(`alertType.${alert.type}`, { source: alert.sourceName, count: alert.count ?? 0, hours: COMPETITOR_WORKER.recentPublicationAlertHours })}</span><a href={`#competitor-source-${alert.sourceId}`}>{t("viewSource")}</a></li>)}
+        {currentData.alerts.map((alert, index) => <li key={`${alert.sourceId}:${alert.type}:${index}`} role="alert"><span>{t(`alertType.${alert.type}`, { source: alert.sourceName, count: alert.count ?? 0, hours: COMPETITOR_WORKER.recentPublicationAlertHours })}</span><a href={`#competitor-source-${alert.sourceId}`} onClick={() => setActiveTab("sources")}>{t("viewSource")}</a></li>)}
       </ul> : null}
       {currentData.canManage ? <form key={`${brandId}:${currentData.alertSettings.enabled}:${currentData.alertSettings.failureThreshold}:${currentData.alertSettings.staleAfterHours}`} className="competitorIntelligence__alertSettings" onSubmit={(event) => void saveAlertSettings(event)}>
         <h3>{t("alertSettingsTitle")}</h3>
@@ -361,6 +393,8 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
         <Button appearance="quiet" type="submit" disabled={saving}>{t("saveAlertSettings")}</Button>
       </form> : null}
     </section> : null}
+      </div>
+      <div id="competitor-panel-sources" className="publicationAnalytics__tabPanel" role="tabpanel" tabIndex={0} aria-labelledby="competitor-tab-sources" hidden={activeTab !== "sources"}>
     {!loading && !error && currentData && currentData.sources.length === 0 ? <p className="workspaceEmpty">{t("empty")}</p> : null}
     {!loading && !error && currentData?.sources.length ? <>
       <section className="competitorIntelligence__sourceFilters" aria-label={t("sourceFiltersTitle")}>
@@ -419,6 +453,8 @@ export function CompetitorIntelligence({ brands, selectedBrandId, onBrandChange,
         </ol> : <p className="competitorIntelligence__sourceMeta">{t("noObservations")}</p>}
       </li>)}
       </ul>}
+    </> : null}
+      </div>
     </> : null}
   </section>;
 }

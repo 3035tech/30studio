@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { BarChart3, Building2, CalendarDays, ChevronRight, ClipboardCheck, LayoutDashboard, Link2, LogOut, Plus, Radar, UserRound, UsersRound } from "lucide-react";
+import { BarChart3, Building2, CalendarDays, ChevronRight, ClipboardCheck, LayoutDashboard, Link2, LogOut, Menu, Plus, Radar, UserRound, UsersRound, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -38,7 +38,9 @@ export function WorkspaceShell({
   const tNavigation = useTranslations("navigation");
   const tWorkspace = useTranslations("workspace");
   const [activeSection, setActiveSection] = useState<WorkspaceSection>("overview");
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const languageLabel = nextLocale === "en" ? tNavigation("english") : tNavigation("portuguese");
+  const languageFlag = nextLocale === "en" ? "🇺🇸" : "🇧🇷";
   const sections = [
     { id: "overview" as const, href: WORKSPACE_SECTION_IDS.overview, icon: LayoutDashboard, label: tNavigation("overview") },
     { id: "calendar" as const, href: WORKSPACE_SECTION_IDS.calendar, icon: CalendarDays, label: tNavigation("calendar") },
@@ -76,73 +78,91 @@ export function WorkspaceShell({
         <aside className="workspaceSidebar">
           <nav className="workspaceNavigation" aria-label={tNavigation("workspaceNavigation")}>
             <div className="workspaceNavigation__header">
-              <Link className="workspaceNavigation__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")} title={tWorkspace("title")}>
+              <Link className="workspaceNavigation__brand" href={`#${WORKSPACE_SECTION_IDS.overview}`} aria-label={tWorkspace("title")} title={tWorkspace("title")} onClick={() => setMobileNavigationOpen(false)}>
                 <BrandLogo />
               </Link>
-            </div>
-            <Button className="workspaceNavigation__create" type="button" aria-label={tNavigation("createContent")} disabled={!canCreateContent} title={!canCreateContent ? tNavigation("createContentUnavailable") : tNavigation("createContent")} onClick={() => { setActiveSection("calendar"); window.location.hash = WORKSPACE_SECTION_IDS.calendar; window.dispatchEvent(new Event(WORKSPACE_UI_EVENTS.createContent)); }}>
-              <Plus aria-hidden="true" size={17} /><span>{tNavigation("createContent")}</span>
-            </Button>
-            <div className="workspaceNavigation__groups">
-              {navigationGroups.map(({ id, sections: groupSections }) => (
-                <section className="workspaceNavigation__group" key={id} aria-labelledby={`workspace-navigation-${id}`}>
-                  <h2 className="workspaceNavigation__groupTitle" id={`workspace-navigation-${id}`}>
-                    {tNavigation(id)}
-                  </h2>
-                  <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`}>
-                    {groupSections.map(({ id: sectionId, href, icon: Icon, label }) => (
-                      <a
-                        className={activeSection === sectionId ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
-                        href={`#${href}`}
-                        key={sectionId}
-                        aria-label={label}
-                        aria-current={activeSection === sectionId ? "location" : undefined}
-                        title={label}
-                      >
-                        <Icon aria-hidden="true" size={18} strokeWidth={1.8} />
-                        <span>{label}</span>
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-            <footer className="workspaceNavigation__footer">
-              <span className="workspaceNavigation__email" title={userEmail}>{userEmail}</span>
-              <a
-                className={activeSection === "profile" ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
-                href={`#${WORKSPACE_SECTION_IDS.profile}`}
-                aria-label={tNavigation("profile")}
-                aria-current={activeSection === "profile" ? "location" : undefined}
-                title={tNavigation("profile")}
+              <Button
+                appearance="quiet"
+                className="workspaceNavigation__mobileToggle"
+                type="button"
+                aria-label={tNavigation(mobileNavigationOpen ? "collapseNavigation" : "expandNavigation")}
+                aria-expanded={mobileNavigationOpen}
+                aria-controls="workspace-navigation-menu"
+                title={tNavigation(mobileNavigationOpen ? "collapseNavigation" : "expandNavigation")}
+                onClick={() => setMobileNavigationOpen((open) => !open)}
               >
-                <UserRound aria-hidden="true" size={18} strokeWidth={1.8} />
-                <span>{tNavigation("profile")}</span>
-              </a>
-              <Button appearance="quiet" className="workspaceNavigation__signOut" type="button" aria-label={tWorkspace("signOut")} title={tWorkspace("signOut")} onClick={onSignOut} disabled={busy}>
-                <LogOut aria-hidden="true" size={17} /><span>{tWorkspace("signOut")}</span>
+                {mobileNavigationOpen ? <X aria-hidden="true" size={20} /> : <Menu aria-hidden="true" size={20} />}
               </Button>
-            </footer>
+            </div>
+            <SelectField
+              className="workspaceNavigation__organization"
+              id="organization"
+              label={tWorkspace("switchOrganization")}
+              value={activeOrganizationId}
+              onChange={(event) => { setMobileNavigationOpen(false); onOrganizationChange(event.target.value); }}
+              disabled={busy}
+            >
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>{organization.name}</option>
+              ))}
+            </SelectField>
+            <div className="workspaceNavigation__menu" id="workspace-navigation-menu" data-open={mobileNavigationOpen}>
+              <Button className="workspaceNavigation__create" type="button" aria-label={tNavigation("createContent")} disabled={!canCreateContent} title={!canCreateContent ? tNavigation("createContentUnavailable") : tNavigation("createContent")} onClick={() => { setMobileNavigationOpen(false); setActiveSection("calendar"); window.location.hash = WORKSPACE_SECTION_IDS.calendar; window.dispatchEvent(new Event(WORKSPACE_UI_EVENTS.createContent)); }}>
+                <Plus aria-hidden="true" size={17} /><span>{tNavigation("createContent")}</span>
+              </Button>
+              <div className="workspaceNavigation__groups">
+                {navigationGroups.map(({ id, sections: groupSections }) => (
+                  <section className="workspaceNavigation__group" key={id} aria-labelledby={`workspace-navigation-${id}`}>
+                    <h2 className="workspaceNavigation__groupTitle" id={`workspace-navigation-${id}`}>
+                      {tNavigation(id)}
+                    </h2>
+                    <div className="workspaceNavigation__groupLinks" id={`workspace-navigation-links-${id}`}>
+                      {groupSections.map(({ id: sectionId, href, icon: Icon, label }) => (
+                        <a
+                          className={activeSection === sectionId ? "workspaceNavigation__link is-active" : "workspaceNavigation__link"}
+                          href={`#${href}`}
+                          key={sectionId}
+                          aria-label={label}
+                          aria-current={activeSection === sectionId ? "location" : undefined}
+                          title={label}
+                          onClick={() => setMobileNavigationOpen(false)}
+                        >
+                          <Icon aria-hidden="true" size={18} strokeWidth={1.8} />
+                          <span>{label}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+              <footer className="workspaceNavigation__footer">
+                <span className="workspaceNavigation__email" title={userEmail}>{userEmail}</span>
+                <Button appearance="quiet" className="workspaceNavigation__signOut" type="button" aria-label={tWorkspace("signOut")} title={tWorkspace("signOut")} onClick={onSignOut} disabled={busy}>
+                  <LogOut aria-hidden="true" size={17} /><span>{tWorkspace("signOut")}</span>
+                </Button>
+              </footer>
+            </div>
           </nav>
         </aside>
 
         <div className="workspaceMain">
           <header className="workspaceHeader">
             <div className="workspaceHeaderActions">
-              <NotificationCenter />
-              <SelectField
-                id="organization"
-                label={tWorkspace("switchOrganization")}
-                value={activeOrganizationId}
-                onChange={(event) => onOrganizationChange(event.target.value)}
-                disabled={busy}
-              >
-                {organizations.map((organization) => (
-                  <option key={organization.id} value={organization.id}>{organization.name}</option>
-                ))}
-              </SelectField>
-              <Link className="localeLink" href="/" locale={nextLocale} aria-label={tNavigation("switchLanguage")}>
+              <Link className="localeLink" href="/" locale={nextLocale} aria-label={tNavigation("switchLanguage")} onClick={() => setMobileNavigationOpen(false)}>
+                <span aria-hidden="true" className="localeLink__flag">{languageFlag}</span>
                 {languageLabel}
+              </Link>
+              <NotificationCenter />
+              <Link
+                className="workspaceHeader__profile"
+                href={`#${WORKSPACE_SECTION_IDS.profile}`}
+                aria-label={`${tNavigation("profile")}: ${userEmail}`}
+                aria-current={activeSection === "profile" ? "location" : undefined}
+                title={userEmail}
+                onClick={() => setMobileNavigationOpen(false)}
+              >
+                <UserRound aria-hidden="true" size={18} strokeWidth={1.8} />
+                <span>{tNavigation("profile")}</span>
               </Link>
             </div>
           </header>

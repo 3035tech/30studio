@@ -8,31 +8,15 @@ import { getSocialPublisher } from "../lib/server/social-publisher/registry";
 import { cleanupExpiredSocialPublicationImages, createInstagramPublicationImage, deleteSocialPublicationImage } from "../lib/server/brand-asset-storage";
 import { isPublishableInstagramImage } from "../lib/server/social-publisher/instagram-media";
 import { recordSocialPublishingWorkerHeartbeat } from "../lib/db/repositories/social-publication-health";
+import { claimNextDueSocialPublicationJob, recoverExpiredSocialPublicationLeases } from "../lib/db/repositories/social-publication-worker";
 import { logOperationalError } from "../lib/server/operational-logger";
 import { recordWorkspaceNotification } from "../lib/db/repositories/workspace-notifications";
 
 const pollMilliseconds = 5_000;
-const leaseBatchSize = 1;
-const leaseRecoveryBatchSize = 20;
 const reconciliationBatchSize = 1;
 let stopping = false;
 process.once("SIGINT", () => { stopping = true; });
 process.once("SIGTERM", () => { stopping = true; });
-
-async function claimDueJob() {
-  const db = getDatabase();
-  return db.transaction(async (tx) => {
-    const [job] = await tx.select().from(socialPublicationJobs).where(and(
-      eq(socialPublicationJobs.status, SOCIAL_PUBLICATION_JOB_STATUS.queued),
-      lte(socialPublicationJobs.nextAttemptAt, new Date()),
-    )).orderBy(asc(socialPublicationJobs.nextAttemptAt)).for("update", { skipLocked: true }).limit(leaseBatchSize);
-    if (!job) return null;
-    const now = new Date();
-    await tx.update(socialPublicationJobs).set({ status: SOCIAL_PUBLICATION_JOB_STATUS.processing, lockedAt: now, attemptCount: job.attemptCount + 1, providerReferenceId: null, updatedAt: now })
-      .where(and(eq(socialPublicationJobs.organizationId, job.organizationId), eq(socialPublicationJobs.id, job.id), eq(socialPublicationJobs.status, SOCIAL_PUBLICATION_JOB_STATUS.queued)));
-    return { ...job, attemptCount: job.attemptCount + 1 };
-  });
-}
 
 async function claimIndeterminateJob() {
   const db = getDatabase();
@@ -66,35 +50,7 @@ async function claimIndeterminateJob() {
   });
 }
 
-async function markExpiredLeasesIndeterminate() {
-  const db = getDatabase();
-  const leaseCutoff = new Date(Date.now() - SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS);
-  await db.transaction(async (tx) => {
-    const expiredJobs = await tx.select().from(socialPublicationJobs).where(and(
-      eq(socialPublicationJobs.status, SOCIAL_PUBLICATION_JOB_STATUS.processing),
-      lte(socialPublicationJobs.lockedAt, leaseCutoff),
-    )).orderBy(asc(socialPublicationJobs.lockedAt)).for("update", { skipLocked: true }).limit(leaseRecoveryBatchSize);
-    for (const job of expiredJobs) {
-      await tx.update(socialPublicationJobs).set({
-        status: SOCIAL_PUBLICATION_JOB_STATUS.indeterminate,
-        lastErrorCode: "worker_lease_expired",
-        lockedAt: null,
-        nextReconciliationAt: new Date(Date.now() + SOCIAL_PUBLICATION_RECONCILIATION_LIMITS.automaticCheckIntervalMilliseconds),
-        updatedAt: new Date(),
-      }).where(and(
-        eq(socialPublicationJobs.organizationId, job.organizationId),
-        eq(socialPublicationJobs.id, job.id),
-        eq(socialPublicationJobs.status, SOCIAL_PUBLICATION_JOB_STATUS.processing),
-      ));
-      await tx.insert(socialPublicationAttempts).values({
-        organizationId: job.organizationId, jobId: job.id, attemptNumber: job.attemptCount,
-        outcome: SOCIAL_PUBLICATION_JOB_STATUS.indeterminate, errorCode: "worker_lease_expired",
-      }).onConflictDoNothing({ target: [socialPublicationAttempts.organizationId, socialPublicationAttempts.jobId, socialPublicationAttempts.attemptNumber] });
-    }
-  });
-}
-
-async function finish(job: NonNullable<Awaited<ReturnType<typeof claimDueJob>>>, state: typeof SOCIAL_PUBLICATION_JOB_STATUS.published | typeof SOCIAL_PUBLICATION_JOB_STATUS.failed | typeof SOCIAL_PUBLICATION_JOB_STATUS.indeterminate, errorCode: string | null, externalPostId: string | null) {
+async function finish(job: NonNullable<Awaited<ReturnType<typeof claimNextDueSocialPublicationJob>>>, state: typeof SOCIAL_PUBLICATION_JOB_STATUS.published | typeof SOCIAL_PUBLICATION_JOB_STATUS.failed | typeof SOCIAL_PUBLICATION_JOB_STATUS.indeterminate, errorCode: string | null, externalPostId: string | null) {
   const db = getDatabase();
   await db.transaction(async (tx) => {
     const now = new Date();
@@ -196,7 +152,7 @@ async function processIndeterminateJob(job: NonNullable<Awaited<ReturnType<typeo
   });
 }
 
-async function processJob(job: NonNullable<Awaited<ReturnType<typeof claimDueJob>>>) {
+async function processJob(job: NonNullable<Awaited<ReturnType<typeof claimNextDueSocialPublicationJob>>>) {
   const db = getDatabase();
   try { await cleanupExpiredSocialPublicationImages(job.organizationId); } catch { /* Cleanup is retried by the next publication for this tenant. */ }
   const [data] = await db.select({
@@ -324,10 +280,10 @@ async function main() {
   try {
     while (!stopping) {
       if (Date.now() >= nextLeaseScanAt) {
-        await markExpiredLeasesIndeterminate();
+        await recoverExpiredSocialPublicationLeases();
         nextLeaseScanAt = Date.now() + SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS / 2;
       }
-      const job = await claimDueJob();
+      const job = await claimNextDueSocialPublicationJob();
       if (!job) {
         const indeterminateJob = await claimIndeterminateJob();
         if (indeterminateJob) {

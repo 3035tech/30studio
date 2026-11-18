@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import Image from "next/image";
-import { X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CheckboxField, FileField, PasswordField, SelectField, TextField } from "@/components/ui/field";
 import { brandListItemSchema, brandListResponseSchema, type BrandListItem } from "@/lib/validation/brands";
 import { AUTH_LIMITS, BRAND_ASSET_LIMITS, BRAND_LIMITS, BRAND_SEGMENTS, DASHBOARD_FILTERS, EMAIL_ROUTES, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type BrandSegment, type DashboardFilters, type Locale } from "@/lib/constants";
@@ -532,7 +531,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
         </aside> : null}
       </section>
 
-      <section className="dashboardFilterBar" aria-label={tDashboard("title")}>
+      <section className="dashboardFilterBar" id="workspace-dashboard-filters" aria-label={tDashboard("title")}>
         <SelectField id="dashboard-brand-filter" label={tDashboard("brand")} value={dashboardFilters.brandId} onChange={(event) => setDashboardFilters((current) => ({ ...current, brandId: event.target.value }))}>
           <option value="">{tDashboard("allBrands")}</option>{currentBrands.items.filter((brand) => brand.isActive).map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
         </SelectField>
@@ -662,7 +661,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
               </SelectField>
               <TextField id="brandWebsite" name="brandWebsite" type="url" label={tPortfolio("websiteUrl")} placeholder="https://" maxLength={BRAND_LIMITS.websiteUrlCharacters} />
               <FileField id="brandLogo" name="brandLogo" label={tPortfolio("brandLogo")} helpText={tPortfolio("brandLogoHelp")} accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")} />
-              <div className="brandCollection__editorActions"><DialogClose asChild><Button appearance="quiet" type="button" disabled={busy}>{tPortfolio("cancel")}</Button></DialogClose><Button type="submit" disabled={busy || !activeOrganization?.id || currentBrands.error || currentBrands.pending}>{busy ? tAuth("working") : tWorkspace("addBrand")}</Button></div>
+              <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button type="submit" disabled={busy || !activeOrganization?.id || currentBrands.error || currentBrands.pending}>{busy ? tAuth("working") : tWorkspace("addBrand")}</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -681,7 +680,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
                 <TextField id="brand-edit-website" name="websiteUrl" type="url" label={tPortfolio("websiteUrl")} defaultValue={brand.websiteUrl ?? ""} maxLength={BRAND_LIMITS.websiteUrlCharacters} />
                 {brand.logoAssetId ? <div className="brandEditLogo"><span className="brandEditLogo__preview">{brand.logoAssetStatus ? <Image src={`/api/brands/${brand.id}/logo/${brand.logoAssetId}`} alt="" fill sizes="72px" unoptimized /> : null}</span><span><strong>{tPortfolio("currentBrandLogo")}</strong>{brand.logoAssetStatus === "pending_review" ? <small>{tPortfolio("brandLogoPending")}</small> : null}</span></div> : null}
                 <FileField id="brand-edit-logo" name="brandLogo" label={tPortfolio("replaceBrandLogo")} helpText={tPortfolio("brandLogoHelp")} accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")} />
-                <div className="brandCollection__editorActions"><Button type="submit" disabled={busy}>{busy ? tAuth("working") : tPortfolio("saveChanges")}</Button><Button appearance="quiet" type="button" disabled={busy} onClick={() => setEditingBrandId(null)}>{tPortfolio("cancel")}</Button></div>
+                <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button type="submit" disabled={busy}>{busy ? tAuth("working") : tPortfolio("saveChanges")}</Button></DialogFooter>
               </form>
             </DialogContent>;
           })() : null}
@@ -692,7 +691,7 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
             if (!brand) return null;
             return <DialogContent aria-labelledby="brand-archive-title" aria-describedby="brand-archive-description">
               <DialogHeader><DialogTitle id="brand-archive-title">{tPortfolio("archiveBrand")}</DialogTitle><DialogDescription id="brand-archive-description">{tPortfolio("archiveConfirmation", { brand: brand.name })}</DialogDescription></DialogHeader>
-              <div className="brandCollection__editorActions"><Button appearance="quiet" type="button" disabled={busy} onClick={() => setArchivingBrandId(null)}>{tPortfolio("cancel")}</Button><Button appearance="danger" type="button" disabled={busy} onClick={() => void handleArchiveBrand(brand.id)}>{busy ? tAuth("working") : tPortfolio("confirmArchive")}</Button></div>
+              <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button appearance="danger" type="button" disabled={busy} onClick={() => void handleArchiveBrand(brand.id)}>{busy ? tAuth("working") : tPortfolio("confirmArchive")}</Button></DialogFooter>
             </DialogContent>;
           })() : null}
         </Dialog>
@@ -702,8 +701,8 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
             if (!brand) return null;
             return <DialogContent className="brandKitDialog" aria-labelledby="brand-kit-dialog-title" aria-describedby="brand-kit-dialog-description">
               <DialogHeader><DialogTitle id="brand-kit-dialog-title">{tBrandKit("title", { brand: brand.name })}</DialogTitle><DialogDescription id="brand-kit-dialog-description">{tBrandKit("description")}</DialogDescription></DialogHeader>
-              <div className="brandKitDialog__close"><DialogClose asChild><Button appearance="quiet" type="button" disabled={busy}><X aria-hidden="true" size={16} />{tPortfolio("closeBrandKit")}</Button></DialogClose></div>
               <BrandKitEditor brandId={brand.id} brandName={brand.name} showHeader={false} />
+              <DialogFooter><DialogCancel disabled={busy}>{tPortfolio("closeBrandKit")}</DialogCancel></DialogFooter>
             </DialogContent>;
           })() : null}
         </Dialog>

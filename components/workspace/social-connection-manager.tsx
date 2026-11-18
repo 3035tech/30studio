@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Disclosure } from "@/components/ui/disclosure";
+import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { SOCIAL_PLATFORMS, type Locale, type SocialPlatform, type SocialProfileStatus } from "@/lib/constants";
 import { socialConnectionAuthorizationResponseSchema, socialConnectionConfigurationResponseSchema, socialConnectionListResponseSchema } from "@/lib/validation/social-connections";
@@ -147,6 +148,9 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
             <small className={`brandProfileStatus brandProfileStatus--${connection.status}`}>{statusLabel(connection.status)}</small>
             <div className="socialConnectionManager__health" aria-label={t("health.title")}>
               <strong>{t(`health.${health}`)}</strong>
+            </div>
+            <Disclosure className="socialConnectionManager__details" title={t("health.detailsTitle")}>
+              <div className="socialConnectionManager__healthDetails">
               {connection.connectedByName ? <small>{t("health.connectedBy", { name: connection.connectedByName })}</small> : null}
               {connection.tokenExpiresAt ? <small>{t("health.tokenExpires", { date: dateFormatter.format(new Date(connection.tokenExpiresAt)) })}</small> : null}
               {connection.refreshTokenExpiresAt ? <small>{t("health.refreshExpires", { date: dateFormatter.format(new Date(connection.refreshTokenExpiresAt)) })}</small> : null}
@@ -154,7 +158,8 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
               {connection.missingScopes.length ? <small>{t("health.missingScopes", { scopes: formatScopes(connection.missingScopes) })}</small> : null}
               {connection.grantedScopes.length ? <small>{t("health.grantedScopes", { scopes: formatScopes(connection.grantedScopes) })}</small> : null}
               <small>{t("health.remoteCheckUnavailable")}</small>
-            </div>
+              </div>
+            </Disclosure>
             {canManage && connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => setPendingDisconnect(connection)}>
               {busyPlatform === platform ? t("working") : t("disconnect")}
             </Button> : null}
@@ -169,10 +174,10 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
           <DialogTitle id="social-disconnect-title">{t("disconnectTitle")}</DialogTitle>
           <DialogDescription id="social-disconnect-description">{t("disconnectConfirmation", { account: pendingDisconnect.displayName })}</DialogDescription>
         </DialogHeader>
-        <div className="brandCollection__editorActions">
-          <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => setPendingDisconnect(null)}>{t("cancel")}</Button>
+        <DialogFooter className="brandCollection__editorActions">
+          <DialogCancel disabled={busyPlatform !== null}>{t("cancel")}</DialogCancel>
           <Button appearance="danger" type="button" disabled={busyPlatform !== null} onClick={() => void disconnect(pendingDisconnect)}>{busyPlatform === pendingDisconnect.platform ? t("working") : t("disconnect")}</Button>
-        </div>
+        </DialogFooter>
       </DialogContent> : null}
     </Dialog>
   </section>;

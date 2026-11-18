@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { inArray } from "drizzle-orm";
-import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_STATUS, SOCIAL_PLATFORMS } from "@/lib/constants";
+import { and, eq, inArray } from "drizzle-orm";
+import { CONTENT_APPROVAL_STATUS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, CONTENT_STATUS, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUS, SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS } from "@/lib/constants";
 import { createBrand } from "@/lib/db/repositories/brands";
 import { approveBrandKitVersion, createBrandKitVersion } from "@/lib/db/repositories/brand-kits";
-import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentCarouselGeneration, enqueueContentMediaGeneration, getCalendarContentReviewContext, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
+import { claimNextContentMediaJob, completeContentMediaJob, createCalendarCampaign, createCalendarContentVersion, createCalendarIdea, enqueueContentCarouselGeneration, enqueueContentMediaGeneration, failContentMediaJob, getCalendarContentReviewContext, getCalendarContentVersions, listCalendarItems, listContentMediaForVersion, reviewContentMedia } from "@/lib/db/repositories/calendar";
 import { closeDatabase, getDatabase } from "@/lib/db/client";
 import { decideContentApproval, getContentApprovalState, submitContentForApproval } from "@/lib/db/repositories/content-approvals";
 import { saveContentApprovalPolicy } from "@/lib/db/repositories/content-approval-policies";
-import { organization, socialProfileCredentials, socialProfiles, user } from "@/lib/db/schema";
+import { claimNextDueSocialPublicationJob, recoverExpiredSocialPublicationLeases } from "@/lib/db/repositories/social-publication-worker";
+import { contentMediaAssets, organization, socialProfileCredentials, socialProfiles, socialPublicationAttempts, socialPublicationJobs, user } from "@/lib/db/schema";
 
 const ids = {
   user: `calendar-test-user-${crypto.randomUUID()}`,
@@ -234,6 +235,42 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.equal(claimedTextCard?.id, queuedTextCard.assetId);
   assert.equal(claimedTextCard?.modelId, CONTENT_MEDIA_TEMPLATE.textCardModelId);
   assert.deepEqual(JSON.parse(claimedTextCard?.prompt ?? "{}"), textCardPayload);
+  assert.ok(claimedTextCard?.claimedAt);
+  if (!claimedTextCard?.claimedAt) return;
+  const firstTextCardClaimAt = claimedTextCard.claimedAt;
+  const expiredLeaseAt = new Date(Date.now() - CONTENT_MEDIA_WORKER.leaseMilliseconds - 1_000);
+  await database.update(contentMediaAssets).set({ claimedAt: expiredLeaseAt }).where(and(
+    eq(contentMediaAssets.organizationId, ids.organizationA),
+    eq(contentMediaAssets.brandId, brandA.id),
+    eq(contentMediaAssets.id, claimedTextCard.id),
+    eq(contentMediaAssets.status, CONTENT_MEDIA_STATUS.processing),
+  ));
+  const reclaimedTextCard = await claimNextContentMediaJob(new Date(), ids.organizationA);
+  assert.equal(reclaimedTextCard?.id, claimedTextCard.id);
+  assert.equal(reclaimedTextCard?.attempts, 2);
+  assert.ok(reclaimedTextCard?.claimedAt);
+  if (!reclaimedTextCard?.claimedAt) return;
+  assert.equal(await completeContentMediaJob({
+    organizationId: ids.organizationA,
+    id: reclaimedTextCard.id,
+    claimedAt: firstTextCardClaimAt,
+    contentType: "image/webp",
+    sizeBytes: 1_024,
+    width: 1_024,
+    height: 1_024,
+    sha256: "c".repeat(64),
+  }), null);
+  const failedAt = new Date();
+  await failContentMediaJob({ organizationId: ids.organizationA, id: reclaimedTextCard.id, claimedAt: reclaimedTextCard.claimedAt, attempts: reclaimedTextCard.attempts }, failedAt);
+  const [retryingTextCard] = await database.select({ status: contentMediaAssets.status, attempts: contentMediaAssets.attempts, availableAt: contentMediaAssets.availableAt, failureCode: contentMediaAssets.failureCode }).from(contentMediaAssets).where(and(
+    eq(contentMediaAssets.organizationId, ids.organizationA),
+    eq(contentMediaAssets.brandId, brandA.id),
+    eq(contentMediaAssets.id, reclaimedTextCard.id),
+  ));
+  assert.equal(retryingTextCard?.status, CONTENT_MEDIA_STATUS.queued);
+  assert.equal(retryingTextCard?.attempts, 2);
+  assert.equal(retryingTextCard?.failureCode, CONTENT_MEDIA_STATUS.failed);
+  assert.ok(retryingTextCard?.availableAt && retryingTextCard.availableAt > failedAt);
 
   const carouselItem = await createCalendarIdea(ids.organizationA, ids.user, {
     brandId: brandA.id,
@@ -270,8 +307,13 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.equal(replayedCarousel.kind, "existing");
   assert.equal((await enqueueContentCarouselGeneration({ ...carouselInput, prompts: ["changed", ...carouselInput.prompts.slice(1)] })).kind, "conflict");
   if (carousel.kind !== "created") return;
-  for (let pageIndex = 0; pageIndex < CONTENT_MEDIA_CAROUSEL.pageCount; pageIndex += 1) {
-    const pageJob = await claimNextContentMediaJob(new Date(Date.now() + 10_000 + pageIndex), ids.organizationA);
+  const concurrentPageClaims = await Promise.all([
+    claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA),
+    claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA),
+  ]);
+  assert.equal(concurrentPageClaims.filter((job) => job !== null).length, 2);
+  assert.equal(new Set(concurrentPageClaims.map((job) => job?.id)).size, 2);
+  for (const pageJob of concurrentPageClaims) {
     assert.equal(pageJob?.carouselId, carouselInput.idempotencyKey);
     assert.ok(pageJob?.claimedAt);
     if (!pageJob?.claimedAt) return;
@@ -286,6 +328,20 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
       sha256: "b".repeat(64),
     });
   }
+  const lastPageJob = await claimNextContentMediaJob(new Date(Date.now() + 10_000), ids.organizationA);
+  assert.equal(lastPageJob?.carouselId, carouselInput.idempotencyKey);
+  assert.ok(lastPageJob?.claimedAt);
+  if (!lastPageJob?.claimedAt) return;
+  await completeContentMediaJob({
+    organizationId: ids.organizationA,
+    id: lastPageJob.id,
+    claimedAt: lastPageJob.claimedAt,
+    contentType: "image/webp",
+    sizeBytes: 1_024,
+    width: 1_080,
+    height: 1_080,
+    sha256: "b".repeat(64),
+  });
   const pendingCarousel = await listContentMediaForVersion(ids.organizationA, carouselItem.id, carouselVersion.id);
   assert.equal(pendingCarousel.filter((media) => media.carouselId === carouselInput.idempotencyKey).length, CONTENT_MEDIA_CAROUSEL.pageCount);
   assert.deepEqual(pendingCarousel.filter((media) => media.carouselId === carouselInput.idempotencyKey).map((media) => media.pageNumber), [1, 2, 3]);
@@ -369,4 +425,37 @@ test("calendar ideas are persisted by tenant and listed only within the requeste
   assert.equal(approvedState?.history[0]?.status, CONTENT_APPROVAL_STATUS.approved);
   assert.equal(approvedState?.history[0]?.decisions.length, 2);
   assert.equal(await getContentApprovalState(ids.organizationB, approvalItem.id), null);
+
+  const [queuedPublication] = await database.select({ id: socialPublicationJobs.id }).from(socialPublicationJobs).where(and(
+    eq(socialPublicationJobs.organizationId, ids.organizationA),
+    eq(socialPublicationJobs.contentItemId, approvalItem.id),
+    eq(socialPublicationJobs.status, SOCIAL_PUBLICATION_JOB_STATUS.queued),
+  ));
+  assert.ok(queuedPublication);
+  const claimTime = new Date();
+  await database.update(socialPublicationJobs).set({ nextAttemptAt: new Date(claimTime.getTime() - 1_000) }).where(eq(socialPublicationJobs.id, queuedPublication.id));
+  const concurrentClaims = await Promise.all([
+    claimNextDueSocialPublicationJob(claimTime),
+    claimNextDueSocialPublicationJob(claimTime),
+  ]);
+  const claimedPublication = concurrentClaims.find((job) => job !== null);
+  assert.equal(concurrentClaims.filter((job) => job !== null).length, 1);
+  assert.ok(claimedPublication);
+  assert.equal(claimedPublication.id, queuedPublication.id);
+  assert.equal(claimedPublication.attemptCount, 1);
+
+  const recoveryTime = new Date();
+  const expiredAt = new Date(recoveryTime.getTime() - SOCIAL_PUBLICATION_LEASE_TIMEOUT_MILLISECONDS - 1_000);
+  await database.update(socialPublicationJobs).set({ lockedAt: expiredAt }).where(eq(socialPublicationJobs.id, claimedPublication.id));
+  assert.equal(await recoverExpiredSocialPublicationLeases(recoveryTime), 1);
+  assert.equal(await recoverExpiredSocialPublicationLeases(recoveryTime), 0);
+  const [recoveredPublication] = await database.select().from(socialPublicationJobs).where(eq(socialPublicationJobs.id, queuedPublication.id));
+  assert.equal(recoveredPublication?.status, SOCIAL_PUBLICATION_JOB_STATUS.indeterminate);
+  assert.equal(recoveredPublication?.lastErrorCode, "worker_lease_expired");
+  const leaseAttempts = await database.select().from(socialPublicationAttempts).where(and(
+    eq(socialPublicationAttempts.organizationId, ids.organizationA),
+    eq(socialPublicationAttempts.jobId, queuedPublication.id),
+  ));
+  assert.equal(leaseAttempts.length, 1);
+  assert.equal(leaseAttempts[0]?.outcome, SOCIAL_PUBLICATION_JOB_STATUS.indeterminate);
 });

@@ -185,6 +185,7 @@ export function TeamManagement({ organizationId, brands }: { organizationId: str
             id="team-members" rows={currentTeamData.members} columns={memberColumns} getRowId={(member) => member.id} initialSortColumnId="name"
             searchValue={(member) => `${member.name} ${member.email} ${member.role}`} searchLabel={t("memberSearch")}
             pageSizeLabel={t("tablePageSize")} emptyMessage={t("empty")} noMatchesMessage={t("tableNoMatches")} locale={locale}
+            compact={{ summaryColumnId: "name", detailColumnIds: ["joined", "role"], actionsColumnId: "actions" }}
           /> : null}
         </div>
         <div className="teamSection__panel" id="team-panel-access" role="tabpanel" aria-labelledby="team-tab-access" tabIndex={0} hidden={activeTab !== "access"}>{activeTab === "access" ? <TeamAccessManagement organizationId={organizationId ?? ""} canManage={currentTeamData.canManage} actorRole={currentTeamData.actorRole} /> : null}</div>

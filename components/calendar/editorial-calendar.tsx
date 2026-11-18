@@ -9,7 +9,7 @@ import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { DateField } from "@/components/ui/date-field";
 import { TimeField } from "@/components/ui/time-field";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
 import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
 import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
@@ -716,10 +716,10 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                   })}</div>
                   <p className="editorialCalendar__channelNote">{t("channelPreparationNote")}</p>
                 </fieldset>
-                <div className="editorialCalendar__formActions">
+                <DialogFooter className="editorialCalendar__formActions">
                   <Button type="button" disabled={busy} onClick={continueCampaignSetup}>{t("continueToSchedule")}</Button>
-                  <Button appearance="quiet" type="button" disabled={busy} onClick={() => setFormOpen(false)}>{t("cancel")}</Button>
-                </div>
+                  <DialogCancel disabled={busy}>{t("cancel")}</DialogCancel>
+                </DialogFooter>
               </> : <>
                 <section className="editorialCalendar__wizardStep" aria-labelledby="campaign-schedule-step-title">
                   <div><h3 id="campaign-schedule-step-title">{t("scheduleStepTitle")}</h3><p>{t("scheduleStepDescription")}</p></div>
@@ -741,10 +741,11 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                     <small>{t("localTime")}</small>
                   </section>
                 </section>
-                <div className="editorialCalendar__formActions">
+                <DialogFooter className="editorialCalendar__formActions">
                   <Button appearance="quiet" type="button" disabled={busy} onClick={() => { setCampaignFormError(""); setCreateStep("details"); }}>{t("backToDetails")}</Button>
+                  <DialogCancel disabled={busy}>{t("cancel")}</DialogCancel>
                   <Button type="submit" disabled={busy}>{busy ? t("saving") : t("createCampaign")}</Button>
-                </div>
+                </DialogFooter>
               </>}
             </form>
           </DialogContent>
@@ -926,13 +927,13 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
               <TextAreaField id="calendar-approval-note" label={t("approvalNote")} value={approvalNote} maxLength={CONTENT_APPROVAL_LIMITS.maximumNoteCharacters} onChange={(event) => setApprovalNote(event.target.value)} />
               <div className="editorialCalendar__formActions"><Button type="button" disabled={busy} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.approve)}>{t("approveContent")}</Button><Button appearance="quiet" type="button" disabled={busy || !approvalNote.trim()} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.requestChanges)}>{t("requestChanges")}</Button><Button appearance="danger" type="button" disabled={busy || !approvalNote.trim()} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.reject)}>{t("rejectContent")}</Button></div>
             </div> : null}
-            <div className="editorialCalendar__formActions">
+            <DialogFooter className="editorialCalendar__formActions">
               {selectedCanEdit ? <>
                 <Button type="submit" disabled={busy || generatingCopy || variantCopyExceedsPlatformLimit}>{busy ? t("saving") : t("saveDraft")}</Button>
                 <Button appearance="quiet" type="button" disabled={busy || generatingCopy || variantCopyExceedsPlatformLimit || editorDirty || Boolean(generatedCopy?.itemId === selectedItem.id) || !contentVersionState.data.current || !contentVersionState.data.approval.canRequest || contentVersionState.data.approval.mediaPending || Boolean(currentApprovalRequest) || (contentVersionState.data.approval.publisherProfileRequired && !selectedSocialProfileId)} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.submit)}>{t("requestApproval")}</Button>
               </> : null}
-              <Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } }}>{t("cancel")}</Button>
-            </div>
+              <DialogCancel disabled={busy || generatingCopy}>{t("cancel")}</DialogCancel>
+            </DialogFooter>
           </form> : null}
         </DialogContent> : null}
       </Dialog>

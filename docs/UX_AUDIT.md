@@ -227,3 +227,48 @@ The live browser became unavailable during the latest audit pass, so these are d
 - Brand asset uploads/previews/reviews, content image generation/reviews, and competitor-source mutations now use the shared feedback toast for success and errors. Intentional rejections use the informational tone.
 - Input validation, profile-lookup guidance, and load failures remain next to their forms or lists so recovery instructions stay actionable.
 - Focused checks passed. Chrome visual verification remains pending.
+
+## Workspace header and compact table follow-up — 2026-11-18
+
+- Moved the workspace selector into persistent navigation and grouped language, notifications, and profile actions at the top right. The language action shows the destination locale's flag; on narrow screens the profile control keeps its accessible name while reducing to an icon.
+- Source review found that compact access-history cards rendered the actor a second time as a fake actions area. Compact tables now support rows without an actions column, so the audit card keeps its event as the heading and its actor only in the details.
+- ESLint, TypeScript, production build, and `git diff --check` passed. Chrome's browser access host remains unavailable and Python Playwright is not installed, so responsive rendering and interaction still need visual confirmation.
+
+## Mobile navigation pass — 2026-11-18
+
+- The mobile workspace shell now keeps the brand and active workspace selector visible while collapsing create, section links, and sign-out behind an accessible menu toggle. Choosing a destination closes the menu.
+- The toggle uses the existing localized expand/collapse labels and exposes `aria-expanded` and `aria-controls`; desktop and tablet navigation remain expanded.
+- ESLint, TypeScript, production build, and `git diff --check` passed. Mobile rendering still needs confirmation in a browser because the Chrome access host is unavailable.
+
+## Mobile notification panel pass — 2026-11-18
+
+- Repositioned the notification panel below the mobile workspace header and bounded its height by the visible viewport, including safe-area insets. The open panel no longer covers the bell or extends past the bottom edge on short screens.
+- ESLint, production build, and `git diff --check` passed. Exact viewport placement remains unverified visually because the Chrome access host is unavailable.
+
+## Notification panel viewport alignment — 2026-11-18
+
+- Anchored the notification panel to the viewport edge on desktop so its width no longer depends on the bell's position between language and profile actions. Kept a full-width, inset layout on narrow screens and bounded the panel height to the visible viewport.
+- Source-level CSS review only; Chrome browser access is unavailable in this session, so desktop and mobile placement still need visual confirmation.
+
+## Competitor research information density — 2026-11-18
+
+- Split competitor research into keyboard-accessible Overview and Sources tabs. Operational health, analysis, and trends stay together in Overview; source search, filters, history, and collected items live in Sources.
+- After adding a social profile or website, the view switches to Sources so the user can immediately see collection state and follow the background work. Existing copy continues to explain that results take time and remain stored in the workspace.
+- TypeScript, ESLint, and `git diff --check` passed. Responsive layout and tab interaction still require browser visual confirmation; Chrome access is unavailable in this session.
+
+## Social connection detail density — 2026-11-18
+
+- Social account cards keep the connection health message visible and move token expiry, permission scopes, connection owner, and saved-credential timestamps into a collapsed “Connection details” disclosure. This makes routine account status easier to scan while retaining diagnostics when troubleshooting.
+- TypeScript, ESLint, and `git diff --check` passed. The compact card layout still needs visual confirmation in Chrome.
+
+## Campaign planner short-screen usability — 2026-11-18
+
+- The campaign dialog now keeps its title and description in view while the form scrolls independently. Step actions stay pinned at the bottom of the form, making Continue, Back, and Create reachable when per-network schedules make the dialog taller than the viewport.
+- The dialog height follows the dynamic viewport on mobile browsers and its internal scrolling does not chain into the calendar behind it.
+- TypeScript, ESLint, and `git diff --check` passed. Actual keyboard and mobile viewport behavior still needs visual confirmation in Chrome.
+
+## Shared modal controls and layout — 2026-11-18
+
+- All shared Radix dialogs now include the same labeled close button in the top-right corner, reserve space in the header for it, and use a shared right-aligned footer pattern.
+- Replaced modal-specific cancel controls with the shared Cancel action and added it to the campaign scheduling step and date picker. The Brand Kit uses the same footer position with its clearer “Close” label. Existing dirty-editor handling remains connected to the dialog's close event.
+- Dialog heights now use the dynamic viewport. ESLint, TypeScript, and `git diff --check` passed; live keyboard and responsive visual checks remain pending in Chrome.

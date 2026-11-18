@@ -5,7 +5,7 @@ import type { KeyboardEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type DateFieldProps = {
   id: string;
@@ -188,6 +188,7 @@ export function DateField({ id, label, name, value, defaultValue = "", onValueCh
             onKeyDown={(event) => handleDayKeyDown(event, date)}
           >{date.getUTCDate()}</button></div> : <span aria-hidden="true" className="datePicker__day datePicker__day--empty" key={`empty-${index}`} />)}
         </div>
+        <DialogFooter><DialogCancel /></DialogFooter>
       </DialogContent>
     </Dialog>
   </div>;

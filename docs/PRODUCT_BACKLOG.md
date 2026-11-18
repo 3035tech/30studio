@@ -20,7 +20,7 @@ Revisto em 2026-11-17 após conferência com rotas, workers, repositórios, migr
 ### Auditoria de fechamento da versão — 2026-11-17
 
 - Na revisão do commit `4def6be`, lint, TypeScript, build Webpack, `drizzle-kit check` e 42 testes unitários passaram localmente.
-- A suíte de integração ainda não foi aprovada: no container local, o volume persistente de `node_modules` está desatualizado e não contém `@better-auth/redis-storage`; o PostgreSQL de desenvolvimento está aplicado até `0034`, mas o journal e o código vão até `0040`. O CI agora deve aplicar as migrations numa base PostgreSQL descartável e executar os testes de integração com Mailpit.
+- O container local continua sem validar a suíte completa: seu volume persistente de `node_modules` não contém `@better-auth/redis-storage`, e o PostgreSQL de desenvolvimento está aplicado até `0034`. O workflow do GitHub Actions aplica o journal completo em PostgreSQL descartável, executa as integrações com Mailpit e passou na execução da `main` de 2026-11-18 (`44271758190`).
 - A inspeção de interface via navegador segue pendente porque o host de automação do navegador estava indisponível. O build não substitui a revisão visual e de teclado em desktop/mobile e PT/EN.
 - Ainda não é uma versão homologada para publicação real: conectores, workers, OpenAI e armazenamento dependem das configurações e contas aprovadas no ambiente-alvo. Não enviar conteúdo real durante a homologação.
 
@@ -46,6 +46,12 @@ Revisto em 2026-11-17 após conferência com rotas, workers, repositórios, migr
 | OAuth social, aprovação configurável, publicação e analytics | Conexões, aprovação, publicação inicial e analytics operacionais de publicações implementados | OAuth com adaptadores desacoplados, credenciais criptografadas e gestão de perfis; políticas de aprovação e decisões vinculadas a fingerprint; worker PostgreSQL durável para LinkedIn/Threads/Facebook (texto) e Instagram (uma imagem com legenda), com destino por publicação exibido no calendário e histórico de aprovação. O worker informa heartbeat; o dashboard mostra saúde, volume de jobs vencidos por tenant, marca e rede e o horário do mais antigo, com atalho para a fila. O dashboard também compartilha filtros de marca/rede/período, mostra fila de atenção com atalhos para resolver falhas, conciliar resultados, revisar aprovações e reabrir conexões; alertas podem ser silenciados por usuário por 24 horas. Metas mensais por marca/rede e progresso comparado ao período também estão disponíveis. Coleta manual de curtidas/reactions e comentários de até 10 posts recentes do Facebook/Instagram registra snapshots com origem, versão da definição, data, cobertura, frescor e resultado de acesso. Métricas da API para Threads, LinkedIn, alcance, impressões, vídeo e periodicidade automática seguem pendentes. Migrações `0021`–`0022`, `0026` e `0031`–`0032` geradas, ainda não aplicadas. |
 
 ## Mapa de telas
+
+### Estado de navegação das áreas previstas
+
+- A biblioteca de mídia ainda não é uma área independente: os assets de marca ficam no Brand Kit da marca e as mídias de publicação aparecem dentro do editor do calendário. A navegação deve continuar levando a essas áreas até existir uma biblioteca unificada com escopo, filtros, prévia e direitos de uso.
+- O histórico operacional S17 também não existe como tela independente. Há histórico de notificações, decisões de aprovação, versões de conteúdo e execuções de fontes concorrentes em seus respectivos fluxos; logs operacionais do servidor não são uma interface de usuário. Não apresentar esses históricos parciais como se fossem uma central completa de operações.
+- As áreas existentes usam destinos isolados no shell. A visão geral mantém apenas resumo e indicadores; analytics, concorrentes, calendário, marcas/conexões, equipe e perfil aparecem como destinos separados.
 
 | ID | Tela/área | Objetivo e ações principais | Dados centrais |
 |---|---|---|---|
@@ -202,9 +208,9 @@ Revisto em 2026-11-17 após conferência com rotas, workers, repositórios, migr
 
 ## Ordem de trabalho imediata
 
-1. Executar a suíte completa de integração em PostgreSQL descartável no CI; validar as migrations `0035`–`0040`, mantendo a ordem temporal do journal. Há duas migrations com prefixo `0017`; preservar os IDs já registrados e nunca renomear/reordenar migrations aplicadas.
+1. ~~Executar a suíte completa de integração em PostgreSQL descartável no CI.~~ O workflow aplica o journal completo e roda as integrações com Mailpit; a execução da `main` em 2026-11-18 passou. Há duas migrations com prefixo `0017`; preservar os IDs já registrados e nunca renomear/reordenar migrations aplicadas.
 2. Homologar revisão de conteúdo com `OPENAI_API_KEY` e `OPENAI_MODEL`; sem credenciais, manter a funcionalidade explicitamente não homologada e sem chamadas pagas.
-3. Executar e monitorar workers de publicação, mídia e concorrentes em Docker; testar concorrência, reinício, lease expirado e recuperação sem duplicar publicação.
+3. Integrações em PostgreSQL descartável cobrem o fluxo de concorrentes (fonte salva, observação coletada/persistida, análise em fila e pronta, isolamento entre organizações), o claim concorrente/lease expirado do worker de publicação e concorrência, lease vencido, fencing da tentativa antiga e retry do worker de mídia. Seguem pendentes o ciclo do worker com geração/armazenamento reais e a reconciliação com provedores; não publicar conteúdo real durante esses testes.
 4. Agendar e monitorar a limpeza de uploads no deploy; validar CORS em navegador e homologar bucket, role, política e backups S3 quando a infraestrutura for autorizada.
 5. Fazer auditoria visual no navegador em desktop/mobile e PT/EN; o host de automação do Chrome/Firefox está indisponível no ambiente atual, então não marcar essa validação como concluída.
 6. Depois da homologação, ampliar coleta de analytics e reconciliação remota somente para APIs com permissões e identificadores remotos determinísticos documentados.

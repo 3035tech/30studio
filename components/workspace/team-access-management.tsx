@@ -161,6 +161,7 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
         id="team-invitations" rows={invitations} columns={invitationColumns} getRowId={(row) => row.id} initialSortColumnId="created"
         searchValue={(row) => `${row.email} ${row.role} ${row.status} ${row.inviterName}`} searchLabel={t("invitationSearch")}
         pageSizeLabel={tTable("pageSize")} emptyMessage={t("invitationEmpty")} noMatchesMessage={tTable("noMatches")} locale={locale}
+        compact={{ summaryColumnId: "email", detailColumnIds: ["role", "status", "inviter", "created", "expires"], actionsColumnId: "actions" }}
       />}
       </> : null}
     </section>
@@ -171,6 +172,7 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
         id="team-audit" rows={auditEvents} columns={auditColumns} getRowId={(row) => row.id} initialSortColumnId="time"
         searchValue={(row) => `${row.actorName} ${row.actorEmail} ${row.targetName} ${row.targetEmail ?? ""} ${row.action}`} searchLabel={t("auditSearch")}
         pageSizeLabel={tTable("pageSize")} emptyMessage={t("auditEmpty")} noMatchesMessage={tTable("noMatches")} locale={locale}
+        compact={{ summaryColumnId: "action", detailColumnIds: ["time", "actor", "target", "role"] }}
       />}
       </> : null}
     </section>

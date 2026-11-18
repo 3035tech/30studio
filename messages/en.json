@@ -1,4 +1,5 @@
 {
+  "dialog": { "close": "Close dialog", "cancel": "Cancel" },
   "fields": {
     "validation": {
       "required": "Complete this field.",
@@ -1043,6 +1044,7 @@
     "maximumTextCharacters": "Text or caption limit: {maximum} characters.",
     "health": {
       "title": "Connection health",
+      "detailsTitle": "Connection details",
       "disabled": "This connection is disabled.",
       "pending": "This connection is pending completion.",
       "reauth": "Reconnect this account before publishing.",
@@ -1076,6 +1078,8 @@
     "eyebrow": "COMPETITOR RESEARCH",
     "title": "Competitor activity",
     "description": "Review validated competitor profiles and observed posts. This area contains competitor data; the reference brand is used only to organize the analysis.",
+    "tabsLabel": "Competitor research sections",
+    "tabs": { "overview": "Overview", "sources": "Sources" },
     "analysisTitle": "Observed themes and ideas",
     "analysisDescription": "Themes group the up to 100 most recently captured entries. Each item links to its source; ideas are suggestions, not verified claims or engagement results.",
     "analysisPending": "Analyzing {count} competitor posts…",
@@ -1146,7 +1150,7 @@
     "brand": "Brand",
     "brandContext": "Reference brand",
     "addProfileTitle": "Add a competitor",
-    "addProfileDescription": "Validate a public profile before adding it to monitoring. This area shows observed competitor data only.",
+    "addProfileDescription": "Validate a public profile before adding it to monitoring. Collection and analysis run in the background, so the first results may take a few minutes to appear. Collected information is saved in this workspace.",
     "network": "Social network",
     "platformLookupUnavailable": "{platform} — profile validation unavailable",
     "platformLookupXDisabled": "X — not enabled by the administrator",
@@ -1194,7 +1198,7 @@
     "loading": "Loading competitor sources…",
     "loadError": "Could not load competitor sources. Try again.",
     "saveError": "Could not save this competitor source. Try again.",
-    "sourceAdded": "Source added. The worker will collect it on its next pass.",
+    "sourceAdded": "Source added. Collection and analysis will run in the background; results may take some time to appear.",
     "sourceDuplicate": "This source is already monitored for this brand.",
     "sourceLimit": "This brand has reached the 25-source limit. Archive a source to add another.",
     "sourcePaused": "Monitoring is paused for this source.",
