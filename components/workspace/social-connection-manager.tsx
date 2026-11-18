@@ -16,6 +16,20 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
   const statusLabel = useTranslations("profileStatus");
   const locale = useLocale() as Locale;
   const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  function formatScopes(scopes: string[]) {
+    return scopes.map((scope) => {
+      switch (scope) {
+        case "public_profile": return t("scopes.publicProfile");
+        case "pages_show_list": return t("scopes.pagesShowList");
+        case "pages_read_engagement": return t("scopes.pagesReadEngagement");
+        case "pages_manage_posts": return t("scopes.pagesManagePosts");
+        case "instagram_basic": return t("scopes.instagramBasic");
+        case "instagram_business_basic": return t("scopes.instagramBusinessBasic");
+        case "instagram_business_content_publishing": return t("scopes.instagramBusinessContentPublishing");
+        default: return scope;
+      }
+    }).join(", ");
+  }
   const [connections, setConnections] = useState<Connection[]>([]);
   const [busyPlatform, setBusyPlatform] = useState<SocialPlatform | null>(null);
   const [error, setError] = useState(false);
@@ -136,8 +150,8 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
               {connection.tokenExpiresAt ? <small>{t("health.tokenExpires", { date: dateFormatter.format(new Date(connection.tokenExpiresAt)) })}</small> : null}
               {connection.refreshTokenExpiresAt ? <small>{t("health.refreshExpires", { date: dateFormatter.format(new Date(connection.refreshTokenExpiresAt)) })}</small> : null}
               {connection.credentialsUpdatedAt ? <small>{t("health.credentialsUpdated", { date: dateFormatter.format(new Date(connection.credentialsUpdatedAt)) })}</small> : null}
-              {connection.missingScopes.length ? <small>{t("health.missingScopes", { scopes: connection.missingScopes.join(", ") })}</small> : null}
-              {connection.grantedScopes.length ? <small>{t("health.grantedScopes", { scopes: connection.grantedScopes.join(", ") })}</small> : null}
+              {connection.missingScopes.length ? <small>{t("health.missingScopes", { scopes: formatScopes(connection.missingScopes) })}</small> : null}
+              {connection.grantedScopes.length ? <small>{t("health.grantedScopes", { scopes: formatScopes(connection.grantedScopes) })}</small> : null}
               <small>{t("health.remoteCheckUnavailable")}</small>
             </div>
             {canManage && connection.status !== "disabled" ? <Button appearance="quiet" type="button" disabled={busyPlatform !== null} onClick={() => setPendingDisconnect(connection)}>

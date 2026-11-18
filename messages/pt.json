@@ -1056,6 +1056,15 @@
       "grantedScopes": "Permissões concedidas: {scopes}.",
       "remoteCheckUnavailable": "Estes dados refletem a conexão salva; a plataforma não foi verificada em tempo real."
     },
+    "scopes": {
+      "publicProfile": "identificação básica da conta Meta",
+      "pagesShowList": "listar Páginas do Facebook",
+      "pagesReadEngagement": "ler interações das Páginas",
+      "pagesManagePosts": "criar e gerenciar publicações nas Páginas",
+      "instagramBasic": "acessar dados básicos do Instagram",
+      "instagramBusinessBasic": "acessar dados básicos da conta profissional do Instagram",
+      "instagramBusinessContentPublishing": "publicar conteúdo no Instagram"
+    },
     "capabilities": {
       "connection_only": "Somente conexão; a publicação automática ainda não está disponível.",
       "text": "Publicação automática de texto disponível.",

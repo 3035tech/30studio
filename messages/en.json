@@ -1056,6 +1056,15 @@
       "grantedScopes": "Granted permissions: {scopes}.",
       "remoteCheckUnavailable": "This reflects saved connection data; the platform has not been checked live."
     },
+    "scopes": {
+      "publicProfile": "basic Meta account identity",
+      "pagesShowList": "list Facebook Pages",
+      "pagesReadEngagement": "read Page engagement",
+      "pagesManagePosts": "create and manage Page posts",
+      "instagramBasic": "access basic Instagram data",
+      "instagramBusinessBasic": "access basic professional Instagram account data",
+      "instagramBusinessContentPublishing": "publish Instagram content"
+    },
     "capabilities": {
       "connection_only": "Connection only; automated publishing is not available yet.",
       "text": "Automated text posts are available.",
