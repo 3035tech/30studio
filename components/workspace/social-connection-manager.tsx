@@ -21,6 +21,7 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
   const [error, setError] = useState(false);
   const [configured, setConfigured] = useState<SocialPlatform[]>([]);
   const [publicationCapabilities, setPublicationCapabilities] = useState<Map<SocialPlatform, { publication: "connection_only" | "text" | "single_image"; maximumTextCharacters: number | null }>>(() => new Map());
+  const [configurationIssues, setConfigurationIssues] = useState<Map<SocialPlatform, Array<"provider_credentials" | "meta_api_version" | "token_encryption">>>(() => new Map());
   const [configurationReady, setConfigurationReady] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [pendingDisconnect, setPendingDisconnect] = useState<Connection | null>(null);
@@ -56,6 +57,7 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
         const parsed = socialConnectionConfigurationResponseSchema.safeParse(result);
         if (!parsed.success) throw new Error();
         setConfigured(parsed.data.data.filter((item) => item.configured).map((item) => item.platform));
+        setConfigurationIssues(new Map(parsed.data.data.map((item) => [item.platform, item.configurationIssues])));
         setPublicationCapabilities(new Map(parsed.data.data.map((item) => [item.platform, { publication: item.publication, maximumTextCharacters: item.maximumTextCharacters }])));
         setConfigurationReady(true);
       })
@@ -117,6 +119,7 @@ export function SocialConnectionManager({ brandId, canManage = true }: { brandId
           </div>
           {platform === "facebook" ? <p className="socialConnectionManager__guidance">{t("requirements.facebook")}</p> : null}
           {platform === "instagram" ? <p className="socialConnectionManager__guidance">{t("requirements.instagram")}</p> : null}
+          {!configured.includes(platform) && configurationReady ? <p className="socialConnectionManager__guidance" role="status">{(configurationIssues.get(platform) ?? []).map((issue) => t(`configurationIssues.${issue}`)).join(" ")}</p> : null}
           <small className="socialConnectionManager__capability">{t(`capabilities.${publicationCapability.publication}`)}</small>
           {publicationCapability.maximumTextCharacters !== null ? <small className="socialConnectionManager__capability">{t("maximumTextCharacters", { maximum: publicationCapability.maximumTextCharacters })}</small> : null}
           {connectedCount > 1 ? <p className="socialConnectionManager__note">{t("selectProfilePerPost")}</p> : null}

@@ -18,6 +18,7 @@ import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, cal
 import { contentReviewResponseSchema } from "@/lib/validation/content-review";
 import { socialPublicationReconciliationResponseSchema, socialPublicationReconciliationRequestSchema } from "@/lib/validation/social-publication";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
+import { countSocialCopyCharacters, exceedsSocialCopyLimit } from "@/lib/social-copy";
 
 type CalendarState = {
   requestKey: string;
@@ -186,6 +187,12 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       }
     : null;
   const selectedCanEdit = Boolean(selectedItem && state.canManage && isContentEditable(selectedItem.status));
+  const selectedPlatform = previewPlatform ?? selectedItem?.platform ?? null;
+  const selectedPlatformTextLimit = selectedPlatform
+    ? state.capabilities.find((capability) => capability.platform === selectedPlatform)?.maximumTextCharacters ?? null
+    : null;
+  const selectedVariantLength = countSocialCopyCharacters(selectedCopy?.variantCopy ?? "");
+  const variantCopyExceedsPlatformLimit = exceedsSocialCopyLimit(selectedCopy?.variantCopy ?? "", selectedPlatformTextLimit);
   const selectedCanReview = Boolean(selectedItem && state.canReview && selectedItem.status === CONTENT_STATUS.inReview && (contentVersionState?.data?.canReview ?? true));
   useEffect(() => {
     if (pending) return;
@@ -900,7 +907,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                 onClick={() => { setEditorDirty(true); setGeneratedCopy((current) => current?.itemId === selectedItem.id ? { ...current, variantCopy: copy, selectedVariantIndex: index } : current); }}
               ><span>{t("generatedOption", { index: index + 1 })}</span><small>{copy}</small></Button>)}
             </div> : null}
-            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => { setEditorDirty(true); setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value, variantOptions: current?.itemId === selectedItem.id ? current.variantOptions : [], selectedVariantIndex: null })); }} maxLength={CONTENT_LIMITS.variantCopyCharacters} readOnly={!selectedCanEdit} required />
+            <TextAreaField id={CALENDAR_UI_IDS.variantCopy} name="variantCopy" label={t("variantCopy")} value={selectedCopy?.variantCopy ?? ""} onChange={(event) => { setEditorDirty(true); setGeneratedCopy((current) => ({ itemId: selectedItem.id, canonicalCopy: current?.itemId === selectedItem.id ? current.canonicalCopy : selectedCopy?.canonicalCopy ?? "", variantCopy: event.target.value, variantOptions: current?.itemId === selectedItem.id ? current.variantOptions : [], selectedVariantIndex: null })); }} maxLength={selectedPlatformTextLimit ?? CONTENT_LIMITS.variantCopyCharacters} helpText={selectedPlatformTextLimit ? t("variantCopyLimit", { count: selectedVariantLength, maximum: selectedPlatformTextLimit, platform: t(`platforms.${selectedPlatform ?? selectedItem.platform}`) }) : undefined} readOnly={!selectedCanEdit} required />
             <section className="editorialCalendar__channelPreview" aria-label={t("previewTitle")}>
               <div><strong>{t("previewFor", { platform: t(`platforms.${previewPlatform ?? selectedItem.platform}`) })}</strong><span>{selectedItem.title}</span></div>
               <p>{selectedCopy?.variantCopy || t("previewEmpty")}</p>
@@ -921,8 +928,8 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
             </div> : null}
             <div className="editorialCalendar__formActions">
               {selectedCanEdit ? <>
-                <Button type="submit" disabled={busy || generatingCopy}>{busy ? t("saving") : t("saveDraft")}</Button>
-                <Button appearance="quiet" type="button" disabled={busy || generatingCopy || editorDirty || Boolean(generatedCopy?.itemId === selectedItem.id) || !contentVersionState.data.current || !contentVersionState.data.approval.canRequest || contentVersionState.data.approval.mediaPending || Boolean(currentApprovalRequest) || (contentVersionState.data.approval.publisherProfileRequired && !selectedSocialProfileId)} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.submit)}>{t("requestApproval")}</Button>
+                <Button type="submit" disabled={busy || generatingCopy || variantCopyExceedsPlatformLimit}>{busy ? t("saving") : t("saveDraft")}</Button>
+                <Button appearance="quiet" type="button" disabled={busy || generatingCopy || variantCopyExceedsPlatformLimit || editorDirty || Boolean(generatedCopy?.itemId === selectedItem.id) || !contentVersionState.data.current || !contentVersionState.data.approval.canRequest || contentVersionState.data.approval.mediaPending || Boolean(currentApprovalRequest) || (contentVersionState.data.approval.publisherProfileRequired && !selectedSocialProfileId)} onClick={() => void applyApprovalAction(CONTENT_APPROVAL_ACTION.submit)}>{t("requestApproval")}</Button>
               </> : null}
               <Button appearance="quiet" type="button" disabled={busy || generatingCopy} onClick={() => { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } }}>{t("cancel")}</Button>
             </div>

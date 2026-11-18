@@ -376,6 +376,7 @@
     "reviewDescription": "Revise a versão salva e as imagens aprovadas antes de decidir.",
     "canonicalCopy": "Texto de referência",
     "variantCopy": "Texto da variante do canal",
+    "variantCopyLimit": "{count} de {maximum} caracteres para {platform}.",
     "generateCopy": "Gerar sugestão de copy",
     "generatingCopy": "Gerando sugestão…",
     "generatedCopyReview": "Ao gerar, o briefing e o Brand Kit aprovado são enviados ao provedor de IA configurado. Compare três opções, escolha uma e salve o rascunho para criar uma versão.",
@@ -1030,6 +1031,11 @@
     "requirements": {
       "facebook": "Antes de conectar: entre com uma conta que tenha acesso à Página e autorize pages_show_list, pages_read_engagement e pages_manage_posts. A Página precisa permitir criação de conteúdo.",
       "instagram": "Antes de conectar: use uma conta profissional do Instagram (Empresa ou Criador) e autorize instagram_business_basic e instagram_business_content_publishing no login da Meta."
+    },
+    "configurationIssues": {
+      "provider_credentials": "Faltam as credenciais do aplicativo do provedor.",
+      "meta_api_version": "Configure uma versão válida da API Meta Graph no servidor.",
+      "token_encryption": "Configure uma chave válida para criptografar tokens sociais no servidor."
     },
     "selectProfilePerPost": "Escolha a conta de destino ao solicitar a aprovação de cada publicação.",
     "maximumTextCharacters": "Limite de texto ou legenda: {maximum} caracteres.",

@@ -24,6 +24,14 @@ Revisto em 2026-11-17 após conferência com rotas, workers, repositórios, migr
 - A inspeção de interface via navegador segue pendente porque o host de automação do navegador estava indisponível. O build não substitui a revisão visual e de teclado em desktop/mobile e PT/EN.
 - Ainda não é uma versão homologada para publicação real: conectores, workers, OpenAI e armazenamento dependem das configurações e contas aprovadas no ambiente-alvo. Não enviar conteúdo real durante a homologação.
 
+### Follow-up de evolução — 2026-11-17
+
+- O editor de conteúdo agora mostra a contagem e o limite de caracteres do canal configurado, restringe a entrada e o endpoint de salvamento rejeita variantes acima do limite. A contagem considera pontos de código Unicode; a suíte unitária cobre esse caso.
+- A tela de conexões agora explica, sem expor valores, se faltam credenciais do provedor, versão da Meta Graph API ou chave de criptografia. Isso melhora o diagnóstico, mas não substitui o teste OAuth com uma conta Meta autorizada.
+- Analytics ainda não faz coleta automática e só consulta métricas de publicações do Facebook/Instagram pela Meta. Métricas de outras redes dependem de permissões e APIs oficiais; o worker agendado requer configuração e homologação separadas.
+- A revisão visual no Chrome de produção não pôde ser concluída porque o host de automação do navegador estava indisponível; build e testes automatizados não comprovam o layout visual em desktop/mobile.
+- A limpeza diária de uploads e a validação de bucket privado, CORS, IAM, versionamento e recuperação ainda dependem dos valores e da identidade AWS de produção. Não configurar esses recursos com nomes ou permissões presumidos.
+
 | Área | Estado | Limite conhecido |
 |---|---|---|
 | Next.js, TypeScript, Tailwind v4, tema e identidade 30studio | Implementado no scaffold | Revisão visual automatizada ainda não foi comprovada neste ambiente. |

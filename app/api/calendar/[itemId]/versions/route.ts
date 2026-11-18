@@ -6,6 +6,8 @@ import { ApiError } from "@/lib/server/api-error";
 import { apiErrorResponse } from "@/lib/server/api-response";
 import { assertSameOriginJsonRequest, requireTenant } from "@/lib/server/auth";
 import { hasTenantPermission } from "@/lib/server/permissions";
+import { getSocialPublisher } from "@/lib/server/social-publisher/registry";
+import { exceedsSocialCopyLimit } from "@/lib/social-copy";
 import { calendarContentVersionSaveSchema, calendarContentVersionResponseSchema } from "@/lib/validation/calendar";
 
 export const runtime = "nodejs";
@@ -53,6 +55,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     const parsed = calendarContentVersionSaveSchema.safeParse(body);
     if (!parsed.success) throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
+    const maximumTextCharacters = getSocialPublisher(parsed.data.platform)?.maximumTextCharacters;
+    if (exceedsSocialCopyLimit(parsed.data.variantCopy, maximumTextCharacters)) {
+      throw new ApiError(API_ERROR_CODES.invalidRequest, HTTP_STATUS.unprocessable);
+    }
 
     const version = await createCalendarContentVersion(tenant.organizationId, tenant.userId, itemId, parsed.data);
     if (!version) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);

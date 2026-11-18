@@ -376,6 +376,7 @@
     "reviewDescription": "Review the exact saved version and its approved media before deciding.",
     "canonicalCopy": "Source copy",
     "variantCopy": "Channel variant copy",
+    "variantCopyLimit": "{count} of {maximum} characters for {platform}.",
     "generateCopy": "Generate copy suggestion",
     "generatingCopy": "Generating suggestion…",
     "generatedCopyReview": "Generating sends the brief and approved Brand Kit to the configured AI provider. Compare three options, choose one, and save the draft to create a version.",
@@ -1030,6 +1031,11 @@
     "requirements": {
       "facebook": "Before connecting: sign in with an account that can access the Page and grant pages_show_list, pages_read_engagement, and pages_manage_posts. The Page must allow content creation.",
       "instagram": "Before connecting: use an Instagram professional account (Business or Creator) and grant instagram_business_basic and instagram_business_content_publishing through Meta login."
+    },
+    "configurationIssues": {
+      "provider_credentials": "The provider app credentials are missing.",
+      "meta_api_version": "Set a supported Meta Graph API version in the server configuration.",
+      "token_encryption": "Set a valid social token encryption key in the server configuration."
     },
     "selectProfilePerPost": "Choose the destination account when you submit each post for approval.",
     "maximumTextCharacters": "Text or caption limit: {maximum} characters.",

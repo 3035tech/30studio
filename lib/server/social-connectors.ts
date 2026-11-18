@@ -76,13 +76,25 @@ export function getSocialConnector(platform: SocialPlatform): SocialConnector | 
 }
 
 export function getSocialConnectorAvailability() {
-  return SOCIAL_PLATFORMS.map((platform) => ({ platform, configured: isSocialConnectorConfigured(platform) }));
+  return SOCIAL_PLATFORMS.map((platform) => {
+    const configurationIssues = getSocialConnectorConfigurationIssues(platform);
+    return { platform, configured: configurationIssues.length === 0, configurationIssues };
+  });
 }
 
 export function isSocialConnectorConfigured(platform: SocialPlatform) {
-  if (!getSocialConnector(platform)) return false;
-  if (platform === "facebook" || platform === "instagram") return Boolean(process.env.META_GRAPH_API_VERSION && /^v\d+\.\d+$/u.test(process.env.META_GRAPH_API_VERSION));
-  return true;
+  return getSocialConnectorConfigurationIssues(platform).length === 0;
+}
+
+export function getSocialConnectorConfigurationIssues(platform: SocialPlatform) {
+  const config = PROVIDERS[platform];
+  const issues: Array<"provider_credentials" | "meta_api_version"> = [];
+  if (!process.env[config.clientIdEnv] || !process.env[config.clientSecretEnv]) issues.push("provider_credentials");
+  if ((platform === "facebook" || platform === "instagram")
+    && (!process.env.META_GRAPH_API_VERSION || !/^v\d+\.\d+$/u.test(process.env.META_GRAPH_API_VERSION))) {
+    issues.push("meta_api_version");
+  }
+  return issues;
 }
 
 export async function createSocialAuthorizationUrl(

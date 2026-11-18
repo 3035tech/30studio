@@ -13,11 +13,15 @@ export async function GET(request: NextRequest) {
   try {
     await requireTenant(request, TENANT_PERMISSIONS.brandsRead);
     const capabilities = new Map(getSocialPublisherCapabilities().map((capability) => [capability.platform, capability]));
-    const data = getSocialConnectorAvailability().map((provider) => ({
-      ...provider, configured: provider.configured && isSocialTokenEncryptionConfigured(),
-      publication: capabilities.get(provider.platform)?.publication ?? "connection_only",
-      maximumTextCharacters: capabilities.get(provider.platform)?.maximumTextCharacters ?? null,
-    }));
+    const data = getSocialConnectorAvailability().map((provider) => {
+      const configurationIssues: Array<"provider_credentials" | "meta_api_version" | "token_encryption"> = [...provider.configurationIssues];
+      if (!isSocialTokenEncryptionConfigured()) configurationIssues.push("token_encryption");
+      return {
+        ...provider, configured: configurationIssues.length === 0, configurationIssues,
+        publication: capabilities.get(provider.platform)?.publication ?? "connection_only",
+        maximumTextCharacters: capabilities.get(provider.platform)?.maximumTextCharacters ?? null,
+      };
+    });
     return NextResponse.json({ data }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return apiErrorResponse(error, request); }
 }

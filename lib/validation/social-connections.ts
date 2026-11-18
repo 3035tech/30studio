@@ -12,6 +12,7 @@ export const socialConnectionListResponseSchema = z.object({ data: z.array(socia
 export const socialConnectionConfigurationResponseSchema = z.object({
   data: z.array(z.object({
     platform: z.enum(SOCIAL_PLATFORMS), configured: z.boolean(),
+    configurationIssues: z.array(z.enum(["provider_credentials", "meta_api_version", "token_encryption"])),
     publication: z.enum(SOCIAL_PUBLISHING_CAPABILITIES), maximumTextCharacters: z.number().int().positive().nullable(),
   })),
 });
