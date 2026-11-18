@@ -6,14 +6,13 @@ import { useLocale, useTranslations } from "next-intl";
 import { authClient } from "@/lib/client/auth";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckboxField, FileField, PasswordField, SelectField, TextField } from "@/components/ui/field";
+import { CheckboxField, PasswordField, SelectField, TextField } from "@/components/ui/field";
 import { brandListItemSchema, brandListResponseSchema, type BrandListItem } from "@/lib/validation/brands";
-import { AUTH_LIMITS, BRAND_ASSET_LIMITS, BRAND_LIMITS, BRAND_SEGMENTS, DASHBOARD_FILTERS, EMAIL_ROUTES, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type BrandSegment, type DashboardFilters, type Locale } from "@/lib/constants";
+import { AUTH_LIMITS, BRAND_LIMITS, BRAND_SEGMENTS, DASHBOARD_FILTERS, EMAIL_ROUTES, SOCIAL_PLATFORMS, SOCIAL_PROFILE_STATUS, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, type BrandSegment, type DashboardFilters, type Locale } from "@/lib/constants";
 import { Link } from "@/lib/i18n/routing";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { TeamManagement } from "@/components/workspace/team-management";
-import { BrandKitEditor } from "@/components/brand/brand-kit-editor";
+import { BrandManagementDialogs } from "@/components/workspace/brand-management-dialogs";
 import { EditorialCalendar } from "@/components/calendar/editorial-calendar";
 import { SocialConnectionManager } from "@/components/workspace/social-connection-manager";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
@@ -47,7 +46,6 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
   const tPlatforms = useTranslations("platforms");
   const tProfileStatus = useTranslations("profileStatus");
   const tSocialConnections = useTranslations("socialConnections");
-  const tBrandKit = useTranslations("brandKit");
   const tDashboard = useTranslations("dashboardFilters");
   const locale = useLocale() as Locale;
   const nextLocale: Locale = locale === "pt" ? "en" : "pt";
@@ -354,11 +352,15 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
   }
 
   function handleBrandTabsKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const tabs = Array.from(event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % tabs.length
+      : event.key === "ArrowLeft" ? (currentIndex - 1 + tabs.length) % tabs.length
+        : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+    if (nextIndex < 0 || tabs.length === 0) return;
     event.preventDefault();
-    const view = brandView === "brands" ? "connections" : "brands";
-    selectBrandView(view);
-    document.getElementById(`brand-tab-${view}`)?.focus();
+    tabs[nextIndex]?.focus();
+    tabs[nextIndex]?.click();
   }
 
   function getBrandSegmentLabel(industry: string | null) {
@@ -649,63 +651,23 @@ export function WorkspaceEntry({ socialConnectionResult, socialConnectionBrandId
             {brandView === "connections" && selectedConnectionBrand ? <SocialConnectionManager key={selectedConnectionBrand.id} brandId={selectedConnectionBrand.id} canManage={currentBrands.canManage === true} /> : null}
           </> : <div className="workspaceEmpty"><p>{currentBrands.canManage ? tWorkspace("emptyBrands") : tPortfolio("noBrandsReadOnly")}</p>{currentBrands.canManage ? <Button type="button" onClick={() => setCreateBrandOpen(true)}>{tPortfolio("newBrand")}</Button> : null}</div>}
         </section>
-        <Dialog open={createBrandOpen && currentBrands.canManage === true} onOpenChange={(open) => { if (!busy) setCreateBrandOpen(open); }}>
-          <DialogContent className="brandFormDialog" aria-labelledby="brand-create-title" aria-describedby="brand-create-description">
-            <DialogHeader><DialogTitle id="brand-create-title">{tPortfolio("createBrandDialogTitle")}</DialogTitle><DialogDescription id="brand-create-description">{tPortfolio("createDescription")}</DialogDescription></DialogHeader>
-            <form className="brandCreate__form" onSubmit={handleCreateBrand}>
-              <TextField id="brandName" name="brandName" label={tWorkspace("brandName")} maxLength={BRAND_LIMITS.nameCharacters} required />
-              <TextField id="brandDescription" name="brandDescription" label={tWorkspace("brandDescription")} maxLength={BRAND_LIMITS.descriptionCharacters} />
-              <SelectField id="brandIndustry" name="brandIndustry" label={tWorkspace("brandIndustry")} defaultValue="" required>
-                <option value="" disabled>{tPortfolio("selectSegment")}</option>
-                {BRAND_SEGMENTS.map((segment) => <option key={segment} value={segment}>{tPortfolio(`segments.${segment}`)}</option>)}
-              </SelectField>
-              <TextField id="brandWebsite" name="brandWebsite" type="url" label={tPortfolio("websiteUrl")} placeholder="https://" maxLength={BRAND_LIMITS.websiteUrlCharacters} />
-              <FileField id="brandLogo" name="brandLogo" label={tPortfolio("brandLogo")} helpText={tPortfolio("brandLogoHelp")} accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")} />
-              <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button type="submit" disabled={busy || !activeOrganization?.id || currentBrands.error || currentBrands.pending}>{busy ? tAuth("working") : tWorkspace("addBrand")}</Button></DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={Boolean(editingBrandId)} onOpenChange={(open) => { if (!open && !busy) setEditingBrandId(null); }}>
-          {activeBrands.find((brand) => brand.id === editingBrandId) ? (() => {
-            const brand = activeBrands.find((item) => item.id === editingBrandId)!;
-            return <DialogContent className="brandFormDialog" aria-labelledby="brand-edit-title">
-              <DialogHeader><DialogTitle id="brand-edit-title">{tPortfolio("editBrandDialogTitle")}</DialogTitle><DialogDescription>{brand.name}</DialogDescription></DialogHeader>
-              <form className="brandCreate__form" onSubmit={(event) => void handleUpdateBrand(event, brand.id)}>
-                <TextField id="brand-edit-name" name="name" label={tPortfolio("brandName")} defaultValue={brand.name} maxLength={BRAND_LIMITS.nameCharacters} required />
-                <TextField id="brand-edit-description" name="description" label={tPortfolio("brandDescription")} defaultValue={brand.description ?? ""} maxLength={BRAND_LIMITS.descriptionCharacters} />
-                <SelectField id="brand-edit-industry" name="industry" label={tPortfolio("industry")} defaultValue={brand.industry ?? "other"}>
-                  {brand.industry && !BRAND_SEGMENTS.some((segment) => segment === brand.industry) ? <option value={brand.industry}>{brand.industry}</option> : null}
-                  {BRAND_SEGMENTS.map((segment) => <option key={segment} value={segment}>{tPortfolio(`segments.${segment}`)}</option>)}
-                </SelectField>
-                <TextField id="brand-edit-website" name="websiteUrl" type="url" label={tPortfolio("websiteUrl")} defaultValue={brand.websiteUrl ?? ""} maxLength={BRAND_LIMITS.websiteUrlCharacters} />
-                {brand.logoAssetId ? <div className="brandEditLogo"><span className="brandEditLogo__preview">{brand.logoAssetStatus ? <Image src={`/api/brands/${brand.id}/logo/${brand.logoAssetId}`} alt="" fill sizes="72px" unoptimized /> : null}</span><span><strong>{tPortfolio("currentBrandLogo")}</strong>{brand.logoAssetStatus === "pending_review" ? <small>{tPortfolio("brandLogoPending")}</small> : null}</span></div> : null}
-                <FileField id="brand-edit-logo" name="brandLogo" label={tPortfolio("replaceBrandLogo")} helpText={tPortfolio("brandLogoHelp")} accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")} />
-                <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button type="submit" disabled={busy}>{busy ? tAuth("working") : tPortfolio("saveChanges")}</Button></DialogFooter>
-              </form>
-            </DialogContent>;
-          })() : null}
-        </Dialog>
-        <Dialog open={Boolean(archivingBrandId)} onOpenChange={(open) => { if (!open && !busy) setArchivingBrandId(null); }}>
-          {activeBrands.find((brand) => brand.id === archivingBrandId) ? (() => {
-            const brand = activeBrands.find((item) => item.id === archivingBrandId);
-            if (!brand) return null;
-            return <DialogContent aria-labelledby="brand-archive-title" aria-describedby="brand-archive-description">
-              <DialogHeader><DialogTitle id="brand-archive-title">{tPortfolio("archiveBrand")}</DialogTitle><DialogDescription id="brand-archive-description">{tPortfolio("archiveConfirmation", { brand: brand.name })}</DialogDescription></DialogHeader>
-              <DialogFooter className="brandCollection__editorActions"><DialogCancel disabled={busy}>{tPortfolio("cancel")}</DialogCancel><Button appearance="danger" type="button" disabled={busy} onClick={() => void handleArchiveBrand(brand.id)}>{busy ? tAuth("working") : tPortfolio("confirmArchive")}</Button></DialogFooter>
-            </DialogContent>;
-          })() : null}
-        </Dialog>
-        <Dialog open={Boolean(activeBrandKitId)} onOpenChange={(open) => { if (!open && !busy) setActiveBrandKitId(null); }}>
-          {activeBrands.find((brand) => brand.id === activeBrandKitId) ? (() => {
-            const brand = activeBrands.find((item) => item.id === activeBrandKitId);
-            if (!brand) return null;
-            return <DialogContent className="brandKitDialog" aria-labelledby="brand-kit-dialog-title" aria-describedby="brand-kit-dialog-description">
-              <DialogHeader><DialogTitle id="brand-kit-dialog-title">{tBrandKit("title", { brand: brand.name })}</DialogTitle><DialogDescription id="brand-kit-dialog-description">{tBrandKit("description")}</DialogDescription></DialogHeader>
-              <BrandKitEditor brandId={brand.id} brandName={brand.name} showHeader={false} />
-              <DialogFooter><DialogCancel disabled={busy}>{tPortfolio("closeBrandKit")}</DialogCancel></DialogFooter>
-            </DialogContent>;
-          })() : null}
-        </Dialog>
+        <BrandManagementDialogs
+          brands={activeBrands}
+          canManage={currentBrands.canManage === true}
+          busy={busy}
+          createOpen={createBrandOpen}
+          editingBrandId={editingBrandId}
+          archivingBrandId={archivingBrandId}
+          activeBrandKitId={activeBrandKitId}
+          createDisabled={busy || !activeOrganization?.id || currentBrands.error || currentBrands.pending}
+          onCreateOpenChange={setCreateBrandOpen}
+          onEditingBrandChange={setEditingBrandId}
+          onArchivingBrandChange={setArchivingBrandId}
+          onActiveBrandKitChange={setActiveBrandKitId}
+          onCreateBrand={handleCreateBrand}
+          onUpdateBrand={handleUpdateBrand}
+          onArchiveBrand={handleArchiveBrand}
+        />
       </section>
       <TeamManagement
         key={`team:${isChangingOrganization ? "organization-switch" : activeOrganization?.id ?? "organization-pending"}`}

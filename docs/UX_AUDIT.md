@@ -284,3 +284,14 @@ The live browser became unavailable during the latest audit pass, so these are d
 - Standard dialogs and the campaign planner now cap their height against the visible viewport after accounting for top and bottom safe areas. This keeps their close control, scrollable content, and actions within reach on notched phones and short browser windows.
 - `window.alert`, `window.confirm`, and `window.prompt` are not used in the application UI; confirmation and feedback flows use the shared components.
 - Source-level review only. Chrome is unavailable, so iOS safe-area rendering remains unverified.
+
+## Brand-area tab keyboard navigation — 2026-11-18
+
+- The Brands and Connections tabs now support the same Arrow, Home, and End navigation used by the other workspace tab groups. Moving focus also activates the destination, matching the expected horizontal-tab interaction for keyboard users.
+- `git diff --check`, lint, and TypeScript validation passed. Chrome keyboard review remains pending because browser access is unavailable.
+
+## Calendar editor focus and history — 2026-11-18
+
+- The approval readiness checklist now appears near the top of the editor, before the long copy and media sections, so authors see blockers early.
+- Previous content versions and approval decisions use the existing disclosure control and start collapsed. This keeps the current post workflow visible while preserving access to audit history.
+- Chrome is unavailable for visual review; source-level checks remain pending for this pass.

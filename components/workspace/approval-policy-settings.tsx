@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { SelectField } from "@/components/ui/field";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
 import { CONTENT_APPROVAL_POLICY, CONTENT_APPROVAL_POLICY_API_PATHS } from "@/lib/constants";
+import { contentApprovalPolicyResponseSchema } from "@/lib/validation/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
 
-type PolicyData = { defaultRequiredApprovals: number; brandOverrides: { brandId: string; brandName: string; requiredApprovals: number }[] };
+type PolicyData = z.infer<typeof contentApprovalPolicyResponseSchema>["data"];
 const INITIAL_POLICY: PolicyData = { defaultRequiredApprovals: CONTENT_APPROVAL_POLICY.defaultRequiredApprovals, brandOverrides: [] };
 const APPROVAL_OPTIONS = Array.from({ length: CONTENT_APPROVAL_POLICY.maximumRequiredApprovals }, (_, index) => index + 1);
 
@@ -24,7 +26,7 @@ export function ApprovalPolicySettings({ brands }: { brands: BrandListItem[] }) 
   useEffect(() => {
     const controller = new AbortController();
     fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { credentials: "same-origin", cache: "no-store", signal: controller.signal })
-      .then(async (response) => { if (!response.ok) throw new Error(); const result = await response.json() as { data: PolicyData }; setPolicy(result.data); setValue(String(result.data.defaultRequiredApprovals)); setHasLoadError(false); })
+      .then(async (response) => { if (!response.ok) throw new Error(); const result = contentApprovalPolicyResponseSchema.safeParse(await response.json()); if (!result.success) throw new Error(); setPolicy(result.data.data); setValue(String(result.data.data.defaultRequiredApprovals)); setHasLoadError(false); })
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setHasLoadError(true); });
     return () => controller.abort();
   }, [t]);
@@ -34,8 +36,9 @@ export function ApprovalPolicySettings({ brands }: { brands: BrandListItem[] }) 
     try {
       const response = await fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brandId, requiredApprovals: Number(value) }) });
       if (!response.ok) throw new Error();
-      const result = await response.json() as { data: PolicyData };
-      setPolicy(result.data); showFeedback("success", t("saved"));
+      const result = contentApprovalPolicyResponseSchema.safeParse(await response.json());
+      if (!result.success) throw new Error();
+      setPolicy(result.data.data); showFeedback("success", t("saved"));
     } catch { showFeedback("error", t("saveError")); } finally { setBusy(false); }
   }
 
@@ -44,8 +47,9 @@ export function ApprovalPolicySettings({ brands }: { brands: BrandListItem[] }) 
     try {
       const response = await fetch(CONTENT_APPROVAL_POLICY_API_PATHS.collection, { method: "DELETE", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brandId }) });
       if (!response.ok) throw new Error();
-      const result = await response.json() as { data: PolicyData };
-      setPolicy(result.data); showFeedback("success", t("saved"));
+      const result = contentApprovalPolicyResponseSchema.safeParse(await response.json());
+      if (!result.success) throw new Error();
+      setPolicy(result.data.data); showFeedback("success", t("saved"));
     } catch { showFeedback("error", t("saveError")); } finally { setBusy(false); }
   }
 

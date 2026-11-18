@@ -57,7 +57,8 @@ export async function storeConnectedSocialProfile(input: {
       }).onConflictDoUpdate({ target: [socialProfileCredentials.organizationId, socialProfileCredentials.socialProfileId], set: {
         accessTokenCiphertext: input.accessTokenCiphertext, refreshTokenCiphertext: input.refreshTokenCiphertext,
         tokenType: input.tokenType, scopes: input.scopes, tokenExpiresAt: input.tokenExpiresAt,
-        refreshTokenExpiresAt: input.refreshTokenExpiresAt, encryptionKeyVersion: input.encryptionKeyVersion, updatedAt: new Date(),
+        refreshTokenExpiresAt: input.refreshTokenExpiresAt, encryptionKeyVersion: input.encryptionKeyVersion,
+        refreshLeaseId: null, refreshLeaseExpiresAt: null, updatedAt: new Date(),
       } });
       await tx.insert(socialConnectionEvents).values({ organizationId: input.organizationId, brandId: input.brandId,
         socialProfileId: existing.id, actorUserId: input.actorUserId, platform: input.platform, eventType: "connected" });

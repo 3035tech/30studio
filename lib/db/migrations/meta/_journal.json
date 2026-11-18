@@ -302,6 +302,13 @@
       "when": 1794959058761,
       "tag": "0042_eager_moon_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795000967070,
+      "tag": "0043_simple_the_hunter",
+      "breakpoints": true
     }
   ]
 }

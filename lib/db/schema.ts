@@ -141,6 +141,8 @@ export const socialProfileCredentials = pgTable(
     scopes: text("scopes").array().notNull().default([]),
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true, mode: "date" }),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true, mode: "date" }),
+    refreshLeaseId: uuid("refresh_lease_id"),
+    refreshLeaseExpiresAt: timestamp("refresh_lease_expires_at", { withTimezone: true, mode: "date" }),
     encryptionKeyVersion: integer("encryption_key_version").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },

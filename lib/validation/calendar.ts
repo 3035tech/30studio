@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { APPROVAL_POLICY_LIMITS, CALENDAR, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_ACTIONS, CONTENT_APPROVAL_DECISIONS, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_GENERATION_MODES, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_MEDIA_TEMPLATE, CONTENT_STATUSES, COPY_GENERATION, DEFAULT_LOCALE, LOCALES, SOCIAL_CAPABILITY_CATALOG_VERSION, SOCIAL_CAPABILITY_SNAPSHOT_SCHEMA_VERSION, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLISHING_CAPABILITIES } from "@/lib/constants";
+import { APPROVAL_POLICY_LIMITS, BRAND_ASSET_LIMITS, CALENDAR, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_ACTIONS, CONTENT_APPROVAL_DECISIONS, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUSES, CONTENT_LIMITS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_GENERATION_MODES, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUSES, CONTENT_MEDIA_TEMPLATE, CONTENT_STATUSES, COPY_GENERATION, DEFAULT_LOCALE, LOCALES, SOCIAL_CAPABILITY_CATALOG_VERSION, SOCIAL_CAPABILITY_SNAPSHOT_SCHEMA_VERSION, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLISHING_CAPABILITIES } from "@/lib/constants";
 
 const validTimeZone = z.string().trim().min(1).max(64).refine((timeZone) => {
   try {
@@ -99,8 +99,9 @@ export const contentMediaSchema = z.object({
   pageNumber: z.number().int().positive().nullable(),
   pageCount: z.number().int().positive().nullable(),
   status: z.enum(CONTENT_MEDIA_STATUSES),
+  origin: z.enum(["ai", "user"]),
   fileName: z.string(),
-  contentType: z.enum(["image/webp"]).nullable(),
+  contentType: z.enum(BRAND_ASSET_LIMITS.allowedMimeTypes).nullable(),
   sizeBytes: z.number().int().positive().nullable(),
   width: z.number().int().positive().nullable(),
   height: z.number().int().positive().nullable(),
@@ -117,6 +118,26 @@ export const contentMediaGenerationRequestSchema = z.object({
   pageCopies: z.array(z.string().trim().min(1).max(CONTENT_MEDIA_TEMPLATE.maximumCarouselPageCharacters)).length(CONTENT_MEDIA_CAROUSEL.pageCount).optional(),
 }).strict().refine((value) => value.mode === CONTENT_MEDIA_GENERATION_MODE.carousel || value.pageCopies === undefined);
 export const contentMediaGenerationResponseSchema = z.object({ data: z.object({ id: z.uuid(), status: z.enum(CONTENT_MEDIA_STATUSES) }).strict() }).strict();
+export const contentMediaUploadRequestSchema = z.object({
+  contentVersionId: z.uuid(),
+  idempotencyKey: z.uuid(),
+  fileName: z.string().trim().min(1).max(BRAND_ASSET_LIMITS.maximumFileNameCharacters),
+  contentType: z.enum(BRAND_ASSET_LIMITS.allowedMimeTypes),
+  sizeBytes: z.number().int().positive().max(BRAND_ASSET_LIMITS.maximumBytes),
+  sha256: z.string().regex(/^[\da-f]{64}$/),
+}).strict().refine(({ fileName, contentType }) => {
+  const extension = fileName.slice(fileName.lastIndexOf(".")).toLocaleLowerCase("en");
+  const allowedExtensions: Record<(typeof BRAND_ASSET_LIMITS.allowedMimeTypes)[number], readonly string[]> = {
+    "image/jpeg": [".jpg", ".jpeg"], "image/png": [".png"], "image/webp": [".webp"],
+  };
+  return allowedExtensions[contentType].includes(extension);
+});
+export const contentMediaUploadResponseSchema = z.object({ data: z.object({ id: z.uuid(), status: z.enum(CONTENT_MEDIA_STATUSES), upload: z.object({ url: z.url({ protocol: /^https?$/ }), fields: z.record(z.string(), z.string()) }).optional() }).strict() }).strict();
+export const contentMediaCarouselRequestSchema = z.object({
+  contentVersionId: z.uuid(),
+  mediaIds: z.array(z.uuid()).length(CONTENT_MEDIA_CAROUSEL.pageCount),
+}).strict().refine(({ mediaIds }) => new Set(mediaIds).size === mediaIds.length);
+export const contentMediaCarouselResponseSchema = z.object({ data: z.object({ carouselId: z.uuid(), pageCount: z.number().int().positive() }).strict() }).strict();
 export const contentMediaReviewSchema = z.object({ decision: z.enum(CONTENT_MEDIA_REVIEW_DECISIONS), note: z.string().trim().max(CONTENT_LIMITS.canonicalCopyCharacters).nullable() }).strict();
 
 export const calendarContentHistoryEntrySchema = z.object({
@@ -187,6 +208,16 @@ export const contentApprovalPolicySaveSchema = z.object({
   requiredApprovals: z.number().int().min(APPROVAL_POLICY_LIMITS.minimumApprovals).max(APPROVAL_POLICY_LIMITS.maximumApprovals),
 }).strict();
 export const contentApprovalPolicyDeleteSchema = z.object({ brandId: z.uuid() }).strict();
+export const contentApprovalPolicyResponseSchema = z.object({
+  data: z.object({
+    defaultRequiredApprovals: z.number().int().min(APPROVAL_POLICY_LIMITS.minimumApprovals).max(APPROVAL_POLICY_LIMITS.maximumApprovals),
+    brandOverrides: z.array(z.object({
+      brandId: z.uuid(),
+      brandName: z.string(),
+      requiredApprovals: z.number().int().min(APPROVAL_POLICY_LIMITS.minimumApprovals).max(APPROVAL_POLICY_LIMITS.maximumApprovals),
+    }).strict()),
+  }).strict(),
+}).strict();
 
 export const calendarCopyDraftRequestSchema = z.object({ brandId: z.uuid(), locale: z.enum(LOCALES), platform: z.enum(SOCIAL_PLATFORMS) }).strict();
 export const calendarCopyDraftResponseSchema = z.object({

@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { ImagePlus } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Disclosure } from "@/components/ui/disclosure";
-import { TextAreaField } from "@/components/ui/field";
+import { CheckboxField, FileField, TextAreaField } from "@/components/ui/field";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
-import { CONTENT_LIMITS, CONTENT_MEDIA_API_PATHS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_EXPORTS, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, type SocialPlatform } from "@/lib/constants";
-import { contentMediaGenerationResponseSchema, contentMediaResponseSchema } from "@/lib/validation/calendar";
+import { BRAND_ASSET_LIMITS, CONTENT_LIMITS, CONTENT_MEDIA_API_PATHS, CONTENT_MEDIA_CAROUSEL, CONTENT_MEDIA_EXPORTS, CONTENT_MEDIA_GENERATION_MODE, CONTENT_MEDIA_REVIEW_DECISIONS, CONTENT_MEDIA_STATUS, CONTENT_MEDIA_TEMPLATE, CONTENT_MEDIA_WORKER, type SocialPlatform } from "@/lib/constants";
+import { contentMediaCarouselResponseSchema, contentMediaGenerationResponseSchema, contentMediaResponseSchema, contentMediaUploadResponseSchema } from "@/lib/validation/calendar";
 
 type MediaState = {
   versionId: string | null;
@@ -44,6 +44,7 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
   const [state, setState] = useState(INITIAL_STATE);
   const [refreshIndex, setRefreshIndex] = useState(0);
   const [busyId, setBusyId] = useState("");
+  const [carouselSelection, setCarouselSelection] = useState<{ versionId: string | null; mediaIds: string[] }>({ versionId, mediaIds: [] });
   const [reviewNote, setReviewNote] = useState("");
   const [pageCopies, setPageCopies] = useState(() => splitIntoCarouselPages(variantCopy));
   const exportSize = CONTENT_MEDIA_EXPORTS[platform];
@@ -75,8 +76,13 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
     return () => controller.abort();
   }, [itemId, refreshIndex, versionId]);
 
-  const processing = state.items.some((item) => item.status === CONTENT_MEDIA_STATUS.queued || item.status === CONTENT_MEDIA_STATUS.processing);
+  const processing = state.items.some((item) => item.status === CONTENT_MEDIA_STATUS.queued || (item.status === CONTENT_MEDIA_STATUS.processing && item.origin === "ai"));
   const mediaGroups = groupMediaItems(state.items);
+  const selectedCarouselIds = carouselSelection.versionId === versionId ? carouselSelection.mediaIds : [];
+  const selectedCarouselImages = selectedCarouselIds.flatMap((id) => {
+    const item = state.items.find((candidate) => candidate.id === id && candidate.origin === "user" && candidate.status === CONTENT_MEDIA_STATUS.pendingReview && candidate.carouselId === null);
+    return item ? [item] : [];
+  });
   const pending = Boolean(versionId && state.versionId !== versionId);
   useEffect(() => {
     if (!processing) return;
@@ -133,11 +139,97 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
     }
   }
 
+  async function uploadImage(file: File | undefined) {
+    if (!file || !versionId || busyId) return;
+    setBusyId("upload");
+    try {
+      if (file.size > BRAND_ASSET_LIMITS.maximumBytes || !BRAND_ASSET_LIMITS.allowedMimeTypes.some((mimeType) => mimeType === file.type)) {
+        showFeedback("error", t(file.size > BRAND_ASSET_LIMITS.maximumBytes ? "fileTooLarge" : "unsupportedType"));
+        return;
+      }
+      const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+      const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const response = await fetch(CONTENT_MEDIA_API_PATHS.upload(itemId), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentVersionId: versionId, idempotencyKey: crypto.randomUUID(), fileName: file.name, contentType: file.type, sizeBytes: file.size, sha256 }),
+      });
+      if (response.status === 409) {
+        const payload: unknown = await response.json().catch(() => null);
+        showFeedback("error", payload && typeof payload === "object" && "code" in payload && payload.code === "CONTENT_MEDIA_LIMIT_REACHED" ? t("generationLimit") : t("uploadError"));
+        return;
+      }
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = contentMediaUploadResponseSchema.safeParse(payload);
+      if (!response.ok || !parsed.success || !parsed.data.data.upload) throw new Error("Upload session could not be created.");
+      const formData = new FormData();
+      Object.entries(parsed.data.data.upload.fields).forEach(([key, value]) => formData.append(key, value));
+      formData.append("file", file);
+      const uploaded = await fetch(parsed.data.data.upload.url, { method: "POST", body: formData });
+      if (!uploaded.ok) throw new Error("Image upload failed.");
+      const finalized = await fetch(CONTENT_MEDIA_API_PATHS.finalizeUpload(itemId, parsed.data.data.id), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!finalized.ok) throw new Error("Image validation failed.");
+      showFeedback("success", t("uploadComplete"));
+      setRefreshIndex((current) => current + 1);
+    } catch {
+      showFeedback("error", t("uploadError"));
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function createUploadedCarousel() {
+    if (!versionId || selectedCarouselImages.length !== CONTENT_MEDIA_CAROUSEL.pageCount || busyId) return;
+    setBusyId("carousel-upload");
+    try {
+      const response = await fetch(CONTENT_MEDIA_API_PATHS.createCarousel(itemId), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentVersionId: versionId, mediaIds: selectedCarouselImages.map((image) => image.id) }),
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok || !contentMediaCarouselResponseSchema.safeParse(payload).success) throw new Error("Could not group the uploaded images.");
+      setCarouselSelection({ versionId, mediaIds: [] });
+      showFeedback("success", t("uploadedCarouselCreated"));
+      setRefreshIndex((current) => current + 1);
+    } catch {
+      showFeedback("error", t("uploadedCarouselError"));
+    } finally {
+      setBusyId("");
+    }
+  }
+
   return (
     <section className="contentMediaPanel" aria-labelledby={`content-media-title-${itemId}`}>
       <header className="contentMediaPanel__header">
         <div><h3 id={`content-media-title-${itemId}`}>{t("title")}</h3><p>{t("versionLabel", { version: versionNumber ?? 0 })}<span className="contentMediaPanel__exportSize">{t("dimensions", { width: exportSize.width, height: exportSize.height })}</span></p></div>
       </header>
+      {state.canManage && versionId ? <div className="contentMediaPanel__upload">
+        <FileField id={`content-media-upload-${itemId}`} label={t("uploadImage")} helpText={t("uploadHelp", { maximum: BRAND_ASSET_LIMITS.maximumBytes / (1024 * 1024) })} accept={BRAND_ASSET_LIMITS.allowedMimeTypes.join(",")} disabled={Boolean(busyId) || processing} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void uploadImage(file); }} />
+        {busyId === "upload" ? <p role="status">{t("uploading")}</p> : null}
+      </div> : null}
+      {state.canManage && versionId && selectedCarouselImages.length > 0 ? <div className="contentMediaPanel__carouselBuilder">
+        <div><strong>{t("carouselSelectionTitle", { count: selectedCarouselImages.length, total: CONTENT_MEDIA_CAROUSEL.pageCount })}</strong><p>{t("carouselSelectionHelp")}</p></div>
+        <ol>
+          {selectedCarouselImages.map((image, index) => <li key={image.id}>
+            <span>{t("pageNumber", { page: index + 1, count: CONTENT_MEDIA_CAROUSEL.pageCount })}: {image.fileName}</span>
+            <div>
+              <Button appearance="quiet" type="button" aria-label={t("moveCarouselImageUp", { name: image.fileName })} disabled={index === 0 || Boolean(busyId)} onClick={() => setCarouselSelection((current) => { const ids = current.versionId === versionId ? current.mediaIds : []; return { versionId, mediaIds: ids.map((id, position) => position === index ? ids[index - 1]! : position === index - 1 ? ids[index]! : id) }; })}><ArrowUp aria-hidden="true" size={16} /></Button>
+              <Button appearance="quiet" type="button" aria-label={t("moveCarouselImageDown", { name: image.fileName })} disabled={index === selectedCarouselImages.length - 1 || Boolean(busyId)} onClick={() => setCarouselSelection((current) => { const ids = current.versionId === versionId ? current.mediaIds : []; return { versionId, mediaIds: ids.map((id, position) => position === index ? ids[index + 1]! : position === index + 1 ? ids[index]! : id) }; })}><ArrowDown aria-hidden="true" size={16} /></Button>
+            </div>
+          </li>)}
+        </ol>
+        <Button type="button" disabled={selectedCarouselImages.length !== CONTENT_MEDIA_CAROUSEL.pageCount || Boolean(busyId)} onClick={() => void createUploadedCarousel()}>
+          {busyId === "carousel-upload" ? t("working") : t("createUploadedCarousel")}
+        </Button>
+      </div> : null}
       {state.canManage && versionId ? <Disclosure title={t("editCarouselCopy")} className="contentMediaPanel__copyDisclosure">
         <div className="contentMediaPanel__pageCopyEditor">
           <p>{t("pageCopyHelp", { width: exportSize.width, height: exportSize.height })}</p>
@@ -172,9 +264,10 @@ export function ContentMediaPanel({ itemId, versionId, versionNumber, variantCop
             {isCarousel ? <strong className="contentMediaPanel__groupTitle">{t("carousel", { count: item.pageCount ?? pages.length })}</strong> : null}
             <div className={isCarousel ? "contentMediaPanel__carouselPages" : undefined}>
               {pages.map((page) => <div className="contentMediaPanel__page" key={page.id}>
+                {state.canManage && page.origin === "user" && page.status === CONTENT_MEDIA_STATUS.pendingReview && !page.carouselId ? <CheckboxField id={`content-media-carousel-select-${page.id}`} label={t("selectCarouselImage", { name: page.fileName })} checked={selectedCarouselIds.includes(page.id)} disabled={Boolean(busyId) || (selectedCarouselIds.length >= CONTENT_MEDIA_CAROUSEL.pageCount && !selectedCarouselIds.includes(page.id))} onChange={(event) => { const checked = event.currentTarget.checked; setCarouselSelection((current) => { const ids = current.versionId === versionId ? current.mediaIds : []; return { versionId, mediaIds: checked ? [...ids, page.id] : ids.filter((id) => id !== page.id) }; }); }} /> : null}
                 {page.previewUrl ? <Image src={page.previewUrl} alt={isCarousel ? t("pageAlt", { page: page.pageNumber ?? 1 }) : page.fileName} width={page.width ?? 640} height={page.height ?? 640} style={{ aspectRatio: `${page.width ?? 1} / ${page.height ?? 1}` }} unoptimized /> : <div className="contentMediaPanel__placeholder" style={{ aspectRatio: isCarousel ? `${exportSize.width} / ${exportSize.height}` : "1" }} role="status">{t(page.status === CONTENT_MEDIA_STATUS.failed ? "generationFailed" : "processing")}</div>}
                 {isCarousel ? <span className="contentMediaPanel__pageNumber">{t("pageNumber", { page: page.pageNumber ?? 1, count: page.pageCount ?? pages.length })}</span> : null}
-                {!isCarousel ? <div className="contentMediaPanel__meta"><strong>{t(`statuses.${page.status}`)}</strong><span>{page.width && page.height ? t("dimensions", { width: page.width, height: page.height }) : page.createdByName}</span></div> : null}
+                {!isCarousel ? <div className="contentMediaPanel__meta"><strong>{t(`statuses.${page.status}`)}</strong><span>{page.origin === "user" ? t("uploadedBy", { name: page.createdByName }) : page.createdByName}{page.width && page.height ? ` · ${t("dimensions", { width: page.width, height: page.height })}` : ""}</span></div> : null}
               </div>)}
             </div>
             {isCarousel ? <div className="contentMediaPanel__meta"><strong>{t(`statuses.${pages.every((page) => page.status === CONTENT_MEDIA_STATUS.approved) ? CONTENT_MEDIA_STATUS.approved : pages.some((page) => page.status === CONTENT_MEDIA_STATUS.failed) ? CONTENT_MEDIA_STATUS.failed : pages.every((page) => page.status === CONTENT_MEDIA_STATUS.pendingReview) ? CONTENT_MEDIA_STATUS.pendingReview : CONTENT_MEDIA_STATUS.processing}`)}</strong></div> : null}

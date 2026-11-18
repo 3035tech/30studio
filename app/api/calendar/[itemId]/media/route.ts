@@ -32,6 +32,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       pageNumber: asset.pageNumber,
       pageCount: asset.pageCount,
       status: asset.status,
+      origin: asset.origin,
       fileName: asset.fileName,
       contentType: asset.contentType,
       sizeBytes: asset.sizeBytes,
@@ -80,12 +81,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!current || current.id !== parsed.data.contentVersionId) {
       throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     }
-    const prompt = isCarousel
-      ? await createContentCarouselPrompts(tenant.organizationId, itemId, current.id, parsed.data.pageCopies)
-      : isTextCard
-      ? await createContentTextCardPrompt(tenant.organizationId, itemId, current.id)
-      : await createContentImagePrompt(tenant.organizationId, itemId, current.id);
-    if (!prompt) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     const commonInput = {
       organizationId: tenant.organizationId,
       itemId,
@@ -95,8 +90,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       modelId,
     };
     const result = isCarousel
-      ? await enqueueContentCarouselGeneration({ ...commonInput, prompts: prompt as string[] })
-      : await enqueueContentMediaGeneration({ ...commonInput, prompt: prompt as string });
+      ? await createContentCarouselPrompts(tenant.organizationId, itemId, current.id, parsed.data.pageCopies).then((prompts) => {
+        if (!prompts) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
+        return enqueueContentCarouselGeneration({ ...commonInput, prompts });
+      })
+      : await (isTextCard
+        ? createContentTextCardPrompt(tenant.organizationId, itemId, current.id)
+        : createContentImagePrompt(tenant.organizationId, itemId, current.id)).then((prompt) => {
+        if (!prompt) throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
+        return enqueueContentMediaGeneration({ ...commonInput, prompt });
+      });
     if (result.kind === "not_found") throw new ApiError(API_ERROR_CODES.calendarItemNotFound, HTTP_STATUS.notFound);
     if (result.kind === "conflict") throw new ApiError(API_ERROR_CODES.contentMediaConflict, HTTP_STATUS.conflict);
     if (result.kind === "limit") throw new ApiError(API_ERROR_CODES.contentMediaLimitReached, HTTP_STATUS.conflict);

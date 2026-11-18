@@ -1,69 +1,95 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
-import { getDatabase } from "@/lib/db/client";
-import { SOCIAL_CONNECTION, SOCIAL_CONNECTION_EVENT } from "@/lib/constants";
-import { socialConnectionEvents, socialProfileCredentials, socialProfiles } from "@/lib/db/schema";
+import { randomUUID } from "node:crypto";
+import { SOCIAL_CONNECTION } from "@/lib/constants";
+import {
+  claimSocialCredentialRefresh,
+  completeSocialCredentialRefresh,
+  releaseSocialCredentialRefresh,
+  requireSocialReauthentication,
+} from "@/lib/db/repositories/social-credentials";
 import { getSocialConnector, refreshSocialAccessToken, SocialProviderError, type SocialTokenSet } from "@/lib/server/social-connectors";
 import { decryptSocialSecret, encryptSocialSecret } from "@/lib/server/social-token-crypto";
 
 /** Fetch a valid access token for a trusted server-side publisher. Never put the result in a queue payload or API response. */
 export async function getValidSocialAccessToken(organizationId: string, socialProfileId: string): Promise<string | null> {
-  const db = getDatabase();
-  return db.transaction(async (tx) => {
-    const [row] = await tx.select({ profile: socialProfiles, credentials: socialProfileCredentials })
-      .from(socialProfiles).innerJoin(socialProfileCredentials, and(
-        eq(socialProfileCredentials.organizationId, socialProfiles.organizationId),
-        eq(socialProfileCredentials.socialProfileId, socialProfiles.id),
-      )).where(and(eq(socialProfiles.organizationId, organizationId), eq(socialProfiles.id, socialProfileId)))
-      .for("update", { of: socialProfileCredentials }).limit(1);
-    if (!row || row.profile.status !== "connected") return null;
-    const { profile, credentials } = row;
-    const accessToken = decryptSocialSecret(credentials.accessTokenCiphertext, credentials.encryptionKeyVersion);
-    if (!credentials.tokenExpiresAt || credentials.tokenExpiresAt.getTime() > Date.now() + SOCIAL_CONNECTION.refreshBeforeExpiryMilliseconds) return accessToken;
+  const deadline = Date.now() + SOCIAL_CONNECTION.tokenRefreshWaitMilliseconds;
+  const leaseId = randomUUID();
+
+  while (Date.now() <= deadline) {
+    const claim = await claimSocialCredentialRefresh(organizationId, socialProfileId, leaseId, new Date());
+    if (claim.kind === "missing" || claim.kind === "not_connected" || claim.kind === "reauth_required") return null;
+    if (claim.kind === "valid") return decryptSocialSecret(claim.credentials.accessTokenCiphertext, claim.credentials.encryptionKeyVersion);
+    if (claim.kind === "waiting") {
+      await delay(Math.min(SOCIAL_CONNECTION.tokenRefreshPollMilliseconds, Math.max(1, deadline - Date.now())));
+      continue;
+    }
+
+    const { profile, credentials } = claim;
     if (credentials.refreshTokenExpiresAt && credentials.refreshTokenExpiresAt <= new Date()) {
-      await markReauthenticationRequired(tx, organizationId, profile.id, profile.brandId, profile.platform, profile.connectedBy);
-      return null;
+      if (await requireSocialReauthentication(organizationId, socialProfileId, leaseId, profile.connectedBy)) return null;
+      continue;
     }
-    const refreshToken = credentials.refreshTokenCiphertext ? decryptSocialSecret(credentials.refreshTokenCiphertext, credentials.encryptionKeyVersion) : null;
+
+    const accessToken = decryptSocialSecret(credentials.accessTokenCiphertext, credentials.encryptionKeyVersion);
+    const refreshToken = credentials.refreshTokenCiphertext
+      ? decryptSocialSecret(credentials.refreshTokenCiphertext, credentials.encryptionKeyVersion)
+      : null;
     const connector = getSocialConnector(profile.platform);
-    const canRefreshWithoutRefreshToken = connector?.config.refreshKind === "instagram" || connector?.config.refreshKind === "threads";
-    if (!connector) throw new Error("Social connector is not configured.");
-    if (!refreshToken && !canRefreshWithoutRefreshToken) {
-      await markReauthenticationRequired(tx, organizationId, profile.id, profile.brandId, profile.platform, profile.connectedBy);
-      return null;
+    if (!connector) {
+      await releaseSocialCredentialRefresh(organizationId, socialProfileId, leaseId);
+      throw new Error("Social connector is not configured.");
     }
+    const canRefreshWithoutRefreshToken = connector?.config.refreshKind === "instagram" || connector?.config.refreshKind === "threads";
+    if (!refreshToken && !canRefreshWithoutRefreshToken) {
+      if (await requireSocialReauthentication(organizationId, socialProfileId, leaseId, profile.connectedBy)) return null;
+      continue;
+    }
+
     const current: SocialTokenSet = {
-      accessToken, refreshToken, tokenType: credentials.tokenType, scopes: credentials.scopes,
-      tokenExpiresAt: credentials.tokenExpiresAt, refreshTokenExpiresAt: credentials.refreshTokenExpiresAt,
+      accessToken,
+      refreshToken,
+      tokenType: credentials.tokenType,
+      scopes: credentials.scopes,
+      tokenExpiresAt: credentials.tokenExpiresAt,
+      refreshTokenExpiresAt: credentials.refreshTokenExpiresAt,
     };
     let updated: SocialTokenSet | null;
-    try { updated = await refreshSocialAccessToken(connector, current); }
-    catch (error) {
+    try {
+      updated = await refreshSocialAccessToken(connector, current);
+    } catch (error) {
       if (error instanceof SocialProviderError && error.requiresReauthentication) {
-        await markReauthenticationRequired(tx, organizationId, profile.id, profile.brandId, profile.platform, null);
-        return null;
+        if (await requireSocialReauthentication(organizationId, socialProfileId, leaseId, null)) return null;
+        continue;
       }
+      await releaseSocialCredentialRefresh(organizationId, socialProfileId, leaseId);
       throw error;
     }
+
     if (!updated) {
-      await markReauthenticationRequired(tx, organizationId, profile.id, profile.brandId, profile.platform, profile.connectedBy);
-      return null;
+      if (await requireSocialReauthentication(organizationId, socialProfileId, leaseId, profile.connectedBy)) return null;
+      continue;
     }
+
     const encryptedAccess = encryptSocialSecret(updated.accessToken);
     const encryptedRefresh = updated.refreshToken ? encryptSocialSecret(updated.refreshToken) : null;
-    await tx.update(socialProfileCredentials).set({
+    const saved = await completeSocialCredentialRefresh({
+      organizationId,
+      socialProfileId,
+      leaseId,
       accessTokenCiphertext: encryptedAccess.ciphertext,
       refreshTokenCiphertext: encryptedRefresh?.ciphertext ?? credentials.refreshTokenCiphertext,
-      tokenType: updated.tokenType, scopes: updated.scopes, tokenExpiresAt: updated.tokenExpiresAt,
-      refreshTokenExpiresAt: updated.refreshTokenExpiresAt, encryptionKeyVersion: encryptedAccess.keyVersion, updatedAt: new Date(),
-    }).where(and(eq(socialProfileCredentials.organizationId, organizationId), eq(socialProfileCredentials.socialProfileId, profile.id)));
-    await tx.insert(socialConnectionEvents).values({ organizationId, brandId: profile.brandId,
-      socialProfileId: profile.id, actorUserId: null, platform: profile.platform, eventType: SOCIAL_CONNECTION_EVENT.refreshed });
-    return updated.accessToken;
-  });
+      tokenType: updated.tokenType,
+      scopes: updated.scopes,
+      tokenExpiresAt: updated.tokenExpiresAt,
+      refreshTokenExpiresAt: updated.refreshTokenExpiresAt,
+      encryptionKeyVersion: encryptedAccess.keyVersion,
+    });
+    if (saved) return decryptSocialSecret(saved.accessTokenCiphertext, saved.encryptionKeyVersion);
+  }
+
+  throw new Error(`Social credential refresh did not complete within ${SOCIAL_CONNECTION.tokenRefreshWaitMilliseconds}ms.`);
 }
 
-async function markReauthenticationRequired(tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0], organizationId: string, profileId: string, brandId: string, platform: typeof socialProfiles.$inferSelect.platform, actorUserId: string | null) {
-  await tx.update(socialProfiles).set({ status: "reauth_required", updatedAt: new Date() }).where(and(eq(socialProfiles.organizationId, organizationId), eq(socialProfiles.id, profileId)));
-  await tx.insert(socialConnectionEvents).values({ organizationId, brandId, socialProfileId: profileId, actorUserId, platform, eventType: SOCIAL_CONNECTION_EVENT.reauthRequired });
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 }

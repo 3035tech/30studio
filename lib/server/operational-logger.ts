@@ -1,5 +1,4 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 
 type LogContext = Record<string, string | number | boolean | null | undefined>;
 
@@ -24,7 +23,7 @@ export function logOperationalError(event: string, error: unknown, context: LogC
 }
 
 export function logUnhandledRequestError(error: unknown, request: Request, event = "http.request.failed") {
-  const requestId = randomUUID();
+  const requestId = globalThis.crypto.randomUUID();
   logOperationalError(event, error, {
     requestId,
     method: request.method,

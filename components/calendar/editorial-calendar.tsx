@@ -1,18 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, WandSparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { DateField } from "@/components/ui/date-field";
 import { TimeField } from "@/components/ui/time-field";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
 import { Dialog, DialogCancel, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ContentMediaPanel } from "@/components/calendar/content-media-panel";
+import { CalendarItemsView } from "@/components/calendar/calendar-items-view";
 import { API_ERROR_CODES, CALENDAR, CALENDAR_API_PATHS, CALENDAR_FORM_FIELDS, CALENDAR_QUERY_PARAMETERS, CALENDAR_UI_IDS, CALENDAR_VIEW_MODE, WORKSPACE_SECTION_IDS, WORKSPACE_UI_EVENTS, CAMPAIGN_API_PATHS, CAMPAIGN_FORM_FIELDS, CONTENT_APPROVAL_ACTION, CONTENT_APPROVAL_LIMITS, CONTENT_APPROVAL_STATUS, CONTENT_EDITABLE_STATUSES, CONTENT_LIMITS, CONTENT_STATUS, CONTENT_STATUSES, SOCIAL_PLATFORMS, SOCIAL_PUBLICATION_JOB_STATUSES, SOCIAL_PUBLICATION_POLL_INTERVAL_MILLISECONDS, SOCIAL_PUBLICATION_RECONCILIATION_LIMITS, type CalendarViewMode, type ContentStatus, type DashboardFilters, type Locale, type SocialPlatform } from "@/lib/constants";
-import { getCalendarMonthBounds, getCalendarMonthDays, toLocalDateInputValue } from "@/lib/calendar";
+import { getCalendarMonthBounds, toLocalDateInputValue } from "@/lib/calendar";
 import type { BrandListItem } from "@/lib/validation/brands";
 import { calendarCampaignCreateResponseSchema, calendarCampaignCreateSchema, calendarCopyDraftResponseSchema, calendarContentVersionResponseSchema, calendarResponseSchema, contentApprovalActionResponseSchema, type CalendarItem, type CalendarSocialCapability } from "@/lib/validation/calendar";
 import { contentReviewResponseSchema } from "@/lib/validation/content-review";
@@ -107,7 +109,6 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
     setNotice(message);
   }
 
-  const monthDays = getCalendarMonthDays(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
   const bounds = getCalendarMonthBounds(month.getFullYear(), month.getMonth(), CALENDAR.firstWeekday[locale]);
   const requestKey = [organizationId, getMonthKey(month), brandFilter, platformFilter, statusFilter, publicationFilter, refreshIndex].join(":");
   const start = bounds.start.toISOString();
@@ -225,20 +226,6 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
     return (state.canManage && (isContentEditable(item.status) || item.publicationStatus === "indeterminate" || item.publicationStatus === "failed"))
       || (state.canReview && item.status === CONTENT_STATUS.inReview);
   }, [state.canManage, state.canReview]);
-
-  function calendarItemActionLabel(item: CalendarItem) {
-    return item.publicationStatus === "indeterminate" ? t("reconcilePublication") : t(item.status === CONTENT_STATUS.inReview ? "reviewContent" : "editContent", { title: item.title });
-  }
-  const eventsByDate = useMemo(() => {
-    const events = new Map<string, CalendarItem[]>();
-    for (const item of visibleItems) {
-      const date = toLocalDateInputValue(new Date(item.plannedAt));
-      const dayItems = events.get(date);
-      if (dayItems) dayItems.push(item);
-      else events.set(date, [item]);
-    }
-    return events;
-  }, [visibleItems]);
 
   useEffect(() => {
     const now = Date.now();
@@ -670,13 +657,6 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
   }
 
   const monthLabel = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }).format(month);
-  const weekdayLabels = Array.from({ length: CALENDAR.daysPerWeek }, (_, index) => {
-    const weekday = CALENDAR.firstWeekday[locale] + index;
-    const referenceDate = new Date(2023, 0, 1 + weekday);
-    return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(referenceDate);
-  });
-  const today = toLocalDateInputValue(new Date());
-
   return (
     <section className="editorialCalendar" id={CALENDAR_UI_IDS.section} aria-labelledby={CALENDAR_UI_IDS.title}>
       <header className="editorialCalendar__header">
@@ -796,54 +776,18 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
       {viewMode === CALENDAR_VIEW_MODE.month && !pending && !hasError && visibleItems.length === 0 ? <p className="editorialCalendar__emptyMonth">{t("emptyMonth")}</p> : null}
       {!pending && state.truncated ? <p className="editorialCalendar__notice" role="status">{t("truncated")}</p> : null}
 
-      {viewMode === CALENDAR_VIEW_MODE.month ? <p className="editorialCalendar__scrollHint">{t("monthScrollHint")}</p> : null}
-      {viewMode === CALENDAR_VIEW_MODE.month ? <div className="editorialCalendar__viewport" aria-busy={pending}>
-        <div className="editorialCalendar__grid" role="group" aria-label={monthLabel}>
-          {weekdayLabels.map((weekday, index) => <div className="editorialCalendar__weekday" key={`${weekday}-${index}`}>{weekday}</div>)}
-          {monthDays.map((date) => {
-            const dateKey = toLocalDateInputValue(date);
-            const allDayItems = eventsByDate.get(dateKey) ?? [];
-            const dayItems = allDayItems.slice(0, CALENDAR.maximumVisibleItemsPerDay);
-            const remainingCount = allDayItems.length - dayItems.length;
-            const outsideMonth = date.getMonth() !== month.getMonth();
-            return (
-              <article className={`editorialCalendar__day${outsideMonth ? " is-outside" : ""}${dateKey === today ? " is-today" : ""}`} key={dateKey} aria-label={new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(date)}>
-                <Button appearance="quiet" className="editorialCalendar__dayButton" type="button" disabled={!state.canManage || pending} aria-label={t("addCampaignOn", { date: new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date) })} onClick={() => openCampaignForm(date)}>
-                  <span>{date.getDate()}</span><Plus aria-hidden="true" size={14} />
-                </Button>
-                <ol className="editorialCalendar__items">
-                  {dayItems.map((item) => (
-                    <li className="editorialCalendar__item" key={item.id}>
-                      <Button appearance="quiet" type="button" className="editorialCalendar__itemButton" disabled={!canOpenCalendarItem(item)} onClick={() => selectCalendarItem(item)} aria-label={calendarItemActionLabel(item)}>
-                      <span className="editorialCalendar__itemTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
-                      <strong>{item.title}</strong>
-                      {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
-                      <span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
-                      <span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
-                      {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}
-                      </Button>
-                    </li>
-                  ))}
-                </ol>
-                {remainingCount > 0 ? <Button appearance="quiet" type="button" className="editorialCalendar__more" onClick={() => setViewMode(CALENDAR_VIEW_MODE.list)}>{t("moreItems", { count: remainingCount })}</Button> : null}
-              </article>
-            );
-          })}
-        </div>
-      </div> : <div className="editorialCalendar__list" aria-busy={pending}>
-        {visibleItems.length === 0 && !pending ? <p className="editorialCalendar__emptyMonth">{t("emptyMonth")}</p> : null}
-        {Array.from(eventsByDate.entries()).map(([dateKey, dayItems]) => <section className="editorialCalendar__listDay" key={dateKey}>
-          <h3>{new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(new Date(`${dateKey}T12:00:00`))}</h3>
-          <ul>{dayItems.map((item) => <li key={item.id}>
-            <span className="editorialCalendar__listTime">{new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.plannedAt))}</span>
-            <Button appearance="quiet" type="button" className="editorialCalendar__listItem" disabled={!canOpenCalendarItem(item)} onClick={() => selectCalendarItem(item)} aria-label={calendarItemActionLabel(item)}>
-              <strong>{item.title}</strong><span>{t("itemMeta", { brand: item.brandName, channel: t(`platforms.${item.platform}`) })}</span>
-            </Button><span className="editorialCalendar__status">{t(`statuses.${item.status}`)}</span>
-            {item.publicationStatus ? <span className="editorialCalendar__publicationStatus">{t(`publicationStatuses.${item.publicationStatus}`)}</span> : null}
-            {item.campaignId ? <span className="editorialCalendar__campaignLabel">{t("campaign")}</span> : null}
-          </li>)}</ul>
-        </section>)}
-      </div>}
+      <CalendarItemsView
+        viewMode={viewMode}
+        month={month}
+        monthLabel={monthLabel}
+        visibleItems={visibleItems}
+        pending={pending}
+        canManage={state.canManage}
+        canOpenCalendarItem={canOpenCalendarItem}
+        onSelectCalendarItem={selectCalendarItem}
+        onOpenCampaignForm={openCampaignForm}
+        onShowList={() => setViewMode(CALENDAR_VIEW_MODE.list)}
+      />
 
       <Dialog open={selectedItem !== null} onOpenChange={(open) => { if (!open && !busy && !generatingCopy) { if (editorDirty) setDiscardChangesPrompt(true); else { setSelectedItem(null); setContentVersionState(null); setGeneratedCopy(null); setApprovalNote(""); } } }}>
         {selectedItem ? <DialogContent aria-labelledby={CALENDAR_UI_IDS.editTitle} aria-describedby={CALENDAR_UI_IDS.editDescription}>
@@ -853,6 +797,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
           {selectedItem.publicationStatus === "indeterminate" ? <p className="editorialCalendar__notice" role="alert">{t("publicationOutcomeUnknown")}</p> : null}
           {selectedItem.publicationStatus === "failed" ? <p className="editorialCalendar__notice" role="status">{t("publicationKnownFailed")}</p> : null}
           {selectedItem.publicationStatus === "processing" ? <p className="editorialCalendar__notice" role="status">{t("publicationInProgress")}</p> : null}
+          {approvalNextSteps.length > 0 ? <section className="editorialCalendar__notice" role="status" aria-labelledby="calendar-approval-next-steps"><strong id="calendar-approval-next-steps">{t("approvalReadinessTitle")}</strong><ul>{approvalNextSteps.map((step) => <li key={step}>{step}</li>)}</ul></section> : null}
           {(selectedItem.publicationStatus === "indeterminate" || selectedItem.publicationStatus === "failed") && state.canManage ? <section className="editorialCalendar__editForm" aria-labelledby="calendar-reconciliation-title">
             <strong id="calendar-reconciliation-title">{t("reconciliationTitle")}</strong>
             <p>{t("reconciliationEvidenceHelp")}</p>
@@ -914,10 +859,13 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
               <p>{selectedCopy?.variantCopy || t("previewEmpty")}</p>
               <small>{t("previewCharacters", { count: Array.from(selectedCopy?.variantCopy ?? "").length })}</small>
             </section>
-            {contentVersionState.data.history.length > 0 ? <div className="editorialCalendar__versionHistory"><strong>{t("versionHistory")}</strong><ol>{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol></div> : null}
+            {contentVersionState.data.history.length > 0 ? <Disclosure className="editorialCalendar__historyDisclosure" title={t("versionHistory")}>
+              <ol className="editorialCalendar__historyList">{contentVersionState.data.history.map((version) => <li key={version.versionNumber}>{t("versionEntry", { version: version.versionNumber, platform: t(`platforms.${version.platform}`), date: new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(version.createdAt)) })}</li>)}</ol>
+            </Disclosure> : null}
             <ContentMediaPanel key={`${selectedItem.id}-${contentVersionState.data.current?.id ?? "new"}`} itemId={selectedItem.id} versionId={contentVersionState.data.current?.id ?? null} versionNumber={contentVersionState.data.current?.versionNumber ?? null} variantCopy={selectedCopy?.variantCopy ?? ""} platform={selectedItem.platform} />
-            {contentVersionState.data.approval.history.length > 0 ? <section className="editorialCalendar__versionHistory" aria-label={t("approvalHistory")}><strong>{t("approvalHistory")}</strong><ol>{contentVersionState.data.approval.history.map((request) => <li key={request.id}>{t(`approvalStatuses.${request.status}`, { version: request.versionNumber, name: request.submittedByName })}{request.targetProfile ? <p>{t("publicationTargetHistory", { name: request.targetProfile.displayName, handle: request.targetProfile.handle ? `@${request.targetProfile.handle}` : "" })}</p> : null}<p>{t("approvalProgress", { approved: request.decisions.filter((decision) => decision.decision === CONTENT_APPROVAL_STATUS.approved).length, required: request.requiredApprovals })}</p>{request.decisions.map((decision, index) => <p key={`${request.id}-${index}`}>{t(`approvalDecisions.${decision.decision}`, { name: decision.reviewerName })}{decision.note ? ` — ${decision.note}` : ""}</p>)}</li>)}</ol></section> : null}
-            {approvalNextSteps.length > 0 ? <section className="editorialCalendar__notice" role="status" aria-labelledby="calendar-approval-next-steps"><strong id="calendar-approval-next-steps">{t("approvalReadinessTitle")}</strong><ul>{approvalNextSteps.map((step) => <li key={step}>{step}</li>)}</ul></section> : null}
+            {contentVersionState.data.approval.history.length > 0 ? <Disclosure className="editorialCalendar__historyDisclosure" title={t("approvalHistory")}>
+              <ol className="editorialCalendar__historyList">{contentVersionState.data.approval.history.map((request) => <li key={request.id}>{t(`approvalStatuses.${request.status}`, { version: request.versionNumber, name: request.submittedByName })}{request.targetProfile ? <p>{t("publicationTargetHistory", { name: request.targetProfile.displayName, handle: request.targetProfile.handle ? `@${request.targetProfile.handle}` : "" })}</p> : null}<p>{t("approvalProgress", { approved: request.decisions.filter((decision) => decision.decision === CONTENT_APPROVAL_STATUS.approved).length, required: request.requiredApprovals })}</p>{request.decisions.map((decision, index) => <p key={`${request.id}-${index}`}>{t(`approvalDecisions.${decision.decision}`, { name: decision.reviewerName })}{decision.note ? ` — ${decision.note}` : ""}</p>)}</li>)}</ol>
+            </Disclosure> : null}
             {approvalMessage ? <p className="editorialCalendar__notice" role="status">{approvalMessage}</p> : null}
             {selectedCanEdit && contentVersionState.data.approval.publisherProfileRequired ? contentVersionState.data.approval.targetProfiles.length > 0 ? <SelectField id="calendar-publication-target" label={t("publicationTarget")} value={selectedSocialProfileId} onChange={(event) => setSelectedSocialProfileId(event.target.value)} disabled={busy || !contentVersionState.data.approval.canRequest || Boolean(currentApprovalRequest)} required>
               <option value="">{t("selectPublicationTarget")}</option>

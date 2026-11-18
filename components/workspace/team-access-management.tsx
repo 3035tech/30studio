@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SelectField, TextField } from "@/components/ui/field";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { API_ERROR_CODES, AUTH_LIMITS, INVITATION_STATUS, TEAM_API_PATHS, TEAM_FORM_ID_PREFIXES, TEAM_AUDIT_ACTIONS, TEAM_ROLES, TENANT_ROLE, type Locale, type TenantRole } from "@/lib/constants";
-import { teamAuditResponseSchema, teamInvitationsResponseSchema, type TeamAuditEvent, type TeamInvitation } from "@/lib/validation/team";
+import { teamAuditResponseSchema, teamInvitationCreateSchema, teamInvitationsResponseSchema, tenantRoleSchema, type TeamAuditEvent, type TeamInvitation } from "@/lib/validation/team";
 import { useSystemFeedback } from "@/components/ui/system-feedback";
 
 const ACTION_TRANSLATION_KEYS: Record<(typeof TEAM_AUDIT_ACTIONS)[keyof typeof TEAM_AUDIT_ACTIONS], string> = {
@@ -61,12 +61,18 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const email = String(form.get("email") ?? "").trim().toLowerCase();
-    const role = String(form.get("role") ?? TENANT_ROLE.editor) as TenantRole;
+    const invitation = teamInvitationCreateSchema.safeParse({
+      email: String(form.get("email") ?? "").trim().toLowerCase(),
+      role: String(form.get("role") ?? TENANT_ROLE.editor),
+    });
+    if (!invitation.success) {
+      showFeedback("error", t("inviteError"));
+      return;
+    }
     try {
       const response = await fetch(TEAM_API_PATHS.invitations, {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify(invitation.data),
       });
       const result = await response.json().catch(() => null) as { code?: string } | null;
       if (!response.ok) {
@@ -128,7 +134,13 @@ export function TeamAccessManagement({ organizationId, canManage, actorRole }: {
     { id: "actor", label: t("auditActor"), sortValue: (row) => row.actorName || row.actorEmail, render: (row) => row.actorName || row.actorEmail },
     { id: "action", label: t("auditAction"), sortValue: (row) => t(ACTION_TRANSLATION_KEYS[row.action]), render: (row) => t(ACTION_TRANSLATION_KEYS[row.action]) },
     { id: "target", label: t("auditTarget"), sortValue: (row) => row.targetName || row.targetEmail || "", render: (row) => row.targetName || row.targetEmail || t("unknownMember") },
-    { id: "role", label: t("auditRole"), sortValue: (row) => `${row.previousRole ?? ""} ${row.newRole ?? ""}`, render: (row) => row.previousRole && row.newRole ? t("roleChange", { previousRole: tRoles(row.previousRole as TenantRole), newRole: tRoles(row.newRole as TenantRole) }) : "—" },
+    { id: "role", label: t("auditRole"), sortValue: (row) => `${row.previousRole ?? ""} ${row.newRole ?? ""}`, render: (row) => {
+      const previousRole = tenantRoleSchema.safeParse(row.previousRole);
+      const newRole = tenantRoleSchema.safeParse(row.newRole);
+      return previousRole.success && newRole.success
+        ? t("roleChange", { previousRole: tRoles(previousRole.data), newRole: tRoles(newRole.data) })
+        : "—";
+    } },
   ];
 
   return <div className="teamAccess">

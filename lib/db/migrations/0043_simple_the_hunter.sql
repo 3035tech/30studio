@@ -1,0 +1,2 @@
+ALTER TABLE "social_profile_credentials" ADD COLUMN "refresh_lease_id" uuid;--> statement-breakpoint
+ALTER TABLE "social_profile_credentials" ADD COLUMN "refresh_lease_expires_at" timestamp with time zone;
