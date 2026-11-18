@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 import { ArrowLeft, ArrowRight, CalendarDays, CalendarPlus, List, Plus, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SocialPlatformIcon } from "@/components/ui/social-platform-icon";
 import { DateField } from "@/components/ui/date-field";
 import { TimeField } from "@/components/ui/time-field";
 import { CheckboxField, SelectField, TextAreaField, TextField } from "@/components/ui/field";
@@ -701,7 +702,7 @@ export function EditorialCalendar({ organizationId, brands = EMPTY_BRANDS, dashb
                 <TextAreaField id={CALENDAR_UI_IDS.campaignBrief} name="brief" label={t("campaignBrief")} value={campaignBrief} onChange={(event) => setCampaignBrief(event.target.value)} maxLength={CONTENT_LIMITS.campaignBriefCharacters} required />
                 <fieldset className="editorialCalendar__platformPicker">
                   <legend>{t("selectChannels")}</legend>
-                  <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
+                  <div>{SOCIAL_PLATFORMS.map((platform) => <CheckboxField key={platform} id={CAMPAIGN_FORM_FIELDS.platformCheckboxId(platform)} name={CAMPAIGN_FORM_FIELDS.platforms} value={platform} label={t(`platforms.${platform}`)} leadingIcon={<SocialPlatformIcon platform={platform} size={20} />} checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} />)}</div>
                   <p className="editorialCalendar__channelNote">{t("channelPreparationNote")}</p>
                 </fieldset>
                 <div className="editorialCalendar__formActions">
